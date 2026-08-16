@@ -128,6 +128,57 @@ against the actual shipped file's own runFullSession (not a hand-retyped
 copy) at n=20000: A mean=3.95(ref 3.90) cleared=44.35%(ref 44.44%), B
 mean=8.30(ref 8.32) cleared=21.73%(ref 22.15%).
 
+## Slot-machine-style demo (boss_lines_normal_slot_demo.html, 2026-08-17)
+A second, much higher-fidelity demo: real reel CSVs (BM_Reels_S1-S6,
+extracted verbatim by gen_reel_data.py into an embedded REEL_STRIPS JS
+object), real 15-payline matching, real whole-board-explode damage rule,
+real wild/boss-routing/tumble/elixir/booster/stage-clear mechanics - a
+genuine from-scratch JS reimplementation of game_calculations.py/
+game_bonus.py/game_executables.py for tier="normal", not a hazard-rate
+approximation. Verified against the real Python engine board-for-board
+(300 real boards captured via run_bonus_session, fed into the JS line-
+matcher: 0 mismatches after the fixes below) and in aggregate (n=20000 JS
+vs n=5000 Python, both configs land within ~10% on mean spins/median/
+clearedPct/stage6-reach - see pure_production_diagnostic.py).
+
+Two real bugs found and fixed while building this (not by the user this
+time - caught via the verify-before-shipping self-check, following the
+feedback_verify_before_shipping_demos lesson):
+1. **Wild CAN land on reel/column 0.** game_config.py's own comment near
+   `self.paytable` claims "Wild never lands on reel/column 0 (see the reel
+   CSVs)" - this is FALSE for BM_Reels_S1.csv (column 0 has 72/307 "W"
+   entries, ~23%). Trusting that comment made the first JS line-matcher
+   implementation reject any payline whose reel-0 cell was wild, missing a
+   large share of real wins (verified: this alone cut win-rate roughly in
+   half and was the dominant cause of a 3x-too-low mean-spins/clear-rate
+   gap against the real engine). Fixed by treating the anchor as "first
+   non-wild scanning left-to-right" generically (which is what the
+   real Lines.get_lines algorithm actually does) instead of hardcoding
+   reel-0. **This stale comment should be treated as unreliable if anyone
+   relies on it for other work** - it was not corrected in game_config.py
+   itself since that's production code and out of scope for this scratch
+   demo.
+2. Tumble refill direction: the real Tumble.tumble_board (src/calculations/
+   tumble.py) decrements reel_positions and refills top-to-bottom in
+   increasing strip-index order using the pre-existing top_symbols lookahead
+   - the JS's first draft refilled by incrementing off the OLD BOTTOM of the
+   window instead. Fixed to match exactly. (Measured to not actually be the
+   dominant cause of the gap - bug #1 was - but it's a genuine correctness
+   fix, kept regardless.)
+
+Also confirmed via this exercise: the "chain-break weighted pool" mechanic
+used throughout this file's tuning numbers ([[project_boss_lines_chain_break_is_scratch_only]])
+is a `_tuning_scratch`-only monkeypatch (normal_3param_matrix_test.py etc),
+never present in production game_bonus.py/game_executables.py - a NEW pure-
+production (no chain-break) ground truth was measured instead
+(pure_production_diagnostic.py, n=5000): production
+mean_spins=3.38/median=3/clearedPct=25.62%/stage6reach=29.66%; candidate
+hp200+dmg45 mean_spins=8.23/median=7/clearedPct=22.38%/stage6reach=25.64%.
+These are close to (not identical to, since chain-break is a different
+axis) the chain-break-patched numbers already recorded above - chain-break
+apparently doesn't move survival/spin-count much, it likely only reshapes
+the reward-drop/economy side (not verified further, out of scope here).
+
 ## Session-length padding - SOLVED (normal_filler_deadspin_test.py)
 User's real ask (clarified): more FELT spins per bonus round, WITHOUT
 touching HP cost, real connect probability, or total payout. Confirmed

@@ -1,0 +1,1052 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Boss Lines - Normal Bonus Slot Demo</title>
+<style>
+:root{
+  --bg:#0e0b1a; --panel:#181329; --panel2:#20192f; --line:#332a4d;
+  --gold:#f0c04a; --gold-dim:#a3822f; --hp:#39d16a; --hp-low:#e0473f;
+  --boss:#e0473f; --boss-dim:#5c2323; --wild:#5ad1e8; --text:#eee6ff; --dim:#9186b3;
+  --win:#f0c04a; --stage-flash:#7c4dff;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:radial-gradient(ellipse at top,#241b3d,#0e0b1a 60%);color:var(--text);
+  font-family:"Segoe UI",Arial,sans-serif;padding:16px;min-height:100vh;}
+h1{font-size:18px;margin:0 0 4px;color:var(--gold);letter-spacing:.5px;}
+.sub{color:var(--dim);font-size:12px;margin-bottom:14px;}
+.layout{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;}
+.left{flex:2;min-width:520px;}
+.right{flex:1;min-width:320px;}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:12px;}
+.panel h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin:0 0 8px;}
+
+/* Config bar */
+.config-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+select,button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;
+  padding:6px 10px;font-size:13px;cursor:pointer;}
+button.primary{background:linear-gradient(180deg,#ffd166,#e0a428);color:#241b00;font-weight:700;border:none;}
+button.primary:disabled{opacity:.45;cursor:not-allowed;}
+button:hover:not(:disabled){filter:brightness(1.1);}
+label{font-size:12px;color:var(--dim);}
+
+/* Stage + player HP */
+.stage-track{display:flex;gap:4px;margin-bottom:8px;}
+.stage-dot{flex:1;height:6px;border-radius:3px;background:var(--panel2);}
+.stage-dot.done{background:var(--gold-dim);}
+.stage-dot.active{background:var(--gold);box-shadow:0 0 8px var(--gold);}
+.hp-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.hp-label{font-size:12px;color:var(--dim);width:70px;flex:none;}
+.hp-bar-track{flex:1;height:14px;background:var(--panel2);border-radius:7px;overflow:hidden;border:1px solid var(--line);}
+.hp-bar-fill{height:100%;background:linear-gradient(90deg,#39d16a,#a6e83f);transition:width .35s ease;}
+.hp-bar-fill.low{background:linear-gradient(90deg,#e0473f,#ff8a3d);}
+.hp-num{font-size:12px;width:90px;flex:none;text-align:right;font-variant-numeric:tabular-nums;}
+.counter-readout{font-size:11px;color:var(--dim);margin-bottom:8px;}
+.counter-readout b{color:var(--boss);}
+
+/* Bosses */
+.bosses{display:flex;gap:8px;}
+.boss-card{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px;text-align:center;
+  transition:opacity .3s, transform .3s;}
+.boss-card.dead{opacity:.35;transform:scale(.94);}
+.boss-name{font-size:11px;color:var(--dim);margin-bottom:4px;}
+.boss-hp-track{height:10px;background:#100c1e;border-radius:5px;overflow:hidden;border:1px solid var(--line);margin-bottom:4px;}
+.boss-hp-fill{height:100%;background:linear-gradient(90deg,#e0473f,#ff8a3d);transition:width .35s ease;}
+.boss-hp-num{font-size:10px;color:var(--dim);}
+.boss-dam-num{font-size:10px;color:#ff8a3d;}
+
+/* Reel grid */
+.reel-wrap{position:relative;background:#0a0714;border:2px solid var(--line);border-radius:10px;padding:8px;overflow:hidden;}
+.reel-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;}
+.reel-col{display:grid;grid-template-rows:repeat(5,1fr);gap:6px;position:relative;overflow:hidden;border-radius:6px;}
+.cell{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;border-radius:6px;
+  background:var(--panel2);font-weight:700;font-size:15px;position:relative;
+  transition:transform .18s ease, opacity .18s ease;}
+.cell.win{box-shadow:0 0 0 2px var(--gold),0 0 14px var(--gold) inset;background:#3a2f10;}
+.cell.exploding{transform:scale(0.2);opacity:0;}
+.cell.dropping{animation:dropIn .28s ease;}
+@keyframes dropIn{from{transform:translateY(-40px);opacity:.2;}to{transform:translateY(0);opacity:1;}}
+.reel-col.spinning .cell{animation:spinBlur .12s linear infinite;filter:blur(1.5px);opacity:.7;}
+@keyframes spinBlur{from{transform:translateY(0);}to{transform:translateY(6px);}}
+
+.sym-L1{color:#8fd3ff;} .sym-L2{color:#9fffa0;} .sym-L3{color:#ffe08a;}
+.sym-L4{color:#ff9ecb;} .sym-L5{color:#c39bff;}
+.sym-H1{color:#7de3ff;background:#132233;} .sym-H2{color:#7dffb0;background:#0f2a1c;}
+.sym-H3{color:#ffd27d;background:#2a220f;} .sym-H4{color:#ff7d7d;background:#2a0f0f;}
+.sym-W{color:var(--wild);background:#0c2a30;font-size:18px;}
+.sym-EL{color:#ff8ad1;background:#2a0f22;} .sym-BO{color:#ffb84d;background:#2a1a0f;}
+.sym-SC{color:#ffe066;background:#26240f;}
+
+.line-canvas{position:absolute;inset:8px;pointer-events:none;}
+
+.dmg-float{position:absolute;font-size:12px;font-weight:700;color:#ff8a3d;pointer-events:none;
+  animation:floatUp .8s ease forwards;z-index:5;}
+@keyframes floatUp{from{transform:translateY(0);opacity:1;}to{transform:translateY(-46px);opacity:0;}}
+
+.banner{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:rgba(10,7,20,.72);font-size:22px;font-weight:800;letter-spacing:1px;color:var(--gold);
+  opacity:0;pointer-events:none;transition:opacity .25s;text-align:center;padding:10px;}
+.banner.show{opacity:1;}
+.banner small{display:block;font-size:12px;color:var(--text);font-weight:400;margin-top:6px;}
+
+/* Log */
+.log{height:230px;overflow-y:auto;font-size:12px;font-family:Consolas,monospace;line-height:1.55;}
+.log div{border-bottom:1px dashed var(--line);padding:2px 0;}
+.log .win{color:var(--gold);} .log .dmg{color:#ff8a3d;} .log .boss{color:var(--boss);}
+.log .stage{color:var(--wild);} .log .hp{color:var(--hp);} .log .end{color:#ff5d5d;font-weight:700;}
+.log .heal{color:#7dffb0;} .log .booster{color:#ffb84d;}
+
+/* Stats table */
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th,td{padding:4px 6px;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;}
+th:first-child,td:first-child{text-align:left;}
+.note{font-size:11px;color:var(--dim);line-height:1.5;margin-top:6px;}
+.pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;background:var(--panel2);border:1px solid var(--line);}
+</style>
+</head>
+<body>
+
+<h1>Boss Lines — Normal Bonus, real-mechanic slot demo</h1>
+<div class="sub">Real reel strips (BM_Reels_S1-S6.csv) · real 15 paylines · real paytable · real wild/boss-damage/tumble/elixir/booster mechanics. Symbol art is plain text — visual polish was explicitly not the point. Boss-defeat cash pops use an illustrative placeholder table, not the tuned production reward-drop table (see note below).</div>
+
+<div class="layout">
+  <div class="left">
+
+    <div class="panel">
+      <h2>Session config</h2>
+      <div class="config-row">
+        <label>Config:</label>
+        <select id="cfgSelect">
+          <option value="production">Production (HP 50/50/50/100/100, dmg x1.00)</option>
+          <option value="candidate">Candidate hp200+dmg45% (HP 200 flat, dmg x0.45)</option>
+        </select>
+        <button id="btnSpin" class="primary">SPIN</button>
+        <button id="btnAuto">Autoplay: OFF</button>
+        <select id="speedSelect">
+          <option value="1">Speed 1x</option>
+          <option value="2" selected>Speed 2x</option>
+          <option value="4">Speed 4x</option>
+        </select>
+        <button id="btnNewSession">New Session</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Stage <span id="stageLabel">1</span> / 6</h2>
+      <div class="stage-track" id="stageTrack"></div>
+      <div class="hp-row">
+        <div class="hp-label">Player HP</div>
+        <div class="hp-bar-track"><div class="hp-bar-fill" id="playerHpFill"></div></div>
+        <div class="hp-num" id="playerHpNum">0 / 0</div>
+      </div>
+      <div class="counter-readout">Real counter-attack this spin if stage survives: <b id="counterReadout">0</b> dmg/spin (sum of alive bosses' Dam — unconditional every spin, independent of your damage output)</div>
+      <div class="bosses" id="bossesRow"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Reels</h2>
+      <div class="reel-wrap">
+        <div class="reel-grid" id="reelGrid"></div>
+        <div class="banner" id="banner"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="right">
+    <div class="panel">
+      <h2>Event log</h2>
+      <div class="log" id="logPanel"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Self-check: aggregate stats (headless, no animation)</h2>
+      <div class="config-row">
+        <select id="statsN">
+          <option value="2000">n=2,000</option>
+          <option value="10000" selected>n=10,000</option>
+          <option value="30000">n=30,000</option>
+        </select>
+        <button id="btnRunStats">Run headless batch</button>
+      </div>
+      <table id="statsTable"><tbody></tbody></table>
+      <div class="note" id="statsNote"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Notes / known simplifications</h2>
+      <div class="note">
+        This engine reimplements the real mechanic from game_config.py/game_bonus.py/game_executables.py:
+        real reel CSVs, real 15-line matching (contiguous run from reel 0, wild substitution, min kind=3),
+        real per-instance symbol damage ranges, real wild 2x-highest-substituted damage rule, real boss
+        HP/Dam table with ±25% variance and the 35%-spread reroll, real column→boss routing with live
+        fallback re-evaluation, real mid-spin multi-stage-clear (a hot pass can chain through several
+        boss trios in one spin), real +50/+50 Player HP grant on every stage clear, real Elixir
+        (10-100% of current HP, rounded to nearest 10) and Booster (x2 damage next spin) triggers, real
+        sequential-strip tumble refill with stage-removed-symbol resampling, and the real unconditional
+        per-spin counter-attack.<br><br>
+        Known simplification: boss-defeat cash pops use a small illustrative placeholder table, not the
+        real 21-tier reward_drop_weights_normal_bonus table (that table's exact weights weren't
+        transcribed here) — so the total-win number shown is NOT the tuned economy. The tuned mean/
+        median/ratio numbers already confirmed for these two configs live in CONFIRMED_CANDIDATES.md;
+        this demo is for mechanic/feel, not economy verification.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Real reel strips for Normal-tier Bonus, embedded verbatim from
+// games/0_0_boss_lines/reels/BM_Reels_S1..S6.csv (one array per reel,
+// per-stage). Generated by gen_reel_data.py - do not hand-edit.
+const REEL_STRIPS = {"1": [["L2", "L4", "L3", "L2", "L3", "H4", "W", "W", "H1", "L3", "L2", "W", "W", "H2", "W", "L1", "H4", "W", "L1", "H1", "L3", "L5", "L1", "H1", "L2", "L4", "W", "W", "L5", "L1", "L5", "L5", "L1", "L5", "L2", "W", "L4", "L5", "L2", "L4", "L2", "L5", "L1", "L2", "W", "H4", "L5", "W", "W", "L3", "W", "W", "L1", "W", "L1", "W", "L5", "L2", "L2", "L1", "H2", "W", "H1", "L3", "H1", "L4", "L3", "L3", "L3", "H2", "H1", "L3", "L5", "L4", "L5", "L1", "W", "L2", "L5", "W", "H2", "L1", "L2", "H1", "H2", "W", "W", "L1", "L2", "L3", "H1", "L1", "L3", "W", "L2", "L3", "W", "L5", "L5", "L1", "W", "L1", "L1", "W", "L5", "L2", "L1", "W", "L5", "L4", "L5", "L5", "H4", "L3", "L1", "W", "L1", "L2", "L4", "L3", "L2", "W", "W", "H1", "L4", "L1", "L1", "L2", "W", "L1", "L5", "L1", "L1", "L5", "H1", "W", "L4", "L2", "L4", "W", "L5", "L3", "L2", "W", "W", "W", "L2", "W", "L3", "H1", "L2", "W", "L3", "W", "L4", "L2", "L2", "L1", "L2", "L4", "L1", "L3", "L3", "L4", "L3", "H4", "L2", "L3", "W", "W", "H2", "L4", "L1", "H1", "H1", "L2", "H4", "W", "L3", "W", "L3", "L2", "L1", "L3", "W", "L3", "L2", "L4", "W", "EL", "W", "W", "L1", "W", "L4", "L1", "W", "L4", "L3", "H2", "H1", "L4", "L4", "L3", "L2", "W", "L1", "EL", "H2", "L4", "W", "L2", "H3", "L5", "L4", "H1", "W", "L5", "L4", "L2", "H1", "H3", "H4", "H2", "L1", "H1", "W", "L1", "L4", "L3", "H1", "W", "W", "W", "L1", "H1", "L2", "L4", "L2", "H1", "L1", "W", "H1", "L1", "W", "EL", "L1", "L1", "L5", "L3", "L4", "L4", "H2", "L5", "H1", "W", "W", "H1", "L3", "W", "L1", "L5", "L5", "L2", "W", "H1", "L5", "L2", "W", "L1", "W", "BO", "BO", "L1", "H1", "W", "W", "H2", "W", "W", "L2", "L5", "W", "L1", "W", "L1", "L1", "H3", "L3", "L4", "L1", "L1", "H2", "W", "W", "L2", "W", "L4", "H1", "L5", "H2", "L2", "H1", "L3", "L2", "H2", "H1"], ["L5", "L3", "L3", "H1", "L4", "W", "L3", "EL", "L2", "L5", "H2", "W", "L5", "H1", "L1", "L1", "L2", "H4", "L3", "H1", "W", "L1", "W", "H3", "L2", "H1", "L3", "L2", "L1", "W", "W", "H2", "L5", "L5", "H1", "H2", "L4", "L2", "L3", "L2", "W", "L5", "H4", "EL", "L3", "W", "W", "L2", "W", "L1", "L3", "L5", "BO", "L2", "W", "L2", "L1", "H1", "L1", "L3", "W", "W", "W", "H2", "L4", "L2", "W", "L1", "L1", "BO", "H1", "L1", "L1", "L5", "L3", "W", "L4", "L3", "L5", "W", "L3", "W", "W", "W", "L1", "H4", "L3", "W", "L2", "H1", "L1", "L2", "W", "L4", "L1", "L3", "L1", "W", "L5", "H2", "L5", "L2", "L4", "L3", "L4", "L5", "W", "L2", "H2", "L5", "L1", "W", "W", "L4", "W", "L2", "L4", "L4", "H1", "L5", "H2", "W", "W", "L2", "L2", "L3", "L1", "L2", "L3", "L3", "L3", "W", "L4", "H1", "L2", "L3", "W", "W", "L3", "W", "L3", "W", "L3", "H2", "H2", "L3", "L3", "L3", "L2", "L5", "L1", "L5", "W", "W", "L4", "W", "W", "W", "L2", "H2", "L1", "W", "L2", "L1", "W", "L2", "L2", "W", "W", "H2", "H1", "W", "W", "H2", "L3", "H1", "L2", "L2", "L3", "L3", "W", "W", "L5", "W", "L3", "L3", "L5", "L4", "W", "L5", "L2", "H4", "L4", "H4", "BO", "W", "L3", "W", "L4", "L5", "L4", "H1", "W", "L4", "L2", "L4", "W", "L1", "L2", "W", "L3", "L2", "L5", "L2", "L5", "L5", "L4", "H2", "H2", "W", "L2", "W", "L3", "W", "L2", "L2", "W", "H1", "W", "L5", "L2", "L1", "L4", "L3", "L1", "L3", "L3", "H1", "L5", "W", "W", "W", "L5", "H1", "L3", "W", "L3", "W", "L3", "H3", "L4", "L1", "L2", "L3", "L3", "L1", "L5", "W", "H1", "L3", "L1", "L2", "H1", "W", "L1", "H2", "L3", "H2", "L5", "L3", "L5", "L2", "L4", "H1", "W", "L3", "L1", "W", "H1", "W", "L1", "H1", "L2", "L1", "W", "L2", "L5", "L5", "L4", "L1", "H1", "L3", "W", "H1", "L3", "H4", "W", "L2", "L1", "L2", "L1", "W", "L5", "L2", "L5", "L2", "W"], ["L1", "W", "H4", "L4", "L3", "W", "L4", "L1", "L1", "L1", "L1", "W", "L4", "L1", "L5", "L3", "L4", "L3", "H1", "W", "L3", "W", "L3", "L5", "W", "L1", "H3", "L1", "W", "W", "H3", "L4", "L3", "L1", "H2", "W", "W", "L2", "L1", "W", "W", "W", "H2", "L3", "W", "L4", "L3", "L5", "EL", "W", "L2", "W", "L5", "H1", "L2", "L1", "L1", "W", "L3", "L3", "L3", "W", "L4", "L2", "L1", "L2", "W", "L1", "W", "L2", "W", "L4", "H2", "W", "L5", "BO", "L1", "L1", "W", "W", "W", "W", "L2", "W", "H1", "L5", "L2", "L2", "L1", "H2", "L4", "W", "W", "L1", "H3", "H1", "H1", "W", "W", "L5", "H2", "W", "L4", "L5", "L1", "L1", "L4", "L1", "L1", "L1", "L3", "L4", "L1", "W", "H2", "L3", "EL", "W", "H1", "W", "L4", "W", "W", "L2", "L4", "W", "L2", "L2", "L2", "L1", "BO", "L3", "W", "L5", "W", "L3", "H1", "W", "L5", "L3", "L5", "W", "L4", "H4", "L2", "W", "W", "W", "L4", "W", "L4", "L5", "L3", "L5", "L5", "L3", "W", "L2", "L4", "W", "L1", "L1", "W", "L1", "L2", "H2", "L2", "W", "H2", "W", "L3", "L5", "L3", "L3", "L1", "L5", "L2", "L1", "H2", "W", "W", "L2", "L3", "L5", "L3", "W", "L1", "L3", "H1", "L5", "L3", "L4", "H1", "L3", "L3", "W", "L4", "W", "L1", "W", "H1", "L3", "L4", "L1", "L2", "L1", "L2", "BO", "H2", "H2", "L5", "L3", "BO", "W", "L2", "H1", "L3", "W", "L2", "L2", "L2", "H3", "W", "L4", "L5", "L5", "W", "L3", "H1", "W", "H3", "W", "L2", "L1", "W", "L1", "L1", "W", "H2", "H4", "L5", "H2", "H2", "L1", "W", "L2", "L1", "L3", "L3", "L4", "W", "L1", "L2", "W", "L2", "L1", "L4", "W", "L3", "W", "H1", "L2", "W", "L1", "H2", "L3", "L2", "L5", "EL", "L3", "L2", "W", "L1", "W", "L1", "W", "BO", "L3", "L1", "H1", "W", "L2", "L1", "L5", "H1", "L1", "L2", "W", "L1", "L2", "W", "W", "H2", "L1", "L1", "L3", "L1", "L4", "L1", "H2", "L2", "L4", "H4", "L2", "W", "L3", "L1"], ["L1", "H1", "W", "W", "L3", "L4", "L3", "L1", "L2", "H3", "L3", "L2", "L3", "L2", "L3", "H2", "L3", "L4", "W", "L3", "L1", "L4", "L2", "H2", "L3", "L2", "L1", "L1", "L3", "W", "L3", "L1", "L2", "H4", "L1", "L3", "H1", "L4", "L1", "L1", "W", "W", "W", "L4", "L5", "L4", "L2", "W", "L1", "L2", "L3", "W", "L4", "L1", "L2", "L5", "L4", "W", "L3", "H1", "L2", "W", "L2", "H3", "BO", "W", "H1", "L4", "L3", "L2", "W", "L2", "L3", "L1", "EL", "L4", "L1", "L1", "L1", "L2", "L1", "L1", "L1", "L3", "L4", "L4", "L2", "L2", "L3", "L2", "W", "W", "W", "L1", "H3", "W", "L1", "W", "L3", "L1", "W", "H1", "W", "L3", "H1", "L1", "H2", "W", "L3", "H3", "L4", "H1", "L3", "H1", "W", "L5", "L2", "L2", "H4", "H2", "W", "L2", "L4", "W", "L1", "L2", "W", "L3", "L2", "W", "L1", "L2", "W", "L2", "W", "L4", "L2", "L3", "L2", "L3", "W", "L5", "L1", "H2", "L2", "L1", "L5", "W", "L4", "L4", "W", "L1", "L1", "L1", "H4", "L1", "L5", "H1", "L4", "L1", "H2", "H3", "L4", "H4", "L1", "L1", "L1", "L3", "L1", "L5", "L3", "W", "H2", "H1", "W", "L3", "W", "L3", "L2", "L4", "W", "W", "L1", "W", "L1", "L4", "W", "L2", "L1", "W", "L3", "L3", "L1", "L1", "W", "L3", "L2", "L2", "L1", "L1", "H1", "L1", "W", "L3", "L4", "W", "L2", "W", "L4", "L4", "L5", "L4", "L1", "W", "H2", "L1", "L1", "L4", "L2", "W", "L2", "L5", "L4", "W", "L2", "L2", "L4", "L5", "L4", "L2", "W", "W", "W", "L1", "L5", "W", "L5", "L2", "H3", "L2", "W", "W", "L5", "W", "L1", "W", "L1", "L3", "L2", "W", "L1", "L3", "L1", "W", "L5", "W", "L1", "L3", "L1", "L5", "L2", "L5", "L2", "L3", "W", "W", "W", "L3", "L4", "W", "L5", "W", "L2", "W", "L2", "H3", "L4", "W", "L2", "L2", "L5", "L2", "H4", "L4", "L2", "L1", "L2", "L1", "L1", "W", "EL", "H1", "L1", "L3", "L4", "H3", "L4", "L5", "L2", "L5", "H2", "L3", "W", "L1", "H2", "BO", "H1"], ["L2", "H3", "L1", "L4", "L3", "L2", "L4", "L1", "L2", "W", "H2", "L2", "L2", "L5", "H1", "L4", "H2", "L4", "W", "L5", "L1", "L1", "L1", "L3", "W", "L2", "H4", "L1", "W", "L4", "L1", "L3", "L4", "H2", "L5", "L1", "L3", "L2", "H2", "L5", "W", "BO", "L1", "L2", "L3", "W", "L3", "L5", "W", "L1", "H1", "W", "L3", "L4", "H3", "H3", "H2", "H2", "EL", "L3", "L3", "L1", "L1", "L1", "W", "L3", "L3", "L2", "L4", "W", "L2", "L3", "L4", "L1", "L1", "L1", "W", "W", "L2", "L5", "L2", "L2", "L1", "L2", "L5", "L2", "L2", "W", "H2", "L1", "L4", "W", "H3", "L3", "L2", "L3", "L5", "L4", "L3", "L1", "W", "W", "W", "L2", "L1", "H4", "L1", "W", "L2", "L2", "EL", "L1", "W", "L1", "L3", "L1", "W", "EL", "L1", "L3", "H1", "BO", "W", "L1", "H1", "L5", "L3", "W", "L2", "L4", "W", "L3", "L2", "L3", "L2", "L5", "L3", "H1", "W", "L1", "L4", "L4", "L2", "W", "W", "H2", "L5", "H2", "W", "L5", "H2", "L3", "H1", "H2", "L3", "H1", "W", "L1", "W", "L1", "H4", "H1", "L4", "L3", "W", "L5", "L2", "L1", "L5", "L2", "L1", "W", "W", "H2", "W", "H1", "L3", "W", "L1", "L1", "W", "L1", "L2", "L1", "H3", "L3", "L5", "L1", "L5", "L1", "W", "L1", "L2", "W", "W", "BO", "L1", "L1", "W", "L4", "L5", "W", "W", "L1", "H2", "L3", "L2", "L3", "W", "L2", "L1", "H2", "H1", "L2", "L4", "H3", "H2", "W", "L1", "W", "W", "H2", "L3", "L3", "W", "W", "L3", "L3", "L2", "L2", "L3", "H1", "H1", "W", "L1", "L3", "L1", "H1", "L2", "L1", "L4", "H1", "EL", "L2", "W", "L2", "L3", "L4", "W", "L3", "L2", "W", "W", "L4", "W", "L2", "W", "L3", "H1", "H1", "L3", "L1", "H1", "L3", "L1", "L1", "H2", "W", "L2", "L2", "L3", "H4", "L4", "L2", "L1", "W", "L3", "H2", "L5", "L2", "L5", "W", "W", "L3", "W", "W", "H1", "W", "W", "H1", "L1", "W", "W", "L2", "L3", "L2", "W", "L1", "L2", "L2", "L1", "L1", "L3", "H2", "L3", "L5", "L2"]], "2": [["L1", "L1", "W", "BO", "W", "EL", "L3", "L2", "L5", "L1", "L5", "L5", "H4", "L5", "L2", "L3", "W", "W", "L2", "EL", "L3", "L3", "L1", "L1", "L2", "H3", "L4", "L2", "L1", "L4", "L1", "L1", "L2", "W", "L1", "L5", "L2", "L3", "L3", "L5", "H2", "H1", "W", "H4", "L3", "L3", "W", "W", "L1", "W", "W", "H1", "L3", "H1", "L2", "L4", "H1", "L2", "H2", "L4", "W", "L1", "W", "L5", "L3", "L2", "L1", "L1", "L5", "L5", "L3", "H1", "H3", "W", "H1", "L4", "L4", "H1", "L3", "L3", "L1", "H3", "L4", "BO", "L5", "L5", "W", "L4", "L2", "L2", "L5", "L3", "EL", "L3", "L1", "L5", "L1", "H2", "L1", "L2", "H2", "L3", "W", "W", "L3", "H1", "L2", "L4", "L5", "L4", "L1", "L4", "L1", "L2", "L3", "L1", "L3", "L5", "L3", "L1", "L1", "L2", "L5", "L5", "W", "L1", "L4", "W", "H3", "L5", "L5", "H2", "L5", "L5", "L3", "L3", "L2", "L4", "L2", "L2", "L4", "W", "L1", "L3", "L1", "W", "L1", "L1", "L5", "L1", "L4", "H2", "L1", "L3", "W", "H1", "L1", "H1", "L2", "L1", "W", "L3", "L5", "L3", "L4", "L4", "L5", "L3", "L3", "H4", "L2", "L3", "W", "L4", "L4", "H2", "L5", "L4", "L5", "L4", "L5", "W", "L2", "H1", "L2", "L1", "W", "W", "W", "H3", "L3", "L5", "L1", "L2", "L2", "W", "L2", "W", "L1", "L1", "W", "L2", "L2", "L2", "H1", "L4", "L3", "H2", "L1", "L2", "W", "EL", "L5", "L1", "H4", "L1", "L4", "L1", "L1", "L3", "L5", "L3", "L4", "L2", "L5", "L1", "L3", "L3", "H4", "L1", "L3", "H1", "L5", "L5", "L3", "L5", "L3", "W", "L1", "L1", "W", "L1", "L1", "L1", "L1", "W", "L2", "L5", "L1", "L2", "L3", "L1", "L1", "L5", "H4", "L3", "W", "L4", "H2", "L1", "L1", "L2", "L5", "L1", "W", "H3", "L3", "L3", "L2", "H2", "H1", "H2", "L2", "L3", "W", "L2", "H1", "W", "L5", "H1", "L2", "L1", "L4", "L4", "L5", "H2", "H2", "L5", "H1", "L1", "L5", "L4", "L4", "L3", "L2", "W", "W", "L5", "L1", "L4", "H4", "L4", "L4", "L2", "W", "L5", "L3"], ["W", "L5", "L4", "L4", "L3", "W", "L5", "L5", "L1", "L3", "H1", "L3", "L4", "L2", "W", "L3", "L1", "L2", "L1", "L5", "L2", "L2", "H1", "L1", "W", "L1", "L1", "L2", "L3", "L5", "L2", "L2", "L1", "L5", "H1", "L4", "L1", "W", "L1", "H2", "L5", "L4", "L3", "L2", "L2", "W", "H1", "L3", "L3", "W", "L3", "L5", "L1", "L3", "H4", "W", "L1", "W", "W", "L1", "L1", "L1", "L3", "L1", "L4", "H3", "L2", "W", "L2", "W", "L1", "W", "L1", "W", "L1", "L1", "H2", "L1", "L3", "L1", "L1", "L3", "H1", "W", "H2", "L5", "L1", "L1", "L2", "H3", "L3", "L4", "L3", "L1", "L5", "L4", "W", "W", "L3", "W", "L3", "L2", "L4", "W", "H2", "L1", "W", "L5", "L1", "L3", "H2", "L4", "L1", "H1", "W", "W", "H1", "L2", "L3", "L3", "W", "L5", "L2", "L5", "L4", "L2", "L4", "W", "L5", "L2", "EL", "L4", "L4", "L1", "W", "L4", "L4", "H3", "H1", "L5", "W", "L4", "L2", "L1", "W", "L1", "W", "W", "L4", "H1", "H1", "L4", "L2", "L4", "L1", "H2", "L1", "H2", "L2", "W", "H2", "W", "L3", "L5", "L4", "L1", "L4", "W", "H1", "W", "L5", "W", "L1", "L1", "L5", "W", "L1", "W", "W", "H1", "L2", "L3", "L3", "L5", "L3", "H1", "L1", "L4", "L5", "L1", "L4", "L2", "L5", "L3", "L2", "L4", "L5", "L1", "L4", "W", "L4", "H3", "L1", "L1", "W", "L4", "L4", "L3", "L3", "W", "L4", "H1", "BO", "L2", "L3", "W", "W", "L5", "L1", "L5", "H1", "L2", "L1", "W", "L1", "L1", "L2", "L4", "L4", "L1", "L3", "L4", "H2", "L3", "H1", "L3", "L3", "L1", "L2", "L1", "L4", "L1", "L1", "L3", "H2", "L4", "L2", "L2", "W", "L3", "H1", "L5", "L4", "L5", "L1", "L1", "L2", "L4", "L5", "H1", "W", "L2", "H1", "L3", "L4", "L3", "W", "H4", "L3", "L1", "L1", "L1", "H1", "H4", "L1", "W", "L3", "L3", "L1", "W", "L3", "H1", "W", "L1", "L1", "L5", "W", "L3", "L2", "H1", "L1", "L3", "L3", "L3", "W", "W", "H2", "L4", "H2", "L1", "L2", "H4", "H3", "H4", "H2", "L1", "L4"], ["L3", "L1", "L1", "L1", "L2", "L3", "L2", "L2", "L4", "L3", "EL", "H1", "H2", "EL", "L4", "L1", "L2", "L3", "L1", "L5", "L1", "H1", "W", "W", "L2", "H3", "L1", "W", "H1", "L5", "L2", "L4", "L1", "L4", "L1", "L5", "L5", "L2", "L3", "L1", "W", "W", "L1", "L2", "W", "L1", "W", "L3", "W", "L2", "L1", "H1", "L1", "L3", "L5", "L3", "H1", "W", "L4", "L3", "W", "L3", "L1", "L3", "L5", "W", "L4", "L1", "W", "L1", "L3", "H1", "W", "W", "L4", "L2", "H1", "L5", "H1", "H1", "L2", "L2", "W", "L3", "L5", "W", "L2", "H2", "H4", "H2", "W", "L1", "W", "W", "H2", "W", "H1", "L2", "L5", "L1", "H2", "L2", "W", "W", "L5", "H2", "H2", "L4", "L3", "H4", "L1", "L5", "L1", "L1", "L2", "L1", "L1", "W", "L3", "L3", "W", "L4", "L5", "L2", "L5", "L3", "H3", "L3", "L1", "L4", "L1", "L2", "H4", "L2", "L4", "L5", "L1", "L1", "L3", "L1", "W", "L3", "L5", "L2", "L3", "W", "L3", "L2", "L1", "L3", "L1", "L4", "L3", "L2", "L2", "L3", "H2", "L5", "W", "L1", "L2", "L3", "L4", "L2", "L2", "L4", "H4", "L3", "W", "L1", "L2", "L5", "L1", "EL", "L4", "L1", "L5", "L1", "L4", "L1", "L3", "L3", "L4", "L3", "W", "L5", "L3", "H2", "L2", "H3", "H1", "L3", "L2", "L1", "L2", "L2", "H3", "W", "L3", "L1", "H2", "L1", "L1", "H2", "L1", "L1", "L3", "L2", "H3", "H2", "L5", "L1", "L1", "EL", "W", "L4", "L4", "L1", "H3", "W", "W", "W", "L1", "H1", "L3", "L3", "L5", "L1", "L2", "H1", "L3", "L4", "L2", "W", "L1", "L3", "L1", "L5", "L3", "W", "L3", "L1", "L2", "L4", "H1", "L4", "L2", "W", "L5", "L3", "L5", "L4", "L3", "H1", "L1", "L1", "L2", "L4", "H3", "W", "W", "H1", "L1", "L1", "L5", "W", "L2", "W", "L5", "L4", "L5", "L4", "L3", "L1", "L4", "L3", "L2", "W", "W", "L1", "H2", "L2", "L3", "L2", "W", "W", "W", "L3", "W", "L1", "L3", "W", "L1", "L2", "W", "L3", "L2", "H2", "L4", "L2", "L4", "L3", "L5", "L3", "L3", "W", "W"], ["W", "L1", "W", "BO", "EL", "W", "L3", "L4", "W", "H1", "W", "W", "L1", "H2", "L5", "W", "L4", "L5", "W", "L3", "L3", "L2", "L3", "L3", "L1", "L1", "H4", "L5", "H2", "H3", "L1", "L2", "L3", "L3", "L3", "L3", "L2", "L1", "L2", "H2", "L2", "L3", "L1", "W", "W", "L1", "L2", "L1", "L5", "L1", "L2", "L4", "L1", "L2", "L1", "H1", "L2", "L2", "L2", "L4", "L3", "L5", "L4", "L3", "L5", "L2", "L1", "L2", "L3", "L2", "H2", "H3", "L2", "L2", "L1", "BO", "L2", "W", "H2", "L5", "L1", "W", "H3", "L4", "H2", "L3", "L1", "L3", "L5", "W", "L1", "L4", "L1", "H1", "L4", "L1", "L3", "L4", "W", "L4", "L2", "L4", "L5", "W", "L1", "W", "L1", "L3", "W", "L4", "L4", "L5", "H2", "L1", "L3", "W", "L1", "L4", "L4", "W", "H4", "L3", "L5", "L3", "L1", "L4", "L1", "H1", "L1", "L4", "L4", "L4", "L3", "H1", "L3", "L3", "L3", "L4", "L1", "L2", "W", "L1", "L5", "L4", "W", "L4", "L2", "L1", "H2", "L4", "L1", "L2", "W", "L4", "W", "L1", "L4", "H2", "L3", "L5", "L3", "H3", "H1", "L4", "L1", "H1", "W", "L4", "H2", "W", "L3", "H3", "W", "L3", "W", "W", "W", "L3", "L3", "L1", "W", "W", "L1", "L1", "L3", "H1", "L1", "L5", "L5", "L4", "L4", "L3", "L4", "L5", "L3", "L3", "L2", "L5", "L4", "L4", "L1", "L1", "L3", "L3", "H1", "L5", "L2", "W", "L1", "L4", "L4", "L1", "L1", "L2", "L4", "L1", "L4", "L4", "L4", "L4", "L4", "L1", "L1", "H1", "W", "H3", "W", "L1", "H2", "L1", "W", "L1", "H1", "H1", "L5", "W", "L1", "L2", "L1", "L4", "L2", "L3", "W", "L3", "W", "L2", "W", "L1", "EL", "L3", "L5", "L1", "L3", "L2", "H4", "L1", "L3", "H1", "L3", "L3", "L1", "H1", "W", "L4", "L5", "L1", "L2", "L4", "H3", "L3", "H1", "H1", "H1", "H4", "H1", "L1", "L3", "H4", "L2", "H2", "L3", "L1", "L5", "L3", "L1", "L1", "L1", "H2", "L5", "L3", "L1", "L2", "L4", "L2", "L3", "W", "L1", "H3", "L4", "H1", "L4", "W", "L2", "W", "W", "H2", "L5"], ["L4", "L2", "W", "H2", "L1", "L3", "L5", "BO", "H1", "L4", "L4", "L4", "H2", "L4", "L2", "EL", "H3", "L5", "L1", "L3", "L4", "H2", "L1", "EL", "L3", "L1", "W", "L5", "L4", "L1", "L2", "L3", "L5", "L5", "L1", "L1", "L1", "L1", "L2", "L1", "H1", "L1", "H1", "W", "L3", "L3", "L1", "L5", "H2", "L1", "L3", "L4", "L2", "H3", "L1", "L2", "L2", "L2", "L2", "L4", "L1", "H3", "BO", "W", "L4", "H1", "L2", "L2", "H4", "L5", "L2", "L4", "L4", "H2", "L2", "L2", "L3", "L3", "L5", "L1", "H1", "W", "W", "L2", "L5", "W", "L3", "W", "L5", "L3", "L4", "L1", "L2", "L5", "L1", "W", "W", "L5", "W", "L4", "L5", "L4", "L3", "L1", "H1", "L1", "H2", "L5", "W", "H1", "L4", "W", "L4", "L1", "L1", "L1", "L4", "W", "L2", "W", "L3", "L5", "W", "H2", "L1", "W", "H1", "H2", "L2", "L2", "W", "L1", "H3", "H4", "L4", "H3", "H1", "H1", "L5", "L2", "L3", "L2", "L3", "W", "H4", "L3", "L3", "L2", "H1", "L4", "H2", "W", "L4", "L3", "H2", "H1", "W", "L1", "H2", "W", "L5", "L1", "L2", "L3", "L1", "H1", "H1", "H2", "W", "L1", "L5", "W", "L4", "W", "BO", "L1", "W", "W", "L2", "L3", "L5", "L2", "H3", "L1", "L2", "L1", "L1", "L3", "L1", "L2", "L4", "L5", "W", "L1", "W", "L1", "L3", "L2", "W", "W", "L5", "H3", "L3", "L4", "H1", "L3", "L2", "W", "H4", "H2", "L3", "H2", "L3", "L2", "L1", "L3", "H1", "L5", "L5", "H1", "L2", "L1", "L5", "H1", "H1", "L4", "L1", "L1", "W", "L4", "L3", "L1", "L4", "L1", "L1", "L2", "L3", "L2", "H2", "H1", "L2", "H3", "L4", "L3", "L4", "W", "L2", "W", "H3", "H2", "L1", "W", "L5", "L2", "H2", "H4", "H2", "W", "L2", "L4", "L1", "W", "W", "L3", "W", "L5", "H2", "L2", "L1", "EL", "H1", "L2", "L3", "L3", "W", "W", "L1", "L3", "L2", "L2", "L1", "L2", "L4", "L2", "H4", "H1", "L3", "L4", "W", "L1", "H3", "L2", "L4", "L2", "L5", "L1", "L4", "L1", "L3", "L3", "H1", "W", "W", "W", "L1", "L2", "BO"]], "3": [["L4", "H2", "L1", "H4", "L2", "L2", "L1", "L2", "H2", "L5", "L2", "L4", "L1", "L2", "L3", "L1", "W", "L5", "L5", "H2", "L5", "L5", "L2", "H2", "L2", "L3", "H2", "L2", "L2", "L3", "L3", "L5", "L1", "H1", "L3", "L1", "L1", "L5", "L2", "L4", "H2", "W", "L5", "L3", "L5", "L1", "W", "L3", "L2", "L4", "H2", "L3", "L3", "L4", "L4", "L3", "W", "L5", "H1", "H2", "W", "L5", "W", "L2", "L5", "L3", "L3", "L4", "L4", "L2", "L2", "L3", "H2", "L5", "L4", "L3", "W", "H2", "L3", "L3", "H2", "L4", "W", "L1", "H2", "H4", "L5", "L5", "L3", "H1", "L2", "L3", "L2", "L2", "L3", "L1", "L1", "W", "L1", "W", "L1", "L1", "H3", "L3", "L1", "H1", "L5", "L2", "L1", "L2", "L5", "L5", "L4", "H3", "L5", "W", "L4", "W", "L2", "L3", "L1", "H2", "L4", "H2", "L1", "W", "L3", "L3", "L3", "W", "H3", "L1", "L1", "L5", "L4", "H2", "L5", "L4", "L2", "L4", "L1", "L1", "L4", "L2", "H2", "W", "L3", "L3", "L2", "L2", "L4", "W", "H1", "L1", "L5", "L2", "L1", "L4", "L3", "L5", "L3", "L1", "L4", "L1", "L3", "L3", "L1", "L5", "L2", "L1", "L4", "L1", "L3", "L2", "L5", "L3", "H3", "H1", "L5", "H2", "L5", "L1", "L1", "L1", "L1", "L3", "L5", "L4", "L5", "W", "L5", "L2", "L2", "L1", "L3", "W", "L3", "L3", "L1", "L5", "L2", "L3", "W", "L4", "L2", "L4", "L3", "W", "L2", "L2", "L1", "BO", "L1", "L1", "W", "L5", "L4", "H3", "L1", "L2", "L1", "W", "L3", "L3", "H1", "L1", "L3", "H2", "L5", "H2", "H1", "L5", "L3", "L5", "L4", "W", "L4", "L3", "L4", "L4", "L4", "L3", "L3", "L1", "L3", "L3", "L4", "L1", "L1", "H1", "H2", "L4", "L1", "L4", "L3", "L3", "BO", "H2", "L5", "L1", "EL", "H4", "L5", "H2", "BO", "L1", "L4", "H1", "H2", "L2", "L3", "W", "H1", "L3", "W", "L4", "L2", "H3", "W", "L1", "W", "L4", "H2", "W", "L2", "L5", "L4", "W", "L1", "H4", "L2", "L2", "L2", "L4", "L4", "L5", "H1", "H4", "L3", "L1", "L4", "L2", "H2", "W", "L5", "L3", "H3"], ["L2", "L3", "W", "L3", "W", "L3", "L1", "L2", "L5", "L1", "L2", "L3", "L3", "L3", "L3", "L3", "L3", "L1", "L3", "L2", "L2", "L4", "L1", "W", "H1", "L3", "L2", "L1", "W", "L5", "L3", "L4", "L4", "W", "L1", "L1", "L1", "L1", "H3", "L5", "L3", "W", "L3", "L4", "W", "W", "W", "L2", "L1", "L3", "L4", "L5", "L3", "L3", "L3", "L2", "L3", "H1", "H1", "L3", "L4", "L2", "H4", "L4", "L1", "L5", "L4", "L2", "H4", "EL", "L1", "H3", "L2", "L2", "L5", "W", "W", "L4", "EL", "L2", "L4", "L2", "L3", "L1", "H2", "L1", "L1", "L2", "L5", "L3", "L4", "H2", "L2", "W", "L2", "L1", "L5", "L1", "H1", "L5", "H1", "L1", "L2", "L5", "L2", "L3", "L5", "L3", "L1", "L5", "L1", "L1", "L3", "W", "L2", "L2", "L3", "L2", "L2", "L4", "H2", "L1", "L1", "L2", "L3", "L5", "L3", "L2", "L1", "L1", "L1", "L3", "L1", "L1", "H2", "L3", "L2", "L3", "L2", "W", "W", "L1", "L2", "H1", "L3", "L1", "L3", "W", "L5", "L4", "L5", "L1", "L5", "L4", "L5", "L2", "L4", "W", "L2", "L3", "W", "L1", "L3", "H2", "L1", "L1", "L4", "L2", "W", "L2", "L5", "W", "W", "H3", "L1", "EL", "L2", "W", "L1", "BO", "L2", "L3", "L5", "L1", "L5", "L2", "L1", "H3", "L2", "L5", "L4", "L1", "L3", "L5", "L1", "L3", "L2", "L5", "W", "W", "L1", "L5", "L5", "L4", "L3", "W", "L2", "L2", "L1", "L3", "L5", "L4", "W", "L1", "L4", "BO", "L5", "W", "L1", "L5", "L3", "L1", "L5", "L1", "L3", "L2", "H4", "L2", "L2", "L2", "L4", "H1", "W", "L4", "L4", "L2", "L3", "H3", "L2", "L5", "L5", "L2", "L4", "H2", "L3", "L1", "H1", "L5", "L2", "L2", "L3", "L3", "H2", "H1", "L2", "H2", "L1", "L2", "L3", "L3", "L3", "L3", "L3", "L2", "L5", "L1", "H3", "L1", "L3", "H3", "L1", "W", "L1", "H3", "W", "L4", "L4", "H2", "W", "H1", "L1", "L5", "W", "L5", "H3", "H1", "L3", "L2", "H1", "L5", "L4", "L1", "L4", "W", "L1", "L2", "L2", "L5", "L1", "L1", "W", "W", "L5", "L2", "W", "L4", "L1"], ["BO", "L1", "L2", "L5", "W", "L5", "L3", "L1", "H1", "L5", "L2", "L1", "L4", "L2", "L1", "L3", "L3", "L5", "L5", "L1", "H4", "L2", "L3", "L5", "H3", "L2", "EL", "L2", "W", "L3", "L2", "L3", "L3", "L3", "L2", "L1", "L4", "L2", "L4", "L3", "L2", "L4", "L5", "H2", "L4", "L1", "L4", "H1", "EL", "L4", "L3", "L3", "L1", "H3", "L2", "L1", "L4", "L4", "L1", "L2", "L5", "L2", "L5", "L1", "L2", "H2", "L4", "L1", "L3", "H2", "L4", "H2", "L1", "L2", "L5", "L3", "L5", "L5", "L3", "L5", "L3", "W", "L4", "L1", "L4", "L1", "L4", "L3", "L1", "W", "W", "L3", "L1", "W", "L2", "L1", "W", "L3", "H4", "L5", "H2", "L2", "L1", "L1", "L4", "L5", "L1", "L5", "L1", "L2", "L4", "L2", "W", "L5", "EL", "L3", "L2", "L3", "L5", "W", "H2", "L3", "L2", "W", "L2", "W", "H2", "L2", "W", "L4", "L2", "L3", "L4", "L1", "H1", "L3", "H2", "L5", "L3", "H2", "L1", "L3", "L1", "L4", "L1", "L1", "L2", "W", "H2", "L5", "L3", "L1", "H1", "L1", "L1", "H4", "L2", "L5", "H4", "L2", "W", "L3", "L3", "L2", "L2", "L3", "L5", "L2", "L3", "L3", "L1", "L1", "H1", "L4", "L1", "L4", "L3", "L4", "W", "L4", "L4", "L4", "L2", "L1", "L4", "L5", "L3", "W", "L4", "L3", "L5", "L4", "W", "W", "H2", "L4", "L2", "L1", "L2", "L3", "L2", "L1", "L2", "L1", "L3", "L1", "H1", "BO", "H2", "L4", "W", "L3", "H1", "L1", "L2", "L2", "L1", "L3", "W", "H1", "L2", "L3", "L1", "L2", "L1", "L5", "L1", "H1", "L2", "L5", "L2", "L2", "L1", "L3", "H1", "W", "H1", "L1", "W", "H1", "L3", "L5", "L5", "W", "L2", "L5", "L3", "L5", "L2", "L3", "W", "L3", "L4", "L1", "H1", "L2", "L1", "L4", "L3", "L2", "L4", "L1", "L1", "L2", "H1", "H4", "H1", "L3", "L2", "H1", "L4", "L3", "L5", "L2", "L1", "L1", "L1", "L5", "L4", "L5", "L2", "W", "L2", "W", "L4", "W", "L2", "L1", "H2", "L4", "W", "L4", "L1", "L3", "L3", "H2", "W", "L3", "H3", "L2", "L3", "L5", "W", "L4", "L3", "L2", "L4"], ["L1", "L3", "L1", "L3", "L5", "L3", "L2", "H1", "L1", "L2", "H1", "W", "L1", "L1", "W", "H1", "L5", "L5", "L5", "L3", "L5", "L5", "L2", "L1", "H4", "W", "BO", "L5", "H1", "L4", "L1", "W", "L4", "L1", "W", "W", "W", "L2", "L3", "L4", "L4", "W", "L1", "H1", "H2", "H1", "L1", "H3", "L4", "L4", "L5", "L4", "L2", "L5", "L4", "L5", "L1", "L5", "L1", "L1", "L3", "L3", "W", "L1", "L3", "L2", "L1", "L4", "W", "L2", "L1", "L1", "L5", "L3", "L1", "L3", "L5", "L4", "L4", "L2", "L4", "W", "W", "L3", "L2", "L5", "L1", "L4", "H2", "H1", "H3", "L3", "L4", "H3", "W", "H2", "L1", "L3", "L1", "W", "L4", "L1", "L3", "L1", "H2", "H4", "L1", "L3", "L3", "L1", "L1", "L4", "L4", "L3", "W", "L2", "L4", "L2", "L5", "L4", "L3", "L3", "L3", "L5", "W", "L3", "L1", "H4", "W", "L1", "L3", "L5", "L1", "L5", "L4", "L1", "W", "L4", "H4", "L2", "L4", "L1", "H1", "L1", "L3", "W", "H4", "L1", "W", "L1", "L5", "L3", "L3", "H2", "L3", "L1", "L2", "L5", "L3", "L2", "L4", "L4", "L2", "L2", "L5", "L4", "L5", "W", "L5", "L3", "W", "L3", "L4", "W", "L2", "H1", "H1", "H1", "H1", "W", "L2", "L3", "L3", "L5", "L3", "W", "L5", "L4", "L5", "L5", "L1", "L2", "L5", "W", "L1", "L2", "L1", "H1", "L2", "L2", "L5", "L5", "L4", "L4", "W", "L1", "L1", "L2", "L2", "L5", "H1", "W", "L3", "L3", "H2", "L5", "H2", "H3", "H1", "W", "L5", "L3", "L2", "L3", "L3", "L1", "H2", "L2", "W", "L2", "W", "BO", "H2", "L4", "L4", "L5", "W", "L1", "L2", "L2", "L2", "L4", "L3", "H1", "L2", "L4", "L3", "W", "W", "L5", "L1", "L2", "L5", "H3", "L2", "L5", "H1", "H2", "W", "L1", "EL", "L4", "L4", "W", "H1", "L3", "H2", "H3", "L1", "L1", "W", "L1", "L2", "L1", "L4", "L1", "L1", "L1", "L3", "H2", "W", "L1", "L4", "L3", "L4", "L2", "L1", "H1", "W", "L1", "L4", "L1", "L4", "L1", "L5", "L5", "L3", "W", "L4", "L1", "W", "L3", "L2", "L3", "L4", "L2", "H2"], ["H1", "L4", "L5", "L1", "L1", "L2", "L5", "W", "L1", "L4", "H4", "L5", "L2", "L2", "H4", "L3", "L5", "H2", "L5", "L2", "L1", "L1", "H1", "L3", "H4", "L1", "L2", "W", "W", "L1", "H2", "L2", "H4", "L5", "L1", "L4", "L1", "L1", "L3", "W", "L3", "W", "W", "L1", "L2", "L4", "W", "L3", "L2", "L4", "L2", "L3", "L5", "H1", "L5", "H2", "H4", "L3", "L1", "L2", "BO", "L4", "EL", "L4", "L2", "L1", "L3", "L5", "L4", "H3", "H2", "L1", "L2", "H4", "L4", "L2", "W", "L3", "L4", "W", "H2", "L2", "L1", "W", "L1", "BO", "L2", "L2", "L2", "W", "L1", "L1", "L1", "L2", "H1", "L2", "L1", "W", "L1", "L1", "L1", "L1", "L3", "L4", "H4", "L4", "W", "L4", "L2", "W", "H1", "L1", "L1", "H1", "L2", "L3", "BO", "L2", "H2", "H1", "L5", "L2", "L1", "L1", "L1", "H1", "L5", "L1", "L2", "L4", "L5", "L2", "L5", "L2", "L3", "H2", "L5", "L4", "L1", "H2", "L5", "H1", "L5", "H4", "L4", "L4", "L3", "L3", "L1", "L3", "L2", "H1", "W", "L4", "L3", "L4", "L3", "W", "L1", "L1", "L4", "L2", "W", "L3", "H4", "L3", "EL", "L2", "L3", "L5", "H3", "H1", "L4", "BO", "W", "L1", "H1", "H2", "L1", "L2", "L1", "L1", "W", "L5", "H2", "L1", "L3", "W", "L1", "L3", "L1", "L2", "L5", "L2", "L2", "L5", "L5", "L2", "L1", "L4", "L2", "BO", "W", "L4", "L1", "L4", "L1", "L5", "L2", "L1", "L1", "L4", "L2", "H1", "H4", "H1", "L3", "H2", "L1", "L4", "L3", "L3", "L1", "L3", "L3", "H1", "L3", "W", "L5", "L3", "L2", "W", "L1", "W", "H2", "L3", "L5", "L4", "L1", "L2", "L1", "L1", "L2", "L1", "L2", "L2", "L1", "H3", "L1", "L1", "L2", "EL", "L4", "L3", "W", "L4", "L1", "L1", "L1", "L4", "L4", "W", "H4", "L2", "L2", "BO", "L1", "L4", "L5", "L3", "L1", "H1", "L2", "L1", "W", "L2", "L1", "H2", "H2", "L1", "L5", "L2", "L1", "L5", "L1", "W", "L4", "L4", "L2", "L1", "L2", "L1", "L1", "W", "H4", "L2", "L4", "L3", "W", "L4", "L2", "W", "L4", "L1", "L3", "L1", "W"]], "4": [["L1", "H1", "H1", "W", "L1", "H2", "H4", "L3", "L4", "L1", "L4", "L3", "L1", "H3", "W", "L4", "H2", "L3", "L5", "L4", "L2", "EL", "L2", "L2", "L4", "EL", "L3", "L2", "L4", "EL", "L5", "L1", "L1", "L4", "L4", "L1", "L2", "L2", "L4", "L5", "H1", "L4", "L5", "L1", "L1", "L2", "L5", "L4", "L2", "L1", "L5", "L3", "L3", "L1", "L2", "L1", "L3", "L1", "L4", "L2", "L3", "L2", "L4", "L5", "H1", "L5", "H4", "L4", "L3", "L1", "L4", "L1", "L1", "H3", "L5", "L2", "H2", "L2", "L4", "L5", "H1", "L1", "L2", "L5", "H2", "L3", "L5", "L5", "L3", "L3", "L3", "L1", "L3", "BO", "L5", "L1", "L2", "L4", "L2", "L1", "L1", "W", "L2", "L4", "L2", "L1", "L4", "L2", "L4", "W", "L4", "L2", "L2", "L4", "L2", "L3", "L4", "H1", "L4", "L1", "L3", "L4", "L4", "L3", "L3", "EL", "L4", "L2", "L4", "L3", "L2", "W", "L3", "L5", "L1", "L1", "H1", "H2", "BO", "L3", "L1", "L4", "W", "L1", "L4", "L1", "BO", "L2", "L1", "L1", "H2", "L1", "H1", "W", "L2", "L4", "H2", "L1", "W", "L1", "L3", "L2", "L1", "H1", "L5", "L4", "L1", "L4", "L2", "H2", "L1", "L1", "H1", "L5", "L3", "L1", "L3", "W", "H2", "L5", "H1", "L3", "L4", "L4", "L4", "H4", "L2", "L2", "W", "H2", "L1", "L1", "L1", "H2", "L1", "L3", "L1", "L4", "L4", "H1", "H4", "L4", "H3", "BO", "L1", "L1", "W", "L5", "L2", "H3", "L4", "W", "L2", "L3", "L1", "L4", "L2", "H1", "L4", "L2", "L3", "L1", "L3", "L4", "H2", "H1", "H1", "L2", "L1", "L5", "L2", "L5", "W", "L2", "L3", "W", "H4", "L5", "EL", "L1", "L4", "L2", "H1", "L2", "H1", "L5", "L5", "H4", "L1", "H4", "H2", "L4", "L5", "L5", "L4", "L4", "L5", "EL", "H3", "L1", "L3", "L5", "L2", "L4", "H2", "L1", "L3", "L4", "L4", "L5", "L4", "L4", "L2", "L2", "L4", "H2", "L4", "L3", "L3", "L3", "L2", "L5", "L4", "H2", "L3", "L1", "H1", "L4", "H1", "L4", "L1", "L4", "L4", "L3", "L1", "L4", "H1", "L4", "L2", "L2", "L2", "H1", "L4", "L1", "H2", "L4", "L2"], ["L5", "L4", "H1", "L3", "EL", "L3", "H3", "L3", "L1", "L5", "L3", "L1", "H1", "L1", "L2", "L4", "L2", "L3", "L4", "L1", "L3", "L1", "L5", "L1", "L3", "H4", "L1", "L4", "L2", "L4", "L5", "L5", "L1", "L1", "L3", "L3", "L4", "L5", "L1", "L2", "H1", "L3", "L5", "L5", "W", "L3", "H1", "H3", "H1", "L1", "L3", "L2", "H1", "BO", "L4", "L2", "H1", "L1", "W", "L3", "L5", "L3", "L2", "L2", "W", "L1", "L4", "L1", "L1", "L3", "L3", "L2", "L4", "L3", "L1", "L3", "L1", "L4", "H1", "BO", "L2", "L2", "L1", "L2", "L2", "L1", "H1", "L3", "L2", "L2", "H3", "L4", "L3", "L1", "H3", "L2", "H2", "BO", "H4", "L4", "H1", "L2", "H3", "L2", "H2", "L5", "L3", "L3", "L3", "L4", "L2", "L2", "L5", "L5", "L5", "L2", "L4", "L5", "L5", "H1", "L5", "L5", "L3", "W", "L2", "W", "L1", "L3", "L4", "H1", "L2", "L1", "L5", "L2", "H2", "L2", "L5", "L3", "L4", "L1", "L4", "H3", "L5", "L1", "L1", "L1", "L2", "L4", "L5", "L1", "L4", "L4", "L1", "L2", "L4", "L4", "H1", "L4", "H1", "L5", "L1", "L3", "L5", "H4", "L4", "L2", "H2", "H1", "L3", "W", "H1", "L4", "L2", "W", "L1", "L1", "L3", "H1", "H4", "H2", "L3", "L2", "BO", "L3", "L5", "L5", "L1", "L3", "L4", "L3", "L2", "L2", "L3", "L2", "L3", "L5", "L2", "L2", "H2", "W", "H4", "H4", "L1", "L4", "L3", "L3", "L1", "L1", "L4", "L1", "L3", "L3", "H1", "H1", "W", "W", "L4", "L4", "L5", "L1", "L1", "L1", "L4", "L2", "W", "L4", "H4", "L1", "L5", "L4", "L4", "L3", "L5", "L3", "L5", "L1", "H4", "L1", "L3", "L4", "L3", "L2", "H4", "L1", "L1", "H2", "EL", "H1", "L3", "L5", "L3", "L2", "L2", "H3", "W", "L1", "L4", "L2", "L2", "L2", "L4", "L3", "L2", "H1", "L3", "W", "L2", "L1", "L2", "L3", "H1", "L2", "L3", "L1", "L4", "W", "L5", "EL", "L1", "EL", "L1", "H2", "L2", "L1", "L1", "H3", "L5", "W", "H1", "L1", "L4", "L1", "L1", "L1", "L2", "L1", "L1", "H3", "L1", "L2", "L4", "H2", "L2", "L1", "L2", "H1", "L5"], ["L1", "L3", "L3", "L1", "L4", "L4", "L4", "L2", "L3", "L1", "L4", "L2", "L2", "L2", "L3", "H2", "H3", "W", "L2", "H4", "L5", "L4", "L3", "L2", "L2", "H2", "L3", "L4", "L5", "L1", "H3", "L2", "L3", "L1", "L1", "L3", "H2", "L2", "L2", "L1", "H1", "L1", "H3", "L1", "L1", "H4", "L4", "W", "L2", "L1", "L2", "L1", "H4", "H2", "L4", "L3", "L1", "H2", "BO", "L3", "L3", "L1", "L2", "H1", "H1", "L2", "L3", "L1", "L2", "L1", "L4", "L5", "L4", "H2", "L1", "L3", "L1", "L1", "L3", "L3", "L5", "H3", "L5", "L1", "L1", "L5", "L4", "L3", "L1", "L5", "L2", "L3", "H1", "L1", "BO", "H1", "H1", "L5", "L4", "L3", "L2", "L3", "L2", "H3", "L1", "L4", "L4", "H4", "L4", "L1", "W", "L1", "W", "L3", "L2", "L4", "L2", "L2", "H1", "L3", "L3", "L4", "W", "H3", "L5", "H2", "L2", "L3", "W", "H4", "L3", "L4", "L3", "L4", "L1", "L3", "L1", "H3", "L5", "L3", "L1", "L3", "L3", "L4", "L1", "H4", "L2", "L1", "L2", "L3", "L5", "BO", "L5", "L3", "L3", "L1", "L2", "L5", "L2", "W", "H1", "W", "L4", "H3", "L4", "L5", "H2", "H2", "L4", "L3", "L3", "L4", "L5", "L1", "L3", "L5", "L1", "L3", "L3", "L1", "L4", "L1", "L1", "L5", "L3", "L1", "L4", "L1", "L3", "L4", "L2", "H1", "L5", "L2", "L1", "L3", "L1", "L2", "L3", "L4", "L5", "L2", "L2", "L4", "W", "L5", "L3", "H2", "L2", "H1", "L4", "L1", "L2", "L4", "L2", "L5", "L3", "L3", "H3", "L1", "L3", "BO", "W", "L1", "L1", "L1", "H2", "L3", "L5", "H4", "L1", "H2", "L5", "L4", "L4", "L4", "L3", "H1", "L1", "H4", "W", "L4", "L3", "L2", "H1", "L3", "L1", "L2", "L2", "L5", "L3", "L1", "L4", "L5", "L2", "L4", "L1", "L1", "L3", "L1", "L1", "L3", "L1", "L2", "L5", "L2", "H2", "L3", "L4", "W", "L4", "L5", "L4", "L4", "L1", "H4", "L1", "L2", "H1", "L2", "L1", "H4", "L4", "L4", "L1", "L2", "L1", "L4", "L1", "L2", "H1", "W", "L5", "L3", "L1", "H1", "H2", "L1", "L2", "H1", "L2", "W", "L3", "H3", "L1", "L5", "L5"], ["L1", "L5", "L2", "W", "H4", "L3", "L2", "L2", "H1", "L3", "L1", "L2", "H2", "W", "L5", "L1", "L1", "H1", "H2", "L2", "L3", "L4", "L1", "L2", "H3", "H3", "W", "L1", "L5", "L2", "L5", "H4", "L5", "L2", "L1", "L4", "L1", "L1", "H2", "L3", "L4", "L3", "H1", "L1", "L1", "L1", "L2", "L5", "L5", "L1", "L1", "L5", "L1", "L2", "L4", "L3", "L4", "L5", "L5", "W", "L3", "L5", "L2", "L3", "L4", "L2", "L3", "H4", "L4", "L4", "L1", "L2", "L3", "L5", "L1", "BO", "L5", "W", "H2", "L2", "BO", "L1", "L4", "L5", "L3", "H1", "L1", "L5", "L1", "L2", "L5", "L2", "L2", "EL", "L5", "L2", "L2", "L5", "L3", "L3", "L4", "L2", "H3", "L4", "L1", "L4", "L1", "L2", "H1", "L4", "L5", "L5", "L3", "H1", "L5", "L4", "L5", "L1", "L3", "L1", "L2", "L3", "L2", "L1", "L2", "L1", "H4", "H2", "L4", "L1", "L3", "L5", "L3", "L2", "H1", "L1", "L3", "H1", "L4", "L1", "W", "H3", "L5", "L3", "L2", "L1", "L3", "L3", "L5", "L3", "L2", "L5", "L3", "H1", "L4", "H1", "L4", "L1", "L2", "L5", "L2", "L5", "L3", "L4", "L5", "L2", "L1", "L1", "L2", "L4", "L1", "H1", "L1", "L5", "W", "H1", "L4", "L4", "L3", "L1", "L1", "W", "L5", "L3", "L5", "H2", "L5", "L1", "H1", "L4", "L3", "L2", "L1", "L3", "L4", "H1", "H4", "L4", "L5", "L4", "L2", "L3", "L2", "L2", "L3", "L1", "L1", "L4", "H1", "L3", "L2", "L3", "L4", "H1", "L1", "H2", "H1", "L1", "L1", "L2", "H4", "L5", "L2", "L4", "L3", "L1", "L4", "L3", "L1", "W", "L1", "H3", "L1", "L5", "L5", "L5", "L2", "L2", "H1", "H1", "L3", "H2", "L4", "W", "L3", "W", "L1", "H1", "H1", "L2", "L3", "L3", "L3", "L2", "L2", "L3", "L2", "H1", "L4", "L2", "L2", "H4", "L3", "L4", "L2", "H2", "L4", "L5", "H1", "L1", "L4", "L3", "L2", "L3", "L4", "H2", "L4", "L5", "L3", "H1", "L3", "L4", "L3", "L5", "L2", "W", "L1", "L2", "L3", "L1", "L2", "L1", "L1", "L4", "H2", "L3", "L2", "L2", "L2", "L4", "L3", "H4", "L1", "L5", "L3", "L4", "L3"], ["L5", "H1", "L2", "L1", "L1", "L5", "L3", "L2", "L3", "L4", "L3", "L1", "L5", "H1", "L3", "L3", "L2", "L1", "L1", "L5", "EL", "L2", "EL", "H2", "L3", "L3", "L2", "L2", "L1", "H2", "L4", "W", "L1", "L3", "H1", "L2", "H2", "H2", "L1", "L2", "L1", "L5", "L3", "L1", "H1", "H1", "H2", "L1", "L4", "L2", "L4", "L1", "L4", "H3", "L5", "L3", "L2", "L5", "L2", "L2", "L5", "L2", "H1", "L1", "L1", "L3", "L4", "L5", "H2", "L1", "H1", "L1", "L5", "H1", "L4", "L5", "L5", "L5", "L2", "L1", "W", "H1", "L3", "H1", "L1", "W", "L1", "L1", "L5", "L4", "L2", "L3", "BO", "BO", "EL", "L5", "L1", "L4", "L2", "L4", "H2", "L2", "W", "L1", "L5", "W", "L3", "L2", "L4", "L3", "W", "L3", "L5", "L4", "H2", "L3", "L5", "L2", "H3", "L1", "L1", "L2", "L3", "L2", "L2", "H3", "L4", "L3", "L3", "L5", "L2", "H1", "L4", "L4", "L1", "L2", "L1", "L5", "L1", "H2", "L2", "L5", "L4", "L3", "L2", "H2", "L4", "L4", "BO", "H1", "L4", "L2", "W", "L1", "L2", "L1", "L3", "L3", "H1", "L3", "H3", "L2", "H2", "H2", "H1", "L1", "L1", "W", "L3", "L2", "W", "L1", "L3", "L3", "L5", "H2", "L4", "L3", "EL", "L1", "H4", "H2", "H3", "L5", "H2", "L4", "L1", "L4", "L4", "L1", "L4", "L3", "H4", "L4", "L4", "L1", "L2", "BO", "L3", "L1", "L2", "L1", "L3", "L5", "L1", "H1", "L3", "L4", "L3", "L3", "L1", "L3", "L4", "H1", "L4", "W", "L4", "BO", "L3", "L3", "L5", "L3", "L4", "L1", "L5", "L2", "L2", "L1", "L3", "L3", "H2", "L2", "L1", "L3", "L1", "L4", "L2", "L4", "H1", "H1", "BO", "L1", "L1", "L3", "L2", "H1", "L1", "H1", "L1", "L4", "H3", "L5", "L2", "L4", "L2", "L3", "L5", "L1", "L1", "W", "L2", "W", "H4", "L4", "L4", "H3", "L3", "L2", "L5", "L3", "L4", "L3", "L2", "L1", "L1", "L2", "H2", "L3", "H1", "H1", "L4", "L1", "L2", "L5", "L1", "H2", "W", "L1", "H4", "L1", "L1", "H1", "L2", "L1", "L3", "L2", "H1", "L3", "H1", "L1", "L4", "EL", "L3", "H3", "BO", "H2", "L3"]], "5": [["L2", "L3", "H2", "L3", "L2", "L5", "L5", "L3", "L1", "L3", "L4", "L4", "L2", "L4", "L3", "L2", "L3", "L1", "L5", "L1", "L4", "H2", "L1", "L2", "L1", "L4", "H2", "H3", "L2", "L2", "L4", "L2", "L3", "L4", "L4", "L1", "L2", "L1", "L1", "H3", "L4", "H1", "L4", "L3", "L1", "L1", "H2", "L3", "L2", "L4", "L1", "L3", "L4", "L1", "L2", "L4", "H2", "H1", "L1", "L4", "W", "L2", "L3", "L3", "H2", "L3", "L3", "L3", "L2", "L2", "L5", "L2", "H1", "L1", "L5", "L4", "L3", "H4", "L4", "L2", "L1", "L2", "L4", "L3", "L3", "L3", "H2", "L2", "L4", "H1", "H4", "L2", "H1", "H2", "L2", "L1", "L1", "L1", "L4", "L3", "L5", "L2", "L4", "L3", "H1", "L3", "L3", "H4", "L3", "H2", "W", "L2", "L3", "L5", "H2", "L1", "L3", "H3", "BO", "L4", "L2", "L1", "L2", "H1", "L3", "L3", "L2", "L5", "L3", "L2", "L1", "L1", "L3", "L1", "L4", "L2", "H1", "L1", "L1", "BO", "L1", "L3", "L3", "L1", "L1", "L1", "L1", "L4", "L4", "L3", "L4", "L1", "L1", "L1", "L4", "L3", "L5", "L3", "L1", "L1", "H2", "L1", "H3", "L5", "H2", "L3", "L5", "L3", "L1", "L2", "L4", "L1", "L2", "L2", "L3", "L4", "L5", "L4", "L1", "L2", "L1", "L5", "H2", "L5", "L5", "H2", "L4", "L4", "L4", "H2", "W", "L2", "L5", "L4", "L3", "L1", "L4", "L2", "L3", "H1", "EL", "L4", "L1", "L2", "L3", "L2", "W", "L2", "EL", "H1", "L4", "H2", "L1", "L4", "L2", "L2", "EL", "H2", "L2", "L5", "H1", "L1", "L2", "L3", "L1", "L1", "L2", "H4", "L3", "L4", "L3", "L2", "H2", "L2", "L1", "L2", "L2", "L4", "L3", "W", "L2", "L3", "H1", "L3", "L3", "H3", "L3", "L1", "EL", "L4", "L4", "H4", "L5", "L2", "L5", "L4", "L3", "L2", "L5", "L3", "L3", "H1", "L4", "L2", "H1", "L2", "L3", "L2", "H1", "L1", "H2", "L4", "H3", "L4", "L3", "L3", "L3", "W", "L1", "L2", "H2", "L1", "L1", "H1", "L5", "L2", "L4", "L4", "H1", "L1", "L4", "L2", "L2", "L3", "H1", "BO", "L1", "L4", "L5", "L5", "L5", "L4", "L3", "L5", "L1", "L5", "L2"], ["L1", "L3", "L3", "L5", "L4", "L2", "L5", "H1", "L3", "L1", "H1", "H4", "L4", "L1", "L3", "H3", "L5", "L4", "W", "L3", "L1", "L1", "L3", "L2", "EL", "L3", "L3", "L2", "L2", "L1", "L1", "L3", "H4", "L5", "H3", "L4", "L1", "L2", "H4", "L2", "L4", "H1", "H1", "L4", "L5", "L3", "L3", "L5", "H3", "L5", "L5", "L5", "L1", "L1", "H1", "L4", "L2", "L2", "L1", "EL", "L4", "L5", "L3", "W", "L2", "L2", "L1", "H1", "L1", "L5", "L2", "L1", "L2", "L2", "L1", "L2", "BO", "L3", "L4", "L4", "L4", "L1", "L2", "L5", "L4", "H2", "L2", "L3", "H2", "L1", "L2", "L2", "L4", "L1", "L3", "L3", "L5", "L5", "EL", "L2", "L4", "L3", "L1", "L1", "L1", "L5", "L1", "L4", "L1", "L2", "L3", "L2", "L2", "L5", "L3", "L2", "L1", "L4", "H2", "L2", "L4", "L1", "H4", "H1", "L3", "L3", "W", "L5", "L4", "L1", "L5", "L3", "H2", "L1", "L2", "H1", "L3", "H1", "L3", "L2", "L5", "L2", "L5", "L3", "L3", "H4", "L5", "L4", "H1", "L3", "H2", "L2", "L2", "L1", "L1", "H2", "L3", "H1", "L1", "L4", "L4", "L4", "H1", "H2", "L1", "H4", "L1", "L3", "L5", "H2", "L2", "L1", "L3", "L2", "L1", "L1", "L3", "L1", "L5", "L5", "L3", "H2", "L5", "L2", "L5", "H3", "H2", "H1", "L4", "L3", "L2", "L3", "L3", "L4", "L1", "L1", "W", "L3", "L4", "L3", "H1", "L4", "L4", "L5", "L1", "L5", "L5", "L2", "L3", "H4", "L1", "BO", "H3", "L2", "L2", "L3", "L2", "H1", "L3", "L5", "EL", "L3", "L3", "L3", "H1", "L2", "L1", "L1", "L4", "L2", "L5", "L1", "L3", "L4", "L2", "L1", "L4", "L2", "L3", "L3", "H1", "L4", "L3", "L4", "H4", "H2", "L5", "L1", "L4", "L5", "L4", "L5", "L1", "L3", "L5", "L2", "L2", "L1", "L1", "L4", "L3", "L3", "H3", "L2", "H1", "H3", "L4", "L2", "H4", "L1", "L1", "EL", "L4", "L4", "L1", "L3", "L4", "L5", "H3", "W", "L4", "L3", "L5", "H2", "L2", "H4", "L3", "L4", "L4", "L3", "L1", "H2", "L3", "L1", "L3", "L5", "L2", "L2", "L1", "L1", "L4", "L4", "L4", "H1", "L2", "L3", "L3"], ["L3", "H3", "L2", "L1", "L1", "W", "L2", "L2", "L1", "H2", "L1", "H1", "H1", "L2", "L3", "H2", "L1", "L4", "L2", "L3", "H2", "H3", "H2", "L3", "L5", "L4", "L1", "L1", "H2", "L1", "H3", "H2", "L5", "H1", "L3", "L3", "L3", "L2", "L3", "L1", "H1", "L5", "L2", "L1", "L2", "L1", "L1", "H2", "L2", "L2", "L5", "L2", "BO", "L3", "L3", "L1", "L5", "H3", "L5", "L4", "L2", "L5", "L1", "W", "H2", "L5", "L1", "L1", "H2", "H1", "L2", "L1", "L2", "L2", "L2", "L4", "H2", "L3", "L3", "H2", "L3", "L1", "L1", "L5", "L1", "L4", "L4", "L1", "L4", "L1", "L4", "L2", "L3", "H1", "L5", "L3", "L5", "L2", "L1", "L3", "L1", "L3", "L4", "L2", "L5", "L4", "L1", "L1", "L1", "L2", "L1", "L2", "L5", "L3", "L1", "L4", "L3", "L1", "L4", "L1", "L3", "L4", "L2", "L3", "L3", "L2", "L2", "L2", "H2", "L3", "H1", "L2", "H4", "H1", "L4", "H2", "L3", "L1", "L4", "L2", "L1", "L1", "H2", "L4", "L2", "L3", "L2", "L3", "H1", "H1", "L2", "L5", "BO", "L4", "L5", "W", "L4", "EL", "L5", "L5", "H2", "L1", "L1", "L4", "L3", "L4", "L5", "L5", "L5", "L5", "L1", "L4", "L4", "L5", "L3", "L2", "L4", "L3", "L1", "H1", "L2", "L1", "EL", "L3", "L4", "L5", "L2", "L3", "H1", "L1", "L2", "L3", "L4", "H2", "L1", "L4", "L3", "L4", "H2", "L3", "L1", "L3", "L1", "H1", "L1", "L2", "L4", "L4", "L3", "L2", "L3", "L2", "L4", "L1", "L4", "L5", "L3", "L3", "L5", "EL", "L2", "L2", "L3", "L1", "L5", "L3", "H3", "L5", "L3", "L4", "L1", "L4", "L3", "H1", "H3", "H1", "L1", "L5", "H1", "EL", "H1", "L3", "L5", "L5", "L4", "L5", "L3", "L1", "L5", "L5", "H1", "L1", "H1", "L2", "L5", "L3", "L2", "L1", "L1", "L1", "L3", "H1", "L3", "W", "L2", "L5", "L1", "W", "L3", "L2", "L3", "L1", "L2", "L5", "H1", "H3", "L3", "L4", "L1", "L1", "L1", "L4", "L5", "L1", "L5", "L2", "L5", "L1", "L2", "L4", "L3", "H3", "L3", "L5", "H2", "L2", "H2", "H2", "L2", "L4", "L1", "BO", "L5", "L1", "L4", "L5", "L4"], ["L5", "L5", "L4", "L2", "L1", "L4", "L5", "L4", "H4", "L1", "L4", "H1", "L3", "BO", "L2", "H2", "L3", "L1", "L2", "L4", "L1", "L3", "L5", "H2", "L3", "L2", "W", "L4", "L3", "L1", "L3", "L1", "L5", "L5", "L1", "L2", "L1", "L2", "L4", "L1", "L3", "L4", "L4", "L1", "L4", "L1", "L2", "L3", "L1", "L4", "L3", "L1", "L2", "L5", "L1", "L4", "L3", "L4", "L1", "L1", "L2", "L5", "L1", "BO", "L3", "L1", "L2", "L4", "L2", "L1", "L2", "L1", "L4", "L5", "L4", "L4", "H2", "L2", "L1", "L2", "L1", "L5", "L3", "L3", "L2", "L3", "H1", "H3", "H1", "L1", "H2", "L3", "L3", "L5", "H3", "L1", "EL", "L3", "L2", "H1", "L5", "L2", "L1", "L3", "L2", "L2", "L2", "L1", "L3", "L1", "L4", "L3", "L2", "L3", "L2", "L4", "L5", "L1", "L3", "L1", "H4", "L4", "L1", "L5", "L3", "L5", "L1", "L1", "H4", "H4", "L1", "L5", "L5", "L1", "L2", "L1", "L1", "L2", "L1", "L5", "L1", "H4", "L2", "L2", "L1", "H2", "H2", "W", "H2", "H4", "L2", "H1", "L4", "L3", "L2", "L2", "L4", "L1", "L1", "H3", "L1", "L5", "L2", "L4", "L1", "L1", "L1", "L5", "L2", "L2", "L2", "L3", "W", "L5", "L5", "L2", "L5", "L3", "L2", "L2", "L3", "L3", "L3", "H2", "EL", "L5", "L2", "L1", "L1", "L2", "L3", "L3", "L2", "L5", "L1", "L1", "H1", "L3", "L3", "H2", "L3", "L3", "L3", "H1", "L1", "L1", "L4", "H1", "L3", "L3", "L1", "L1", "L1", "L4", "L2", "L3", "L4", "L4", "L2", "W", "L1", "H1", "L1", "L1", "L2", "H1", "BO", "H1", "L1", "L4", "L2", "H2", "L2", "L3", "W", "L5", "L3", "H1", "L5", "L2", "L5", "H2", "H2", "L2", "L5", "H3", "L3", "L1", "H2", "H1", "L5", "W", "L3", "L4", "L5", "W", "L1", "H1", "L2", "L1", "H2", "L5", "L2", "L3", "L2", "L5", "L1", "L3", "L1", "H4", "H3", "L2", "H2", "L2", "H2", "L1", "L1", "L5", "W", "L5", "L5", "L3", "L2", "L4", "L2", "L1", "H1", "H4", "L1", "L5", "H2", "H1", "H3", "L1", "H1", "L2", "H1", "L1", "H1", "L4", "H1", "L2", "L4", "L4", "L3", "L4", "L3"], ["L1", "L3", "L5", "L4", "L2", "H3", "H2", "L4", "L2", "L2", "H3", "W", "L3", "L4", "H2", "L2", "L2", "L2", "L3", "L3", "L2", "H2", "W", "L1", "L1", "L1", "L5", "L2", "H1", "L2", "EL", "H1", "L1", "L4", "L5", "L1", "L1", "L4", "L5", "L2", "L1", "L1", "L3", "H2", "L5", "L5", "L5", "L2", "BO", "L1", "L1", "L3", "L3", "L3", "L5", "H4", "L1", "L2", "L3", "L1", "L5", "L1", "H1", "L3", "L3", "L3", "L4", "L2", "L2", "L2", "L1", "L3", "L4", "L5", "H3", "L3", "L5", "L3", "L3", "L1", "L3", "L5", "L1", "L2", "L1", "L1", "H2", "L5", "L5", "L2", "L1", "L2", "H2", "H4", "H1", "L3", "L5", "L5", "L5", "H3", "L1", "L4", "L1", "L2", "L1", "L5", "L5", "L1", "L1", "L3", "L4", "L3", "L3", "L3", "L1", "L3", "L3", "H3", "L3", "H2", "L5", "L1", "L3", "L2", "L3", "L4", "L4", "L1", "L5", "L4", "L4", "L1", "L1", "L1", "L1", "H1", "L1", "L4", "W", "L5", "L1", "L4", "L3", "H1", "L1", "L2", "L1", "L3", "L1", "L2", "L1", "L3", "L2", "L1", "L1", "H3", "H2", "H1", "L2", "L5", "L1", "L5", "H1", "L4", "W", "H1", "H1", "L4", "L3", "L2", "L1", "L3", "L2", "L3", "L2", "L3", "H1", "L2", "L2", "L3", "L2", "L2", "L4", "H4", "L1", "L1", "L2", "L5", "L3", "L5", "L2", "H3", "L1", "L2", "L1", "L3", "L1", "L5", "L5", "L3", "H4", "L5", "L2", "L5", "L3", "L1", "H1", "L5", "H1", "L1", "L2", "L1", "L3", "L4", "H2", "H1", "H1", "L1", "L3", "L3", "L3", "L1", "L5", "L2", "L1", "L1", "L4", "L5", "L1", "H2", "L3", "H1", "L1", "L2", "L4", "L1", "H2", "L1", "L4", "L1", "L2", "L5", "L3", "L4", "L4", "L4", "H4", "L4", "L2", "L5", "EL", "H4", "L4", "L5", "H1", "L1", "L5", "L4", "L5", "L3", "L5", "L2", "L2", "L3", "L1", "H2", "L3", "L3", "H1", "L4", "L2", "H3", "L3", "BO", "L2", "L3", "L1", "L2", "L1", "H1", "L1", "L5", "H2", "L5", "H4", "L3", "H2", "L4", "L1", "L2", "L2", "L1", "L5", "H2", "L1", "L3", "L5", "L1", "L5", "EL", "H3", "L5", "L1", "L1", "H4", "L2", "L2"]], "6": [["L4", "L2", "L3", "L3", "H4", "H4", "H3", "L2", "L3", "L1", "L3", "L1", "L1", "H4", "L3", "H2", "L5", "L5", "H1", "L1", "L1", "H2", "H1", "L1", "L2", "L4", "L3", "L2", "L3", "L3", "H2", "L1", "L4", "L2", "L1", "L1", "L4", "L5", "L5", "L2", "H3", "L4", "H3", "L5", "L4", "H1", "L4", "L4", "L2", "L2", "L3", "L3", "L1", "H1", "L3", "L1", "H1", "L1", "L2", "L4", "L3", "L3", "L5", "L3", "L3", "L2", "L4", "L5", "L2", "L5", "L3", "L5", "L2", "L4", "L1", "L2", "L2", "L1", "H4", "L4", "L5", "L2", "H1", "L1", "L2", "L1", "H2", "L1", "L5", "H4", "L1", "L5", "L1", "L2", "L3", "L1", "L4", "L1", "H4", "L4", "L3", "L3", "L1", "H3", "L1", "L4", "L1", "L2", "L3", "L1", "H3", "L5", "H1", "L4", "L1", "L2", "H1", "L3", "H1", "L5", "L2", "L1", "H2", "L2", "L3", "L2", "EL", "L3", "H1", "L5", "L4", "L1", "L5", "H1", "L2", "H1", "L1", "L4", "EL", "L2", "L2", "H1", "L2", "L5", "L2", "H1", "L1", "L5", "L4", "H4", "L2", "L1", "L3", "L2", "L1", "L2", "L5", "L1", "L2", "L1", "H2", "H1", "L3", "L3", "L5", "L1", "L3", "L4", "L4", "L5", "L4", "H1", "L3", "H2", "H2", "L3", "H3", "EL", "H2", "L1", "L4", "H1", "L2", "L2", "L3", "L2", "L1", "H2", "L2", "L4", "H2", "L3", "L3", "L4", "L1", "L4", "L4", "L5", "L1", "L4", "L5", "H1", "L2", "L4", "L5", "L4", "L2", "L3", "H2", "L5", "H2", "L5", "L2", "L1", "L5", "L1", "L3", "L1", "H1", "L2", "L4", "L3", "L3", "L2", "L2", "L3", "L1", "L4", "L1", "L5", "L4", "L2", "L2", "L3", "H1", "L1", "L5", "L5", "H4", "W", "L1", "L3", "H2", "L1", "L3", "L3", "L3", "L2", "L1", "H1", "H2", "L2", "L1", "L3", "W", "L2", "H2", "L1", "L1", "L2", "L5", "L1", "L4", "L5", "L2", "H3", "L5", "L1", "L5", "L1", "L3", "L4", "L1", "H1", "L5", "L4", "L2", "L1", "L3", "L3", "L5", "H4", "L2", "H1", "L1", "L3", "L2", "L1", "L3", "L4", "H1", "L2", "L3", "L2", "L1", "H4", "L1", "H2", "L2", "L4", "L2", "L2", "L5", "L4", "L5", "L3", "H2"], ["L3", "L1", "L4", "L2", "L1", "L4", "L5", "W", "L4", "L1", "L1", "L4", "H1", "L5", "H2", "L5", "L2", "H1", "L3", "L2", "L1", "L5", "W", "L3", "L4", "L2", "H1", "L1", "L1", "L1", "L1", "H3", "L5", "L1", "H2", "L2", "L4", "L4", "BO", "L2", "L4", "L3", "L4", "L2", "L2", "L2", "L2", "L4", "L2", "L3", "L5", "L1", "L1", "L4", "H1", "H1", "L3", "L1", "H2", "L1", "L4", "L2", "L4", "L4", "L1", "L3", "L1", "L2", "L3", "L4", "L1", "L4", "L1", "H1", "L3", "L3", "H1", "H3", "L3", "L1", "L1", "L1", "L3", "L4", "L1", "L1", "L3", "H1", "L4", "L3", "L2", "L1", "L3", "L4", "H4", "L3", "L3", "L5", "L5", "L1", "L1", "H1", "L1", "L4", "H2", "L4", "L1", "L2", "H2", "L4", "L5", "L2", "L4", "H2", "L5", "L2", "L1", "L5", "L3", "L1", "L2", "L3", "L2", "L1", "L4", "H4", "L2", "H1", "L2", "H2", "L2", "L4", "L2", "L3", "L4", "L4", "L2", "H1", "L5", "L1", "L3", "L5", "L4", "L4", "L2", "L4", "L2", "BO", "L1", "L4", "L1", "H1", "H1", "W", "L4", "W", "L3", "H1", "H2", "L3", "EL", "L4", "L4", "H1", "L1", "L2", "L1", "L1", "L3", "L2", "L4", "L1", "L3", "L3", "L2", "L4", "H4", "L1", "H4", "BO", "H2", "L4", "L1", "L1", "H2", "L4", "L3", "L3", "L1", "L4", "H3", "L3", "L1", "H2", "L1", "L1", "L5", "L2", "L4", "L5", "L5", "L2", "L2", "L1", "L5", "L3", "L4", "L1", "L1", "L2", "L4", "L4", "L2", "L1", "L1", "H4", "L1", "H2", "H1", "H1", "H2", "L1", "L3", "L4", "L2", "H3", "L1", "H1", "L3", "L1", "L3", "H1", "H1", "L1", "L5", "L5", "L2", "L1", "L1", "L4", "L2", "L1", "H3", "H4", "L5", "L3", "L5", "L1", "H3", "H1", "L2", "L3", "H1", "L2", "L1", "H2", "H3", "L1", "L4", "L1", "L3", "L5", "W", "L3", "L2", "L2", "L5", "L3", "L3", "L3", "L4", "L2", "H4", "L3", "L5", "L4", "L2", "L3", "L4", "H1", "L1", "L3", "L2", "L1", "L3", "L4", "L1", "L5", "H2", "L3", "L2", "L1", "L4", "L4", "H1", "L3", "L2", "L1", "L4", "H1", "L1", "L1", "L2", "L2", "L2", "L1", "L5"], ["L1", "L1", "L3", "L3", "L4", "L1", "L1", "L4", "H2", "L2", "L1", "L1", "L1", "L4", "L2", "L2", "EL", "L4", "L5", "L3", "L3", "L1", "L1", "H2", "L3", "EL", "L3", "L1", "L2", "L3", "L5", "L3", "L5", "L2", "L2", "L4", "L1", "L1", "L3", "L1", "L1", "L3", "H1", "L3", "H2", "H3", "L1", "L4", "L5", "L3", "L3", "H1", "L1", "L5", "L1", "L4", "H2", "L3", "L3", "L2", "L2", "L3", "L1", "L1", "L5", "L2", "L1", "L3", "L1", "L2", "L3", "L1", "H2", "H1", "H4", "L2", "H2", "L4", "H2", "L4", "L1", "L1", "L1", "L2", "L1", "L3", "H2", "H4", "L3", "L3", "L4", "L2", "L3", "L4", "L1", "H4", "L5", "H1", "L2", "L3", "H2", "L4", "L4", "L2", "L4", "L4", "L5", "L3", "L5", "L4", "L4", "L1", "L3", "L4", "L2", "L5", "L2", "H3", "L1", "L4", "H2", "H1", "L2", "L4", "L1", "L3", "L4", "L1", "L3", "L4", "L5", "H2", "L1", "L2", "L3", "W", "L3", "L4", "L5", "L3", "L2", "L2", "L1", "L3", "L5", "H4", "EL", "L1", "L5", "L4", "L4", "L5", "L2", "H3", "H2", "L3", "L2", "L3", "H2", "L3", "L1", "L1", "L5", "H1", "L3", "L2", "L5", "L4", "L4", "H2", "L2", "H1", "H2", "L1", "H4", "H4", "L2", "L1", "H2", "L3", "L3", "H3", "L2", "L2", "L2", "L3", "L4", "L3", "L2", "L4", "H2", "L3", "L2", "L3", "L4", "H2", "L5", "L4", "L5", "L2", "L3", "L4", "L1", "L1", "L1", "L1", "L3", "L1", "L5", "L2", "L3", "L5", "L5", "L2", "L1", "W", "L1", "L3", "L5", "L1", "L1", "L3", "L4", "L1", "L4", "L5", "L5", "L1", "L1", "L5", "H1", "L3", "L4", "L2", "L3", "L4", "L1", "L3", "H4", "L5", "H1", "L5", "H1", "H2", "L1", "L3", "L3", "L1", "L1", "L2", "L1", "L2", "L5", "H2", "H4", "L5", "L2", "H1", "L4", "L5", "H2", "L3", "L4", "L5", "L2", "L1", "H3", "L5", "L5", "H1", "L4", "EL", "L4", "L2", "L1", "L1", "L3", "L3", "H1", "L1", "L5", "L3", "L3", "H4", "L5", "L1", "W", "L1", "L1", "L4", "L1", "H3", "L5", "L1", "L2", "L5", "L2", "L2", "L4", "L3", "L1", "L5", "L4", "L3", "L4", "H1", "L4"], ["L3", "L2", "L1", "L1", "L5", "L1", "L1", "H2", "L3", "L4", "L1", "L1", "L1", "L5", "L1", "H1", "L1", "L1", "L1", "H1", "L4", "L2", "L1", "L1", "L1", "L2", "L1", "L5", "H4", "L1", "H3", "L1", "L5", "H4", "H1", "H1", "L1", "H2", "L2", "H1", "L3", "L3", "L3", "L2", "L3", "H4", "L5", "L3", "L1", "L2", "H3", "H4", "L3", "L4", "L4", "L1", "L1", "L4", "L1", "H2", "L2", "L1", "L1", "L1", "L1", "L5", "L4", "L2", "L3", "L3", "H2", "L5", "L1", "H1", "L1", "L2", "L4", "H1", "L3", "L4", "H3", "L4", "L4", "L3", "L1", "L5", "BO", "L5", "L5", "L4", "L1", "L4", "L2", "L1", "L2", "L1", "L1", "L2", "L3", "L5", "L2", "L1", "L1", "L2", "H4", "L5", "L1", "L2", "L2", "EL", "L1", "H1", "L3", "L5", "L3", "L1", "L1", "L5", "L5", "L1", "L1", "L2", "H1", "L2", "L1", "L5", "L3", "L3", "L2", "L3", "EL", "H3", "L1", "H1", "L2", "L3", "L2", "L1", "L2", "L5", "L1", "L4", "H2", "L4", "L4", "L4", "L1", "H1", "H4", "L1", "L1", "L3", "H2", "L4", "L4", "L3", "L1", "L2", "L1", "EL", "L4", "H1", "L3", "L1", "BO", "L3", "H2", "L4", "L4", "L1", "L2", "L5", "L5", "L1", "H1", "L3", "L1", "L1", "H4", "H1", "L2", "L1", "L2", "EL", "L4", "L2", "L3", "L2", "L3", "L4", "L3", "L4", "L1", "L1", "L2", "L4", "L4", "L2", "L3", "L1", "L2", "L3", "H1", "L1", "L5", "L1", "L4", "L2", "L1", "L4", "W", "L4", "H3", "BO", "L1", "H3", "L4", "H2", "L1", "L2", "H1", "L5", "L3", "H1", "L2", "L5", "L5", "H1", "L1", "L2", "L1", "L5", "L3", "L3", "L3", "L4", "L4", "L1", "L5", "L1", "L2", "L5", "L1", "L4", "H1", "L1", "L1", "L5", "L5", "L5", "L4", "H3", "L3", "L2", "L4", "L2", "L2", "L2", "L1", "L2", "L4", "L4", "L5", "H1", "L1", "L2", "L2", "L4", "H2", "L2", "L5", "H2", "L5", "H2", "L3", "H1", "H3", "L1", "L3", "H1", "L2", "L4", "L4", "L1", "H1", "L2", "H4", "L4", "H1", "L3", "L4", "L4", "L3", "L3", "L5", "L4", "L1", "L2", "L5", "L2", "L3", "H4", "L2", "L1", "L3", "L1", "L2"], ["L2", "L2", "L2", "L1", "H2", "L3", "L3", "L3", "L3", "L1", "L3", "L1", "L5", "H1", "L1", "L1", "L4", "L5", "L5", "L3", "L2", "L2", "L1", "L3", "L4", "L2", "L2", "L4", "L1", "L5", "L1", "H1", "L3", "L1", "L3", "L4", "H4", "L2", "L4", "L3", "H4", "L5", "H1", "L5", "L3", "L5", "L2", "L5", "L2", "L4", "L3", "L5", "H2", "L1", "L1", "L2", "H1", "L3", "L1", "L1", "L2", "L3", "H1", "L2", "EL", "H1", "H4", "L2", "L3", "H1", "L3", "L2", "H2", "H2", "L2", "L3", "L1", "L5", "L3", "L3", "H2", "L4", "L5", "L4", "L2", "L2", "L2", "L4", "L4", "L1", "H1", "L1", "L4", "L2", "L2", "H1", "L2", "L3", "L4", "H2", "L3", "L2", "L1", "L1", "L1", "L2", "L3", "H2", "L3", "L1", "L3", "L1", "L5", "H1", "L5", "L1", "L4", "L2", "L2", "H2", "L1", "L4", "L4", "L3", "L3", "L1", "L1", "L1", "L1", "L3", "EL", "L5", "H2", "L1", "L1", "L3", "L1", "L5", "L2", "L3", "H1", "L5", "H1", "H1", "L1", "W", "L2", "L1", "L5", "BO", "L5", "L2", "L5", "L2", "H1", "L5", "H4", "L3", "H2", "L3", "H1", "L4", "H3", "L1", "L1", "L3", "L4", "L5", "L2", "L1", "L4", "H1", "L5", "L2", "L3", "L3", "L3", "L1", "L3", "L3", "L2", "L2", "L2", "L1", "L4", "L1", "L4", "H2", "L3", "L1", "L1", "L3", "H4", "L3", "L3", "H1", "L4", "H3", "L2", "L2", "L2", "EL", "L1", "H1", "L4", "L4", "L1", "L1", "L3", "EL", "L3", "L1", "L3", "H2", "L4", "L2", "H2", "L2", "L5", "L3", "L3", "L1", "L2", "L1", "L3", "L3", "H2", "H1", "L5", "BO", "L3", "H1", "L1", "L2", "L2", "L1", "L3", "H1", "L5", "L1", "L2", "L1", "H2", "L5", "L3", "EL", "H2", "L1", "L4", "L1", "L2", "H1", "L1", "L4", "H2", "L1", "H2", "L1", "W", "L5", "L4", "L2", "L4", "L2", "L1", "L1", "L1", "L3", "L3", "H1", "H3", "L1", "L1", "H3", "L5", "L4", "L1", "L3", "L5", "L4", "L1", "L2", "L4", "L3", "L4", "L5", "H1", "L4", "EL", "L4", "L5", "L3", "H1", "L4", "L2", "H2", "W", "L1", "W", "L3", "L5", "L1", "L2", "L2", "L5", "H1", "L4"]]};
+
+</script>
+<script>
+// Boss Lines - Normal Bonus - real-mechanic simulation engine.
+// Pure JS, no DOM dependency (can run headless in Node for verification).
+// Reimplements game_config.py / game_bonus.py / game_executables.py for
+// tier="normal" only, using the real reel strips in REEL_STRIPS.
+"use strict";
+
+// ---------- Real config constants (transcribed from game_config.py) ----------
+
+const PAYTABLE = {
+  L1: { 3: 0.1, 4: 0.2, 5: 0.5 },
+  L2: { 3: 0.2, 4: 0.3, 5: 0.8 },
+  L3: { 3: 0.2, 4: 0.4, 5: 1.0 },
+  L4: { 3: 0.3, 4: 0.6, 5: 1.5 },
+  L5: { 3: 0.5, 4: 1.0, 5: 2.5 },
+  H1: { 3: 1.0, 4: 2.0, 5: 5.0 },
+  H2: { 3: 1.5, 4: 4.0, 5: 10.0 },
+  H3: { 3: 2.0, 4: 6.0, 5: 15.0 },
+  H4: { 3: 3.0, 4: 8.0, 5: 20.0 },
+};
+
+const PAYLINES = [
+  [0, 0, 0, 0, 0], [1, 1, 1, 1, 1], [2, 2, 2, 2, 2], [3, 3, 3, 3, 3], [4, 4, 4, 4, 4],
+  [0, 1, 2, 3, 4], [4, 3, 2, 1, 0], [0, 1, 2, 1, 0], [4, 3, 2, 3, 4], [1, 2, 3, 2, 1],
+  [3, 2, 1, 2, 3], [2, 1, 0, 1, 2], [2, 3, 4, 3, 2], [1, 0, 1, 0, 1], [3, 4, 3, 4, 3],
+];
+
+const SYMBOL_DAMAGE_RANGE = {
+  L1: [5, 10], L2: [6, 12], L3: [8, 15], L4: [10, 18], L5: [12, 20],
+  H1: [15, 25], H2: [18, 30], H3: [20, 40], H4: [25, 50],
+};
+const SYMBOL_RANK_ORDER = ["L1", "L2", "L3", "L4", "L5", "H1", "H2", "H3", "H4"];
+const WILD_DAMAGE_MULTIPLIER = 2.0;
+
+const BOSS_STAGE_TABLE = {
+  1: { boss1: [20, 120], boss2: [24, 150], boss3: [20, 100] },
+  2: { boss1: [24, 150], boss2: [28, 200], boss3: [24, 120] },
+  3: { boss1: [28, 200], boss2: [35, 250], boss3: [28, 160] },
+  4: { boss1: [35, 250], boss2: [45, 320], boss3: [35, 210] },
+  5: { boss1: [45, 320], boss2: [60, 400], boss3: [45, 270] },
+  6: { boss1: [60, 450], boss2: [80, 600], boss3: [60, 400] },
+};
+const BOSS_VARIANCE_RANGE = [0.75, 1.25];
+const BOSS_HP_SPREAD_MAX = 0.35;
+const BOSS_HP_REROLL_ATTEMPTS = 60;
+const BOSS_IDS = ["boss1", "boss2", "boss3"];
+const BOSS_PRIMARY_ZONE = { 0: "boss1", 2: "boss2", 4: "boss3" };
+const BOSS_FALLBACK_ZONE = { 1: ["boss1", "boss2"], 3: ["boss3", "boss2"] };
+const MAX_STAGE = 6;
+
+const STAGE_CLEAR_REMOVED_SYMBOL = { 1: "L1", 2: "L2", 3: "L3", 4: "L4", 5: "L5", 6: null };
+const STAGE_CLEAR_HP_GRANT = 50;
+
+const ELIXIR_HEAL_PCT_RANGE = [0.10, 1.00];
+const ELIXIR_HEAL_ROUND_TO = 10;
+const BOOSTER_DAMAGE_MULTIPLIER = 2.0;
+
+const BONUS_SAFETY_CAP_SPINS = 500;
+const MAX_RESOLVE_PASSES_SAFETY = 80;
+
+// Reel filenames match REEL_STRIPS keys "1".."6" directly (BM_Reels_S{stage}).
+
+// Config toggle presets (the two candidates under test).
+const SESSION_CONFIGS = {
+  production: { label: "Production", hpChoices: [50, 50, 50, 100, 100], dmgMult: 1.0 },
+  candidate: { label: "Candidate hp200+dmg45%", hpChoices: [200, 200, 200, 200, 200], dmgMult: 0.45 },
+};
+
+// Illustrative-only boss-defeat cash table (NOT the real 21-tier reward_drop table).
+const REWARD_DROP_TABLE = [
+  { mult: 1, w: 30 }, { mult: 2, w: 25 }, { mult: 3, w: 15 }, { mult: 5, w: 12 },
+  { mult: 8, w: 8 }, { mult: 15, w: 5 }, { mult: 25, w: 3 }, { mult: 50, w: 1.5 }, { mult: 100, w: 0.5 },
+];
+const REWARD_DROP_TABLE_LAST = [
+  { mult: 2, w: 10 }, { mult: 3, w: 15 }, { mult: 5, w: 15 }, { mult: 8, w: 15 },
+  { mult: 15, w: 15 }, { mult: 25, w: 12 }, { mult: 50, w: 10 }, { mult: 100, w: 5 }, { mult: 250, w: 3 },
+];
+
+// ---------- RNG helpers ----------
+function rand(lo, hi) { return lo + Math.random() * (hi - lo); }
+function randInt(loInclusive, hiInclusive) { return Math.floor(rand(loInclusive, hiInclusive + 1)); }
+function choice(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function weightedChoice(rows) {
+  const total = rows.reduce((a, r) => a + r.w, 0);
+  let x = Math.random() * total;
+  for (const r of rows) { x -= r.w; if (x <= 0) return r.mult; }
+  return rows[rows.length - 1].mult;
+}
+
+// ---------- Boss rolling ----------
+function rollStageBosses(stage) {
+  const base = BOSS_STAGE_TABLE[stage];
+  let dam = {}, hp = {};
+  for (let attempt = 0; attempt < BOSS_HP_REROLL_ATTEMPTS; attempt++) {
+    for (const b of BOSS_IDS) {
+      const [baseDam, baseHp] = base[b];
+      dam[b] = Math.round(baseDam * rand(BOSS_VARIANCE_RANGE[0], BOSS_VARIANCE_RANGE[1]));
+      hp[b] = Math.round((baseHp * rand(BOSS_VARIANCE_RANGE[0], BOSS_VARIANCE_RANGE[1])) / 10) * 10;
+    }
+    const vals = BOSS_IDS.map((b) => hp[b]);
+    const maxHp = Math.max(...vals), minHp = Math.min(...vals);
+    if (maxHp <= 0 || (maxHp - minHp) / maxHp <= BOSS_HP_SPREAD_MAX) break;
+  }
+  return {
+    stage,
+    dam,
+    hp: { ...hp },
+    hpMax: { ...hp },
+    alive: { boss1: true, boss2: true, boss3: true },
+    defeatOrder: [],
+    active: true,
+  };
+}
+
+function routeBossForColumn(col, bossState) {
+  if (col in BOSS_PRIMARY_ZONE) return BOSS_PRIMARY_ZONE[col];
+  const [primary, fallback] = BOSS_FALLBACK_ZONE[col];
+  return bossState.alive[primary] ? primary : fallback;
+}
+
+// ---------- Board / reel handling ----------
+function newReelCursors(stage) {
+  // One cursor per reel = "topIndex", the strip index currently showing at
+  // board row 0 for that reel (mirrors real Board.reel_positions).
+  const strips = REEL_STRIPS[String(stage)];
+  return strips.map((strip) => randInt(0, strip.length - 1));
+}
+
+function drawInitialBoard(stage, cursors) {
+  const strips = REEL_STRIPS[String(stage)];
+  const board = [];
+  for (let r = 0; r < 5; r++) {
+    const strip = strips[r];
+    const start = randInt(0, strip.length - 1);
+    const col = [];
+    for (let i = 0; i < 5; i++) col.push(strip[(start + i) % strip.length]);
+    cursors[r] = start; // topIndex = row 0's strip index (matches reel_positions)
+    board.push(col);
+  }
+  return board;
+}
+
+function resampleValidSymbol(reel, stage, cursors, removedSymbols) {
+  // Real resample_valid_symbol draws ONE replacement from a fresh random
+  // offset in that reel's own strip - it does NOT move the tumble
+  // continuation cursor (`cursors` is only ever advanced by tumbleBoard's
+  // sequential-continuation refill).
+  const strip = REEL_STRIPS[String(stage)][reel];
+  for (let tries = 0; tries < 50; tries++) {
+    const idx = randInt(0, strip.length - 1);
+    const sym = strip[idx];
+    if (sym !== "W" && sym !== "SC" && !removedSymbols.has(sym)) return sym;
+  }
+  for (let idx = 0; idx < strip.length; idx++) {
+    const sym = strip[idx];
+    if (sym !== "W" && sym !== "SC" && !removedSymbols.has(sym)) return sym;
+  }
+  return strip[0];
+}
+
+function enforceRemovedSymbols(board, stage, cursors, removedSymbols) {
+  if (removedSymbols.size === 0) return [];
+  const changed = [];
+  for (let r = 0; r < 5; r++) {
+    for (let row = 0; row < 5; row++) {
+      if (removedSymbols.has(board[r][row])) {
+        board[r][row] = resampleValidSymbol(r, stage, cursors, removedSymbols);
+        changed.push([r, row]);
+      }
+    }
+  }
+  return changed;
+}
+
+function tumbleBoard(board, exploded, stage, cursors) {
+  // exploded: 5x5 boolean grid. Gravity down; refill from the TOP by
+  // extending the strip BACKWARD from the current topIndex (matches real
+  // Tumble.tumble_board: reel_positions decrements per new symbol, and the
+  // new symbols are inserted top-to-bottom in strictly increasing strip-
+  // index order starting at the new, lower topIndex) - NOT a fresh-random
+  // draw and NOT continuing forward past the old bottom row.
+  const strips = REEL_STRIPS[String(stage)];
+  const dropInfo = [];
+  for (let r = 0; r < 5; r++) {
+    const survivors = [];
+    for (let row = 0; row < 5; row++) if (!exploded[r][row]) survivors.push(board[r][row]);
+    const numNew = 5 - survivors.length;
+    if (numNew > 0) {
+      const strip = strips[r];
+      const len = strip.length;
+      cursors[r] = ((cursors[r] - numNew) % len + len) % len;
+      const fresh = [];
+      for (let j = 0; j < numNew; j++) fresh.push(strip[(cursors[r] + j) % len]);
+      board[r] = fresh.concat(survivors);
+      dropInfo.push({ reel: r, newRows: Array.from({ length: numNew }, (_, i) => i) });
+    } else {
+      board[r] = survivors;
+    }
+  }
+  return dropInfo;
+}
+
+// ---------- Line evaluation ----------
+function evaluateLines(board) {
+  // NOTE: Wild ("W") CAN land on reel 0 (verified against the real reel
+  // CSVs directly - contrary to an earlier, incorrect assumption) - so the
+  // anchor is the first NON-wild symbol scanning left-to-right, which may
+  // sit behind 1+ leading wilds. The contiguous match is counted from
+  // position 0 (not from the anchor's own index), so leading wilds count
+  // toward kindCount exactly like any other wild-substituted position.
+  const wins = [];
+  for (let li = 0; li < PAYLINES.length; li++) {
+    const line = PAYLINES[li];
+    const cellsSym = line.map((row, reel) => board[reel][row]);
+    let anchorIdx = -1;
+    for (let i = 0; i < 5; i++) { if (cellsSym[i] !== "W") { anchorIdx = i; break; } }
+    if (anchorIdx === -1) continue; // all 5 wild - no anchor, W has no paytable entry
+    const anchorSym = cellsSym[anchorIdx];
+    if (!(anchorSym in PAYTABLE)) continue; // not a paying symbol (EL/BO/SC)
+    let kindCount = 0;
+    for (let i = 0; i < 5; i++) {
+      if (cellsSym[i] === anchorSym || cellsSym[i] === "W") kindCount++;
+      else break;
+    }
+    if (kindCount < 3) continue;
+    if (!(kindCount in PAYTABLE[anchorSym])) continue;
+    const positions = [];
+    for (let i = 0; i < kindCount; i++) positions.push([i, line[i]]);
+    wins.push({ lineIndex: li, anchorSym, kindCount, pay: PAYTABLE[anchorSym][kindCount], positions });
+  }
+  return wins;
+}
+
+function hasElixirOrBooster(board) {
+  let el = false, bo = false;
+  for (let r = 0; r < 5; r++) for (let row = 0; row < 5; row++) {
+    if (board[r][row] === "EL") el = true;
+    if (board[r][row] === "BO") bo = true;
+  }
+  return { el, bo };
+}
+
+// ---------- Damage resolution for one pass ----------
+function dealDamageToBoss(reel, damage, bossState, ctx) {
+  if (!bossState.active) return;
+  const bossId = routeBossForColumn(reel, bossState);
+  if (!bossState.alive[bossId]) return;
+  bossState.hp[bossId] = Math.max(0, bossState.hp[bossId] - damage);
+  ctx.damageEvents.push({ reel, boss: bossId, amount: damage, stage: bossState.stage });
+  if (bossState.hp[bossId] <= 0) onBossDefeated(bossId, bossState, ctx);
+}
+
+function onBossDefeated(bossId, bossState, ctx) {
+  bossState.alive[bossId] = false;
+  bossState.defeatOrder.push(bossId);
+  const isLast = bossState.defeatOrder.length === 3;
+  const mult = weightedChoice(isLast ? REWARD_DROP_TABLE_LAST : REWARD_DROP_TABLE);
+  ctx.cashWin += mult;
+  ctx.events.push({ type: "bossDefeated", boss: bossId, stage: bossState.stage, isLast, mult });
+  if (isLast) clearStage(bossState, ctx);
+}
+
+function clearStage(bossState, ctx) {
+  const clearedStage = bossState.stage;
+  const removedSym = STAGE_CLEAR_REMOVED_SYMBOL[clearedStage];
+  if (removedSym) ctx.removedSymbols.add(removedSym);
+  const nextStage = clearedStage + 1;
+  if (nextStage > MAX_STAGE) {
+    bossState.active = false;
+    ctx.events.push({ type: "stageCleared", stage: clearedStage, final: true });
+  } else {
+    const rolled = rollStageBosses(nextStage);
+    Object.assign(bossState, rolled);
+    ctx.events.push({ type: "stageCleared", stage: clearedStage, final: false, nextStage });
+  }
+  ctx.playerHp += STAGE_CLEAR_HP_GRANT;
+  ctx.playerHpMax += STAGE_CLEAR_HP_GRANT;
+  ctx.events.push({ type: "hpGrant", amount: STAGE_CLEAR_HP_GRANT, hp: ctx.playerHp, hpMax: ctx.playerHpMax });
+}
+
+function resolveExplosionsForWins(board, wins, bossState, ctx, dmgMult, boosterMult) {
+  // Real mechanic (game_calculations.py:evaluate_and_explode): a payline win
+  // only decides WHICH symbol *type* won - once it wins, EVERY instance of
+  // that symbol name anywhere on the whole 5x5 board explodes and deals
+  // damage, not just the cells inside the winning line. Wild cells explode
+  // too, but only if that specific cell was part of a winning line's
+  // positions (never every wild on the board).
+  const winningNames = new Set();
+  const wildReplacedBy = new Map(); // "reel,row" -> Set(names it substituted for)
+  for (const w of wins) {
+    winningNames.add(w.anchorSym);
+    for (const [reel, row] of w.positions) {
+      if (board[reel][row] === "W") {
+        const key = reel + "," + row;
+        if (!wildReplacedBy.has(key)) wildReplacedBy.set(key, new Set());
+        wildReplacedBy.get(key).add(w.anchorSym);
+      }
+    }
+  }
+
+  const exploding = []; // {reel,row,kind:"normal"|"wild",refName}
+  for (let r = 0; r < 5; r++) {
+    for (let row = 0; row < 5; row++) {
+      const sym = board[r][row];
+      if (winningNames.has(sym)) exploding.push({ reel: r, row, kind: "normal", refName: sym });
+    }
+  }
+  for (const [key, names] of wildReplacedBy.entries()) {
+    const [r, row] = key.split(",").map(Number);
+    let best = null, bestRank = -1;
+    for (const s of names) {
+      const rk = SYMBOL_RANK_ORDER.indexOf(s);
+      if (rk > bestRank) { bestRank = rk; best = s; }
+    }
+    exploding.push({ reel: r, row, kind: "wild", refName: best });
+  }
+  // Deterministic column-major order, matching the real engine, so a
+  // mid-pass boss death/stage-clear correctly re-routes later instances.
+  exploding.sort((a, b) => (a.reel - b.reel) || (a.row - b.row));
+
+  for (const cell of exploding) {
+    const [lo, hi] = SYMBOL_DAMAGE_RANGE[cell.refName];
+    let dmg = rand(lo, hi);
+    if (cell.kind === "wild") dmg *= WILD_DAMAGE_MULTIPLIER;
+    dmg *= dmgMult * boosterMult;
+    dealDamageToBoss(cell.reel, dmg, bossState, ctx);
+  }
+  return exploding.map((c) => [c.reel, c.row]);
+}
+
+function activateElixirBooster(board, ctx) {
+  const elCells = [], boCells = [];
+  for (let r = 0; r < 5; r++) for (let row = 0; row < 5; row++) {
+    if (board[r][row] === "EL") elCells.push([r, row]);
+    if (board[r][row] === "BO") boCells.push([r, row]);
+  }
+  for (const [r, row] of elCells) {
+    const pct = rand(ELIXIR_HEAL_PCT_RANGE[0], ELIXIR_HEAL_PCT_RANGE[1]);
+    const rawHeal = ctx.playerHp * pct;
+    const heal = Math.round(rawHeal / ELIXIR_HEAL_ROUND_TO) * ELIXIR_HEAL_ROUND_TO;
+    const newHp = Math.min(ctx.playerHpMax, ctx.playerHp + heal);
+    const actualHealed = newHp - ctx.playerHp;
+    ctx.playerHp = newHp;
+    ctx.events.push({ type: "elixir", reel: r, row, healed: actualHealed, hp: ctx.playerHp });
+  }
+  if (boCells.length > 0) {
+    ctx.boosterPendingForNextSpin = true;
+    ctx.events.push({ type: "booster", cells: boCells });
+  }
+  return { elCells, boCells };
+}
+
+// ---------- One internal Bonus spin ----------
+function runOneBonusSpin(bossState, ctx, dmgMult) {
+  const stage = bossState.stage;
+  const cursors = ctx.cursors;
+  const board = drawInitialBoard(stage, cursors);
+  enforceRemovedSymbols(board, stage, cursors, ctx.removedSymbols);
+
+  const spinTrace = { stage, boardSnapshots: [board.map((c) => c.slice())], passes: [] };
+
+  const boosterMult = ctx.boosterPendingForNextSpin ? BOOSTER_DAMAGE_MULTIPLIER : 1.0;
+  ctx.boosterPendingForNextSpin = false;
+
+  let passCount = 0;
+  while (passCount < MAX_RESOLVE_PASSES_SAFETY) {
+    const wins = evaluateLines(board);
+    if (wins.length > 0) {
+      const dmgBefore = ctx.damageEvents.length;
+      const explodedCells = resolveExplosionsForWins(board, wins, bossState, ctx, dmgMult, boosterMult);
+      const damageSlice = ctx.damageEvents.slice(dmgBefore);
+      const exploded = Array.from({ length: 5 }, () => Array(5).fill(false));
+      for (const [r, row] of explodedCells) exploded[r][row] = true;
+      tumbleBoard(board, exploded, stage, cursors);
+      enforceRemovedSymbols(board, stage, cursors, ctx.removedSymbols);
+      const bossSnapshot = JSON.parse(JSON.stringify(bossState));
+      spinTrace.passes.push({ wins, explodedCells, damageSlice, boardAfter: board.map((c) => c.slice()), bossSnapshot });
+      passCount++;
+      continue;
+    }
+    const eb = hasElixirOrBooster(board);
+    if (eb.el || eb.bo) {
+      const { elCells, boCells } = activateElixirBooster(board, ctx);
+      const exploded = Array.from({ length: 5 }, () => Array(5).fill(false));
+      for (const [r, row] of elCells) exploded[r][row] = true;
+      for (const [r, row] of boCells) exploded[r][row] = true;
+      tumbleBoard(board, exploded, stage, cursors);
+      enforceRemovedSymbols(board, stage, cursors, ctx.removedSymbols);
+      spinTrace.passes.push({
+        elixirBooster: true, elCells, boCells, boardAfter: board.map((c) => c.slice()),
+        bossSnapshot: JSON.parse(JSON.stringify(bossState)),
+      });
+      passCount++;
+      continue;
+    }
+    break;
+  }
+  spinTrace.finalBoard = board;
+  return spinTrace;
+}
+
+// ---------- Full Bonus session ----------
+function runBonusSession(configKey, opts) {
+  opts = opts || {};
+  const cfg = SESSION_CONFIGS[configKey];
+  const ctx = {
+    playerHp: 0, playerHpMax: 0,
+    removedSymbols: new Set(),
+    boosterPendingForNextSpin: false,
+    cashWin: 0,
+    events: [],
+    cursors: null,
+    damageEvents: [],
+  };
+  const granted = choice(cfg.hpChoices);
+  ctx.playerHp = granted; ctx.playerHpMax = granted;
+
+  let bossState = rollStageBosses(1);
+  ctx.cursors = newReelCursors(1);
+
+  const trace = opts.trace ? [] : null;
+  let spinCount = 0;
+  let endReason = "safety_cap";
+  const stageReach = { max: 1 };
+
+  while (ctx.playerHp > 0 && spinCount < BONUS_SAFETY_CAP_SPINS) {
+    spinCount++;
+    ctx.damageEvents = [];
+    const eventsBefore = ctx.events.length;
+    const spinTrace = runOneBonusSpin(bossState, ctx, cfg.dmgMult);
+    stageReach.max = Math.max(stageReach.max, bossState.stage);
+    if (trace) {
+      trace.push({
+        spinIndex: spinCount,
+        stageAtStart: spinTrace.stage,
+        spinTrace,
+        events: ctx.events.slice(eventsBefore),
+        damageEvents: ctx.damageEvents.slice(),
+        bossSnapshot: JSON.parse(JSON.stringify(bossState)),
+      });
+    }
+
+    if (!bossState.active) { endReason = "stage_cleared"; break; }
+
+    const totalDamage = BOSS_IDS.reduce((s, b) => s + (bossState.alive[b] ? bossState.dam[b] : 0), 0);
+    ctx.playerHp -= totalDamage;
+    ctx.events.push({ type: "counterattack", amount: totalDamage, hp: ctx.playerHp });
+    if (trace) trace[trace.length - 1].counterattack = { amount: totalDamage, hpAfter: ctx.playerHp };
+    if (ctx.playerHp <= 0) { endReason = "hp_depleted"; break; }
+  }
+
+  return {
+    spinCount, endReason, maxStageReached: stageReach.max,
+    cashWin: ctx.cashWin, finalPlayerHp: ctx.playerHp,
+    trace,
+  };
+}
+
+// ---------- Headless batch stats ----------
+function runBatch(configKey, n) {
+  const spins = [];
+  let cleared = 0, depleted = 0, safetyCap = 0;
+  const stageDist = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+  const cashWins = [];
+  for (let i = 0; i < n; i++) {
+    const r = runBonusSession(configKey, { trace: false });
+    spins.push(r.spinCount);
+    stageDist[r.maxStageReached] = (stageDist[r.maxStageReached] || 0) + 1;
+    if (r.endReason === "stage_cleared") cleared++;
+    else if (r.endReason === "hp_depleted") depleted++;
+    else safetyCap++;
+    cashWins.push(r.cashWin);
+  }
+  spins.sort((a, b) => a - b);
+  cashWins.sort((a, b) => a - b);
+  const mean = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
+  const median = (arr) => arr[Math.floor(arr.length / 2)];
+  const stagePct = {};
+  for (let s = 1; s <= 6; s++) stagePct[s] = (100 * stageDist[s]) / n;
+  return {
+    n,
+    meanSpins: mean(spins), medianSpins: median(spins), maxSpins: spins[spins.length - 1],
+    spinsLE2Pct: (100 * spins.filter((x) => x <= 2).length) / n,
+    clearedPct: (100 * cleared) / n, depletedPct: (100 * depleted) / n, safetyCapPct: (100 * safetyCap) / n,
+    stagePct,
+    meanCash: mean(cashWins), medianCash: median(cashWins),
+  };
+}
+
+// Export for Node-based headless verification (no-op in a browser <script> tag).
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { runBonusSession, runBatch, SESSION_CONFIGS, REEL_STRIPS: typeof REEL_STRIPS !== "undefined" ? REEL_STRIPS : null };
+}
+
+</script>
+<script>
+// Boss Lines - Normal Bonus - UI/animation layer (DOM only, no sim logic).
+"use strict";
+
+const SYMBOL_LABEL = {
+  L1: "L1", L2: "L2", L3: "L3", L4: "L4", L5: "L5",
+  H1: "H1", H2: "H2", H3: "H3", H4: "H4",
+  W: "WILD", EL: "ELX", BO: "BST", SC: "SC",
+};
+
+let state = {
+  configKey: "production",
+  bossState: null,
+  ctx: null,
+  board: null,
+  cursors: null,
+  spinCount: 0,
+  sessionOver: false,
+  autoplay: false,
+  speedMs: { base: 500, tumble: 420, dmg: 380 },
+};
+
+function speedScale() {
+  return 1 / Number(document.getElementById("speedSelect").value);
+}
+function delay(ms) { return new Promise((res) => setTimeout(res, ms * speedScale())); }
+
+function el(tag, cls, text) {
+  const e = document.createElement("div");
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+function log(msg, cls) {
+  const panel = document.getElementById("logPanel");
+  const d = el(cls || "", null, msg);
+  panel.appendChild(d);
+  panel.scrollTop = panel.scrollHeight;
+  while (panel.children.length > 400) panel.removeChild(panel.firstChild);
+}
+
+function fmt(n, d) { return Number(n).toFixed(d === undefined ? 1 : d); }
+
+// ---------- Rendering ----------
+function renderStageTrack() {
+  const track = document.getElementById("stageTrack");
+  track.innerHTML = "";
+  for (let s = 1; s <= 6; s++) {
+    const dot = el("stage-dot");
+    if (s < state.bossState.stage) dot.classList.add("done");
+    else if (s === state.bossState.stage) dot.classList.add("active");
+    track.appendChild(dot);
+  }
+  document.getElementById("stageLabel").textContent = state.bossState.stage;
+}
+
+function renderPlayerHp() {
+  const pct = Math.max(0, Math.min(100, (100 * state.ctx.playerHp) / Math.max(1, state.ctx.playerHpMax)));
+  const fill = document.getElementById("playerHpFill");
+  fill.style.width = pct + "%";
+  fill.classList.toggle("low", pct < 30);
+  document.getElementById("playerHpNum").textContent = `${Math.round(state.ctx.playerHp)} / ${Math.round(state.ctx.playerHpMax)}`;
+  const counter = state.bossState.active
+    ? require_boss_ids().reduce((s, b) => s + (state.bossState.alive[b] ? state.bossState.dam[b] : 0), 0)
+    : 0;
+  document.getElementById("counterReadout").textContent = fmt(counter, 0);
+}
+function require_boss_ids() { return ["boss1", "boss2", "boss3"]; }
+
+function renderBosses(snapshot) {
+  const bs = snapshot || state.bossState;
+  const row = document.getElementById("bossesRow");
+  row.innerHTML = "";
+  for (const b of require_boss_ids()) {
+    const card = el("boss-card");
+    if (!bs.alive[b]) card.classList.add("dead");
+    card.appendChild(el("boss-name", null, b.toUpperCase()));
+    const track = el("boss-hp-track");
+    const fill = el("boss-hp-fill");
+    const pct = Math.max(0, Math.min(100, (100 * bs.hp[b]) / Math.max(1, bs.hpMax[b])));
+    fill.style.width = pct + "%";
+    track.appendChild(fill);
+    card.appendChild(track);
+    card.appendChild(el("boss-hp-num", null, `${Math.round(Math.max(0, bs.hp[b]))}/${bs.hpMax[b]}`));
+    card.appendChild(el("boss-dam-num", null, `dam ${bs.dam[b]}/spin`));
+    card.dataset.boss = b;
+    row.appendChild(card);
+  }
+}
+
+function symbolClass(sym) { return "cell sym-" + sym; }
+
+function renderBoardStatic(board) {
+  const grid = document.getElementById("reelGrid");
+  grid.innerHTML = "";
+  for (let r = 0; r < 5; r++) {
+    const col = el("reel-col");
+    col.dataset.reel = r;
+    for (let row = 0; row < 5; row++) {
+      const sym = board[r][row];
+      const cell = el(symbolClass(sym), null, SYMBOL_LABEL[sym] || sym);
+      cell.dataset.reel = r; cell.dataset.row = row;
+      col.appendChild(cell);
+    }
+    grid.appendChild(col);
+  }
+}
+
+function getCell(reel, row) {
+  return document.querySelector(`#reelGrid .reel-col[data-reel="${reel}"] .cell[data-row="${row}"]`);
+}
+
+async function playSpinAnimation() {
+  const grid = document.getElementById("reelGrid");
+  grid.querySelectorAll(".reel-col").forEach((c) => c.classList.add("spinning"));
+  await delay(320);
+  grid.querySelectorAll(".reel-col").forEach((c) => c.classList.remove("spinning"));
+}
+
+function showBanner(text, sub) {
+  const b = document.getElementById("banner");
+  b.innerHTML = "";
+  b.appendChild(document.createTextNode(text));
+  if (sub) { const s = document.createElement("small"); s.textContent = sub; b.appendChild(s); }
+  b.classList.add("show");
+}
+function hideBanner() { document.getElementById("banner").classList.remove("show"); }
+
+async function flashDamage(reel, row, boss, amount) {
+  const cell = getCell(reel, row);
+  if (!cell) return;
+  const wrap = document.querySelector(".reel-wrap");
+  const rect = cell.getBoundingClientRect();
+  const wrapRect = wrap.getBoundingClientRect();
+  const f = el("dmg-float", null, "-" + Math.round(amount));
+  f.style.left = (rect.left - wrapRect.left + rect.width / 2 - 10) + "px";
+  f.style.top = (rect.top - wrapRect.top) + "px";
+  wrap.appendChild(f);
+  setTimeout(() => f.remove(), 820);
+  const bossCard = document.querySelector(`.boss-card[data-boss="${boss}"]`);
+  if (bossCard) { bossCard.style.transform = "scale(0.95)"; setTimeout(() => (bossCard.style.transform = ""), 140); }
+}
+
+// ---------- Session flow ----------
+function startNewSession() {
+  const cfg = SESSION_CONFIGS[state.configKey];
+  state.ctx = {
+    playerHp: 0, playerHpMax: 0, removedSymbols: new Set(),
+    boosterPendingForNextSpin: false, cashWin: 0, events: [], cursors: null, damageEvents: [],
+  };
+  const granted = choice(cfg.hpChoices);
+  state.ctx.playerHp = granted; state.ctx.playerHpMax = granted;
+  state.bossState = rollStageBosses(1);
+  state.ctx.cursors = newReelCursors(1);
+  state.spinCount = 0;
+  state.sessionOver = false;
+  hideBanner();
+  document.getElementById("logPanel").innerHTML = "";
+  log(`New session — ${cfg.label} — starting HP ${granted}, stage 1`, "hp");
+  renderStageTrack(); renderPlayerHp(); renderBosses();
+  const stage = state.bossState.stage;
+  const cursors = newReelCursors(stage);
+  renderBoardStatic(drawInitialBoard(stage, cursors));
+  document.getElementById("btnSpin").disabled = false;
+}
+
+async function playPass(pass) {
+  if (pass.elixirBooster) {
+    for (const [r, row] of pass.elCells) {
+      const cell = getCell(r, row);
+      if (cell) cell.classList.add("exploding");
+    }
+    for (const [r, row] of pass.boCells) {
+      const cell = getCell(r, row);
+      if (cell) cell.classList.add("exploding");
+    }
+    await delay(260);
+    renderBoardStatic(pass.boardAfter);
+    document.querySelectorAll("#reelGrid .cell").forEach((c) => c.classList.add("dropping"));
+    await delay(140);
+    return;
+  }
+  // highlight winning cells
+  const winCells = new Set();
+  for (const w of pass.wins) for (const [r, row] of w.positions) winCells.add(r + "," + row);
+  for (const key of winCells) {
+    const [r, row] = key.split(",").map(Number);
+    const cell = getCell(r, row);
+    if (cell) cell.classList.add("win");
+  }
+  if (pass.wins.length > 0) {
+    const names = [...new Set(pass.wins.map((w) => w.anchorSym + "x" + w.kindCount))].join(", ");
+    log(`Line win: ${names}`, "win");
+  }
+  await delay(360);
+  for (const [r, row] of pass.explodedCells) {
+    const cell = getCell(r, row);
+    if (cell) cell.classList.add("exploding");
+  }
+  if (pass.damageSlice) await playDamageEvents(pass.damageSlice);
+  if (pass.bossSnapshot) renderBosses(pass.bossSnapshot);
+  await delay(220);
+  renderBoardStatic(pass.boardAfter);
+  document.querySelectorAll("#reelGrid .cell").forEach((c) => c.classList.add("dropping"));
+  await delay(140);
+}
+
+async function playDamageEvents(events) {
+  for (const d of events) {
+    flashDamage(d.reel, 4, d.boss, d.amount);
+    await delay(30);
+  }
+}
+
+async function playSpinEvents(spinRecordEvents) {
+  for (const e of spinRecordEvents) {
+    if (e.type === "bossDefeated") {
+      log(`${e.boss.toUpperCase()} defeated (stage ${e.stage})${e.isLast ? " — last boss!" : ""} +${e.mult}x`, "boss");
+    } else if (e.type === "stageCleared") {
+      if (e.final) {
+        log(`STAGE 6 CLEARED — session complete!`, "stage");
+        showBanner("STAGE 6 CLEARED!", "Full boss-line clear");
+        await delay(900);
+      } else {
+        log(`Stage ${e.stage} cleared → stage ${e.nextStage} bosses rolled`, "stage");
+        showBanner(`STAGE ${e.stage} CLEARED`, `Stage ${e.nextStage} bosses incoming`);
+        await delay(650);
+        hideBanner();
+      }
+      renderStageTrack(); renderBosses();
+    } else if (e.type === "hpGrant") {
+      log(`+${e.amount} Player HP (stage clear bonus) → ${Math.round(e.hp)}/${Math.round(e.hpMax)}`, "hp");
+      renderPlayerHp();
+    } else if (e.type === "elixir") {
+      log(`Elixir: healed +${Math.round(e.healed)} HP → ${Math.round(e.hp)}`, "heal");
+      renderPlayerHp();
+    } else if (e.type === "booster") {
+      log(`Booster collected — next spin's damage x2`, "booster");
+    }
+  }
+}
+
+async function doSpin() {
+  if (state.sessionOver) return;
+  document.getElementById("btnSpin").disabled = true;
+  await playSpinAnimation();
+
+  state.spinCount++;
+  const eventsBefore = state.ctx.events.length;
+  state.ctx.damageEvents = [];
+  const spinTrace = runOneBonusSpin(state.bossState, state.ctx, SESSION_CONFIGS[state.configKey].dmgMult);
+
+  renderBoardStatic(spinTrace.boardSnapshots[0]);
+  log(`--- Spin ${state.spinCount} (stage ${spinTrace.stage}) ---`, "");
+
+  for (const pass of spinTrace.passes) {
+    await playPass(pass);
+  }
+  const spinEvents = state.ctx.events.slice(eventsBefore);
+  renderBosses();
+  await playSpinEvents(spinEvents);
+  renderStageTrack(); renderBosses(); renderPlayerHp();
+
+  if (!state.bossState.active) {
+    state.sessionOver = true;
+    log(`SESSION END — stage_cleared, total spins ${state.spinCount}, cash ${fmt(state.ctx.cashWin, 1)}x`, "end");
+    document.getElementById("btnSpin").disabled = true;
+    return maybeAutoNext();
+  }
+
+  const totalDamage = ["boss1", "boss2", "boss3"].reduce(
+    (s, b) => s + (state.bossState.alive[b] ? state.bossState.dam[b] : 0), 0
+  );
+  state.ctx.playerHp -= totalDamage;
+  log(`Counter-attack: -${fmt(totalDamage, 0)} Player HP (unconditional, sum of alive bosses' Dam)`, "dmg");
+  renderPlayerHp();
+  await delay(260);
+
+  if (state.ctx.playerHp <= 0) {
+    state.sessionOver = true;
+    log(`SESSION END — hp_depleted, total spins ${state.spinCount}, cash ${fmt(state.ctx.cashWin, 1)}x`, "end");
+    document.getElementById("btnSpin").disabled = true;
+    showBanner("HP DEPLETED", `${state.spinCount} spins · ${fmt(state.ctx.cashWin, 1)}x illustrative cash`);
+    return maybeAutoNext();
+  }
+
+  document.getElementById("btnSpin").disabled = false;
+  maybeAutoNext();
+}
+
+function maybeAutoNext() {
+  if (!state.autoplay) return;
+  setTimeout(() => {
+    if (state.sessionOver) {
+      startNewSession();
+      setTimeout(doSpin, 300 * speedScale());
+    } else {
+      doSpin();
+    }
+  }, 500 * speedScale());
+}
+
+// ---------- Self-check batch stats ----------
+function runStatsBatch() {
+  const n = Number(document.getElementById("statsN").value);
+  const cfg = state.configKey;
+  const r = runBatch(cfg, n);
+  const tbody = document.querySelector("#statsTable tbody");
+  tbody.innerHTML = "";
+  const rows = [
+    ["Config", SESSION_CONFIGS[cfg].label],
+    ["Mean spins", fmt(r.meanSpins, 2)],
+    ["Median spins", r.medianSpins],
+    ["Max spins", r.maxSpins],
+    ["Spins ≤2", fmt(r.spinsLE2Pct, 2) + "%"],
+    ["Stage-cleared %", fmt(r.clearedPct, 2) + "%"],
+    ["HP-depleted %", fmt(r.depletedPct, 2) + "%"],
+    ["Mean illustrative cash", fmt(r.meanCash, 2) + "x"],
+    ["Median illustrative cash", fmt(r.medianCash, 2) + "x"],
+  ];
+  for (const [k, v] of rows) {
+    const tr = document.createElement("tr");
+    const th = document.createElement("th"); th.textContent = k;
+    const td = document.createElement("td"); td.textContent = v;
+    tr.appendChild(th); tr.appendChild(td);
+    tbody.appendChild(tr);
+  }
+  let stageRow = "Max-stage-reach: ";
+  for (let s = 1; s <= 6; s++) stageRow += `S${s}=${fmt(r.stagePct[s], 2)}% `;
+  document.getElementById("statsNote").textContent =
+    stageRow + " — this is the JS engine's own headless self-check (pure real mechanic, no chain-break harness), run just now on your machine.";
+}
+
+// ---------- Wiring ----------
+document.getElementById("cfgSelect").addEventListener("change", (e) => {
+  state.configKey = e.target.value;
+  startNewSession();
+});
+document.getElementById("btnSpin").addEventListener("click", doSpin);
+document.getElementById("btnNewSession").addEventListener("click", startNewSession);
+document.getElementById("btnAuto").addEventListener("click", (e) => {
+  state.autoplay = !state.autoplay;
+  e.target.textContent = "Autoplay: " + (state.autoplay ? "ON" : "OFF");
+  if (state.autoplay && document.getElementById("btnSpin").disabled === false) doSpin();
+});
+document.getElementById("btnRunStats").addEventListener("click", runStatsBatch);
+
+startNewSession();
+
+</script>
+</body>
+</html>
