@@ -417,6 +417,7 @@
             <span class="num mono"><b id="playerHpNow">0</b> / <span id="playerHpMax">0</span></span>
           </div>
           <div class="hpbar-track"><div class="hpbar-fill" id="playerHpFill" style="background:var(--hp-high);"></div></div>
+          <div class="num mono" style="margin-top:4px;">Real counter-attack if all alive bosses hit this stage: <b id="realCounter">&mdash;</b>/spin (per <code class="mono">game_bonus.py</code> &mdash; NOT what the log's paced numbers show, see footer)</div>
         </div>
 
         <div class="boss-row" id="bossRow"></div>
@@ -467,7 +468,7 @@
   </div>
 
   <footer>
-    v2 methodology: per-stage clear/death odds are drawn from the real engine's own measured conditional hazard rate at each stage (derived from <code class="mono">normal_stage_reach_diagnostic.py</code>, n=15000 per config) &mdash; not reverse-engineered from a guessed damage model. Spins-per-stage-attempt is sampled from an exponential distribution whose mean is calibrated so total session length matches the real measured mean_spins. Per-spin HP/boss-HP bars are then interpolated to land exactly on that pre-determined outcome, purely for a smooth visual &mdash; the numbers driving what happens (stage cleared or not, how many spins) are real; the spin-by-spin animation dressing them up is a dramatization. Boss Dam/HP roll formulas, the &plusmn;25% variance, and the +50/+50 HP stage-clear grant still match <code class="mono">game_config.py</code> exactly and set the numbers shown per boss. Run &ldquo;Run 200 Sessions&rdquo; and compare against the real ground-truth panel &mdash; they should track closely, because they're now built from the same measured hazard data, not two independent models.
+    <strong>Two different "damage" numbers appear on this page &mdash; they mean different things.</strong> The <em>Real counter-attack</em> line above the HP bar, and each boss's <em>real dam</em> figure, come straight from <code class="mono">game_config.py</code>'s boss roll formulas (&plusmn;25% variance, exact same math as production) &mdash; that IS what the real game deals every spin the boss system is active, unconditionally, per <code class="mono">game_bonus.py:405-407</code>. The <em>log's</em> "HP -N (paced)" number and the boss HP bars moving are NOT that &mdash; they're a smoothed animation that spreads a whole stage-attempt's pre-decided total HP change evenly across however many spins were statistically drawn for it, so a single log line can show a small number like -6 late in a long attempt even though the real per-spin counter-attack (shown above) is much bigger. This trade-off exists because the outcome of each stage attempt (clear or die, and how many spins it takes) is drawn directly from the real engine's own measured per-stage hazard rate (<code class="mono">normal_stage_reach_diagnostic.py</code>, n=15000 per config) so the aggregate stats match reality &mdash; the per-spin animation is then reverse-fit to land on that real outcome smoothly, rather than mechanistically simulated hit-by-hit (which would require the actual paytable/reel data this context doesn't have). Run &ldquo;Run 200 Sessions&rdquo; and compare against the real ground-truth panel to see the aggregate match.
   </footer>
 </div>
 
@@ -763,7 +764,7 @@
         <div class="name"><span>${BOSS_NAMES[b]}</span><span>${alive ? "" : "DEFEATED"}</span></div>
         <div class="cols">${BOSS_COLS[b]}</div>
         <div class="hpbar-track"><div class="hpbar-fill" style="width:${Math.max(0, pct * 100)}%; background:var(--boss-hp);"></div></div>
-        <div class="num mono">${Math.round(hp)} / ${hpMax}</div>
+        <div class="num mono">HP ${Math.round(hp)} / ${hpMax} &nbsp;&middot;&nbsp; real dam ${s.bosses.dam[b]}${alive ? "/spin" : ""}</div>
       `;
       row.appendChild(card);
     });
@@ -776,6 +777,8 @@
     const fill = el("playerHpFill");
     fill.style.width = Math.max(0, pct * 100) + "%";
     fill.style.background = hpColor(pct);
+    const realCounter = BOSS_IDS.filter((b) => s.bosses.alive[b]).reduce((sum, b) => sum + s.bosses.dam[b], 0);
+    el("realCounter").textContent = realCounter;
     const flash = el("hitFlash");
     if (hit) {
       flash.textContent = "-" + hit;
@@ -801,7 +804,7 @@
       <div class="log-row">
         <span class="spinno mono">#${e.spin}</span>
         ${tagLabel(e)}
-        <span class="detail mono">${e.deadSpin ? "no wins" : `${e.passes} pass${e.passes > 1 ? "es" : ""}, dealt <b>${e.totalDmg}</b>`}${e.stageCleared ? " &mdash; stage cleared, +50/+50 HP" : ` &mdash; took <b>${e.counterDmg}</b> counter`}</span>
+        <span class="detail mono">${e.deadSpin ? "no wins" : `${e.passes} pass${e.passes > 1 ? "es" : ""}, dealt <b>${e.totalDmg}</b>`}${e.stageCleared ? " &mdash; stage cleared, +50/+50 HP" : ` &mdash; HP -<b>${e.counterDmg}</b> (paced)`}</span>
         <span class="hpafter mono">HP ${e.playerHpAfter}</span>
       </div>
     `).join("");
