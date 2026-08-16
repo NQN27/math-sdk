@@ -602,8 +602,17 @@
       targetBossHp[BOSS_IDS[0]] = Math.max(1, Math.round(s.bosses.hpMax[BOSS_IDS[0]] * 0.1));
     }
 
+    // Randomized (not equal) step sizes so consecutive spins don't show the
+    // identical "dealt N" / "HP -N" every time - still sums to exactly 1 by
+    // the final spin, landing on the same real pre-decided outcome.
+    const weights = [];
+    for (let i = 0; i < Math.max(1, spinsPlanned); i++) weights.push(0.3 + Math.random());
+    const totalW = weights.reduce((a, b) => a + b, 0);
+    let acc = 0;
+    const cumFrac = weights.map((w) => (acc += w / totalW));
+
     s._attempt = {
-      dies, spinsPlanned, spinsDone: 0,
+      dies, spinsPlanned, spinsDone: 0, cumFrac,
       startHp: s.playerHp, targetHp: s.playerHp * targetHpFrac,
       startBossHp: { ...s.bosses.hp }, targetBossHp,
     };
@@ -659,7 +668,7 @@
     a.spinsDone += 1;
     s.spin += 1;
 
-    const frac = Math.min(1, a.spinsDone / a.spinsPlanned);
+    const frac = a.cumFrac[a.spinsDone - 1];
     const newHp = a.startHp + (a.targetHp - a.startHp) * frac;
     const counterDmg = Math.max(0, Math.round(s.playerHp - newHp));
     s.playerHp = Math.max(0, newHp);
@@ -804,7 +813,7 @@
       <div class="log-row">
         <span class="spinno mono">#${e.spin}</span>
         ${tagLabel(e)}
-        <span class="detail mono">${e.deadSpin ? "no wins" : `${e.passes} pass${e.passes > 1 ? "es" : ""}, dealt <b>${e.totalDmg}</b>`}${e.stageCleared ? " &mdash; stage cleared, +50/+50 HP" : ` &mdash; HP -<b>${e.counterDmg}</b> (paced)`}</span>
+        <span class="detail mono">${e.deadSpin ? "no wins" : `${e.passes} pass${e.passes > 1 ? "es" : ""}, dealt <b>${e.totalDmg}</b> (paced)`}${e.stageCleared ? " &mdash; stage cleared, +50/+50 HP" : ` &mdash; HP -<b>${e.counterDmg}</b> (paced)`}</span>
         <span class="hpafter mono">HP ${e.playerHpAfter}</span>
       </div>
     `).join("");
