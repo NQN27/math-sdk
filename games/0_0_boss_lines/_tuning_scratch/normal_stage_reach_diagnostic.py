@@ -17,8 +17,28 @@ gamestate_mod.GameState.run_bonus_session = m.patched_run_bonus_session
 
 def patched_run_one_bonus_spin_counted(self, both_ways):
     self._diag_spin_count = getattr(self, "_diag_spin_count", 0) + 1
+    # BUG (found 2026-08-17): checking self.stage only once per spin, here,
+    # misses mid-spin stage advances - clear_stage() can advance self.stage
+    # multiple times WITHIN a single spin's cascade if enough damage lands
+    # in one pass to clear back-to-back stages, so a session that clears
+    # stage 6 in the same spin it cleared stage 5 got recorded as reaching
+    # only stage 5. Wrap clear_stage itself instead, so every actual
+    # transition is caught regardless of how many happen in one spin.
     self._diag_max_stage = max(getattr(self, "_diag_max_stage", 1), self.stage)
     return m.patched_run_one_bonus_spin(self, both_ways)
+
+
+_original_clear_stage = gamestate_mod.GameState.clear_stage
+
+
+def patched_clear_stage(self, stage):
+    self._diag_max_stage = max(getattr(self, "_diag_max_stage", 1), stage)
+    result = _original_clear_stage(self, stage)
+    self._diag_max_stage = max(getattr(self, "_diag_max_stage", 1), getattr(self, "stage", stage))
+    return result
+
+
+gamestate_mod.GameState.clear_stage = patched_clear_stage
 
 
 gamestate_mod.GameState.run_one_bonus_spin = patched_run_one_bonus_spin_counted
