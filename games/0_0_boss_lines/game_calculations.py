@@ -149,7 +149,12 @@ class GameCalculations(Executables):
 
         if win_data["totalWin"] <= 0:
             self.win_manager.tumble_win = 0.0
+            if getattr(self, "in_bonus", False):
+                self.chain_pass_count = 0
             return
+
+        if getattr(self, "in_bonus", False):
+            self.chain_pass_count = getattr(self, "chain_pass_count", 0) + 1
 
         # --- Power connection scan --------------------------------------
         # Walk winning lines in line-index order (win_data["wins"] already

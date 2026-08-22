@@ -102,6 +102,31 @@ class GameConfig(Config):
         # measured effect on mean/median Bonus payout.
         self.bonus_grace_deadspin_chance = 0.65
 
+        # --- Chain-block (2026-08-19 rebalance bundle) -------------------------
+        # Reactive counterpart to the grace-deadspin above: instead of a fixed
+        # post-stage-clear breather, this watches consecutive same-spin winning
+        # tumble passes (see game_calculations.evaluate_and_explode's
+        # chain_pass_count bookkeeping) and, once that streak exceeds
+        # chain_block_threshold, escalates the chance of forcing a column dead
+        # (via the same Controlled Deadspin Routing primitive grace-deadspin
+        # uses - see game_executables._route_column_force_deadspin) on every
+        # later pass of that same run - capping how long a single spin's
+        # cascade can keep paying out before something interrupts it. Ported
+        # from the accepted 2026-08-19 rebalance proposal
+        # (_tuning_scratch/final_combined_candidate.py's chain-break state
+        # machine / _tuning_scratch/boss_lines_normal_slot_demo.html's
+        # CHAIN_BLOCK_THRESHOLD/CHAIN_BLOCK_STEP), paired with the HP=200 pool
+        # and boss_stage_table HP scaling below - the reward-table redesign
+        # further down assumed this mechanic capping runaway chains, so it
+        # must ship together with those, not in isolation. Chance on the pass
+        # `extra` beyond threshold is min(1.0, chain_block_step * (extra + 1));
+        # if routing can't find a safe column to force dead (hits
+        # _route_column_force_deadspin's own fallback), the attempt carries
+        # over as chain_block_pending and retries unconditionally on the very
+        # next pass rather than re-rolling.
+        self.chain_block_threshold = 2
+        self.chain_block_step = 0.30
+
         # --- Symbol map -------------------------------------------------------
         # L1..L5 = 10, J, Q, K, A (low pay, ascending). H1..H4 = Mini, Minor,
         # Major, Grand (high pay, ascending). W = Wild (never on reel/column 0).
@@ -331,8 +356,16 @@ class GameConfig(Config):
         # already close, ~1233x measured vs 1070x target, left unchanged).
         # OLD pools (pre-fix): normal=[250,300,350,400],
         # super=[350,400,450,500,550,600].
+        # 2026-08-19 rebalance: Normal's HP pool raised flat to 200 (from
+        # [50,50,50,100,100]) as part of the bundled boss-table/reward-table
+        # rebalance below - see boss_stage_table and
+        # reward_drop_weights_normal_bonus for the paired changes this HP
+        # pool assumes. Ported from _tuning_scratch's "candidate" preset
+        # (boss_lines_normal_slot_demo.html) - see game_config.py's own
+        # boss_stage_table comment for the measured target this whole
+        # bundle was validated against.
         self.bonus_player_hp_choices = {
-            "normal": [50, 50, 50, 100, 100],
+            "normal": [200, 200, 200, 200, 200],
             "super": [300, 350, 400, 450],
             # hidden was already close (measured ~1233-1299x vs 1070x
             # target at the old pool - much less severe than normal/super's
@@ -391,13 +424,24 @@ class GameConfig(Config):
         # and stored for structural completeness/forward-compatibility but has
         # NO gameplay effect in Phase 1. Only HP (damaged by exploding board
         # symbols) matters this phase.
+        # 2026-08-19 rebalance: Normal-tier boss HP scaled up by
+        # {1:3.7, 2:2.5, 3:2.7, 4:3.3, 5:4.75, 6:7.0} per stage (Dam
+        # unchanged) - paired with bonus_player_hp_choices["normal"]=[200]*5
+        # above and reward_drop_weights_normal_bonus's SEG1-7/chest table
+        # below as one bundled design, ported from
+        # _tuning_scratch/boss_lines_normal_slot_demo.html's "candidate"
+        # preset / final_combined_candidate.py's HP_MULT. This table is
+        # SHARED across all 3 tiers (Super/Hidden still use these same
+        # values) - only Normal's own HP pool and reward table changed to
+        # match; Super/Hidden's own separate hard-tuning is unaffected by
+        # this rebalance.
         self.boss_stage_table = {
-            1: {"boss1": (20, 120), "boss2": (24, 150), "boss3": (20, 100)},
-            2: {"boss1": (24, 150), "boss2": (28, 200), "boss3": (24, 120)},
-            3: {"boss1": (28, 200), "boss2": (35, 250), "boss3": (28, 160)},
-            4: {"boss1": (35, 250), "boss2": (45, 320), "boss3": (35, 210)},
-            5: {"boss1": (45, 320), "boss2": (60, 400), "boss3": (45, 270)},
-            6: {"boss1": (60, 450), "boss2": (80, 600), "boss3": (60, 400)},
+            1: {"boss1": (20, 444.0), "boss2": (24, 555.0), "boss3": (20, 370.0)},
+            2: {"boss1": (24, 375.0), "boss2": (28, 500.0), "boss3": (24, 300.0)},
+            3: {"boss1": (28, 540.0), "boss2": (35, 675.0), "boss3": (28, 432.0)},
+            4: {"boss1": (35, 825.0), "boss2": (45, 1056.0), "boss3": (35, 693.0)},
+            5: {"boss1": (45, 1520.0), "boss2": (60, 1900.0), "boss3": (45, 1282.5)},
+            6: {"boss1": (60, 3150.0), "boss2": (80, 4200.0), "boss3": (60, 2800.0)},
         }
         # Endless stage-6 tail: each additional loop (every re-clear of
         # stage 6's 3 bosses, after the first) multiplies every boss's Dam
@@ -472,11 +516,16 @@ class GameConfig(Config):
         self.stage_clear_removed_symbol = {
             1: "L1", 2: "L2", 3: "L3", 4: "L4", 5: "L5", 6: None,
         }
+        # 2026-08-19: stage 4's list extended to [10,12,15,18] (was [10,15])
+        # to match reward_drop_weights_normal_bonus's new SEG4 tiers below -
+        # the extra 12/18 keys don't exist in the shared base-game
+        # reward_drop_weights table, so pruning them there is a harmless
+        # no-op (dict-membership check, not a lookup).
         self.stage_clear_pruned_tiers = {
             1: [1, 2],
             2: [3, 4],
             3: [5, 6, 8],
-            4: [10, 15],
+            4: [10, 12, 15, 18],
             5: [20, 25],
             6: [],
         }
@@ -523,13 +572,19 @@ class GameConfig(Config):
         # still exclude it entirely). Against the pool's other weights
         # (500+1000+2000+5000 tiers = 3.98 total), this value gives
         # P(maxwin | one chest-open) = w/(w+3.98).
-        # PLACEHOLDER at 1-in-500,000 per chest-open (w = 3.98/499999 =
-        # 0.00000796) - user-confirmed starting point, pending final
-        # calibration against the endless stage-6 tail's measured expected
-        # chest-opens-per-spin (more loops survived per session -> more
-        # rolls at this pool -> this weight needs to shrink further to hit
-        # any specific overall per-spin target).
-        self.stage6_chest_natural_maxwin_weight = 0.00000796
+        # 2026-08-19: recalibrated against Normal's NEW chest pool weight
+        # sum (15+8+4+0.9+0.35+0.12=28.37, not the old shared pool's 3.98)
+        # for a 1-in-25000 session-level Max Win target - solved as
+        # w = pool_weight_base * p_select_needed / (1 - p_select_needed),
+        # P(chest reached) calibrated at ~1.75% via a 60000-session/3-seed
+        # run. Result: w=0.0651 -> P(selected | chest reached)=0.2289% ->
+        # session-level rate = 1-in-23509, inside the 1-in-20000-1-in-40000
+        # target band. This value is SHARED with base/Super/Hidden's own
+        # stage-6-chest rolls too (see roll_reward_drop) - was the
+        # old-shared-pool placeholder (0.00000796, 1-in-500k) before this
+        # change; only Normal's own chest pool weight sum was used to
+        # derive the new number.
+        self.stage6_chest_natural_maxwin_weight = 0.0651
 
         # Normal-tier-Bonus-ONLY reward-drop table (2026-08-14/15 hard-tune
         # + shape redesign, SUPERSEDES the earlier two-band-compression
@@ -642,16 +697,43 @@ class GameConfig(Config):
         # so they're rescaled by the same K to keep matching this dict's
         # keys, or the "reserved for last boss"/"stage-6 chest exclusivity"
         # checks would silently stop matching anything.
+        # 2026-08-19 rebalance, replaces the K=4.28-rescaled table above:
+        # a genuinely new "7-segment" structure (not a rescale of the old
+        # one) - seg1/seg2/.../seg5 are progressively PRUNED as each stage
+        # clears (see stage_clear_pruned_tiers below), seg6 (30-1000) stays
+        # in the regular pool through stage 6, and the 6 chest tiers
+        # (400-4000) are stage-6-last-kill EXCLUSIVE only (see
+        # reward_drop_stage6_last_tiers_normal_bonus / roll_reward_drop's
+        # exclusive_chest_tiers). Ported from
+        # _tuning_scratch/reshape_segments_test.py's SEG1..SEG7_CHEST -
+        # bundled with bonus_player_hp_choices["normal"]=[200]*5 and
+        # boss_stage_table's HP scale-up above; measured together (real
+        # run_bonus_session("normal"), n=100000): mean=83.89x, median=38.10x,
+        # ratio=45.4%, p75=84.10x. See
+        # _tuning_scratch/results/segments_n100000_20260822_003530.json for
+        # the full percentile table this was validated against.
+        # NOTE: values 400/500/800 exist in BOTH seg6 (regular pool) and the
+        # chest table below - this collision is INTENTIONAL and matches the
+        # source script exactly (`{**REGULAR_WEIGHTS, **SEG7_CHEST}`, chest
+        # applied last so it wins the dict-key collision). It's harmless:
+        # seg6's own 400/500/800 entries are excluded from the regular pool
+        # anyway (every key in reward_drop_stage6_last_tiers_normal_bonus is
+        # excluded from non-chest rolls via exclusive_chest_tiers in
+        # roll_reward_drop), so only the chest weights below are ever
+        # actually reachable at these 3 values - the seg6 weights that
+        # would collide (1.1/0.9/0.6) are dead code, kept only for fidelity
+        # with the original candidate's literal numbers.
         self.reward_drop_weights_normal_bonus = {
-            2.57: 400, 3.85: 320, 4.71: 260, 6.42: 210, 7.28: 170, 8.99: 140,
-            10.7: 110, 12.84: 90, 16.26: 65, 20.54: 50, 25.25: 38, 32.96: 13,
-            35.95: 22, 44.08: 9, 54.78: 6, 65.91: 4, 87.74: 2.2, 175.91: 1.1,
-            329.56: 0.5, 769.12: 0.18, 2197.78: 0.02,
+            1: 150, 2: 120, 3: 380, 4: 300, 5: 320, 6: 260, 8: 210,
+            10: 110, 12: 85, 15: 65, 18: 48, 20: 60, 25: 44,
+            30: 36, 35: 29.3, 40: 24.1, 50: 19.6, 60: 16.1, 80: 13.2,
+            100: 10.8, 120: 8.8, 150: 7.2, 180: 5.0, 200: 4.1, 250: 2.0,
+            300: 1.7, 350: 1.4, 600: 0.8, 1000: 0.5,
+            # Chest tiers (applied last, same as {**REGULAR_WEIGHTS, **SEG7_CHEST}):
+            400: 15, 500: 8, 800: 4, 1500: 0.9, 2500: 0.35, 4000: 0.12,
         }
-        self.reward_drop_top_tiers_normal_bonus = {175.91, 329.56, 769.12, 2197.78}
-        self.reward_drop_stage6_last_tiers_normal_bonus = {
-            32.96, 44.08, 54.78, 65.91, 87.74, 175.91, 329.56, 769.12, 2197.78,
-        }
+        self.reward_drop_top_tiers_normal_bonus = {400, 500, 800, 1500, 2500, 4000}
+        self.reward_drop_stage6_last_tiers_normal_bonus = {400, 500, 800, 1500, 2500, 4000}
 
         # Safety cap on resolve-loop passes per spin (should never be hit by a
         # legitimate board; guards against a logic bug causing a true infinite

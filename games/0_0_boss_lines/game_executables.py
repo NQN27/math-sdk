@@ -494,6 +494,50 @@ class GameExecutables(GameCalculations):
         """
         super().tumble_game_board()
         self.enforce_removed_symbols()
+        if getattr(self, "in_bonus", False):
+            self._maybe_apply_chain_block()
+
+    def _maybe_apply_chain_block(self) -> None:
+        """Chain-block reactive check (see game_config.chain_block_threshold/
+        chain_block_step docstring) - MUST run after enforce_removed_symbols
+        above, never before: a removed-symbol resample could otherwise
+        overwrite/undo a just-forced-dead column and accidentally reconnect a
+        win, defeating the guarantee (found via the 2026-08-19 rebalance
+        proposal's own JS-demo debugging history).
+
+        Rolls (or, if a prior pass's forced-deadspin attempt found no safe
+        column and left chain_block_pending set, unconditionally retries)
+        whether to force a column dead this pass. Tries columns 1-3 in random
+        order, stopping at the first one _route_column_force_deadspin
+        actually manages to redraw (detected via its fallback counter not
+        incrementing); if all three hit the fallback, the attempt carries
+        over to the next pass instead of being dropped.
+        """
+        triggered = getattr(self, "chain_block_pending", False)
+        if not triggered:
+            extra = getattr(self, "chain_pass_count", 0) - self.config.chain_block_threshold
+            if extra < 0:
+                return
+            chance = min(1.0, self.config.chain_block_step * (extra + 1))
+            if random.random() >= chance:
+                return
+            triggered = True
+
+        self.chain_block_pending = False
+        cols = [1, 2, 3]
+        random.shuffle(cols)
+        blocked = False
+        for col in cols:
+            before = getattr(self, "_deadspin_route_fallback_count", 0)
+            self._route_column_force_deadspin(col)
+            after = getattr(self, "_deadspin_route_fallback_count", 0)
+            if after == before:
+                blocked = True
+                break
+        if blocked:
+            self.get_special_symbols_on_board()
+        else:
+            self.chain_block_pending = True
 
     def enforce_removed_symbols(self) -> None:
         """Replace every board cell currently showing a stage-removed symbol

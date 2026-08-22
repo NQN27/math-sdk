@@ -211,6 +211,8 @@ class GameBonus(GameExecutables):
         collection)."""
         self.win_manager.reset_spin_win()
         self.pass_exploded_positions = []
+        self.chain_pass_count = 0
+        self.chain_block_pending = False
         self.create_board_reelstrips()
         # BUG FIX (found via a bounded direct-call harness, not left as a
         # surprise - see readme.txt's Phase 3 section): `removed_symbols`
