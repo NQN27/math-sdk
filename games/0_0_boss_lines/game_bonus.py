@@ -399,11 +399,27 @@ class GameBonus(GameExecutables):
                 self.boss_dam = {b: v * escalation for b, v in self.boss_dam.items()}
                 self.boss_hp = {b: v * escalation for b, v in self.boss_hp.items()}
                 self.boss_hp_max = {b: v * escalation for b, v in self.boss_hp_max.items()}
+                # Same counter-attack grace as an ordinary clear_stage
+                # transition (see game_executables.clear_stage) - this
+                # re-roll doesn't go through clear_stage, so it needs its
+                # own grant. Per game designer: every endless-tail loop
+                # gets its own 1-static-state grace, same as a real stage
+                # transition.
+                self.boss_counterattack_grace = True
+                # See game_executables.reset_boss_battle's comment: targets
+                # the NEXT spin's opening board draw, not this one.
+                self.grace_deadspin_pending = True
                 boss_state_event(self)
                 continue
 
-            total_damage = sum(self.boss_dam[b] for b in self.config.boss_ids if self.boss_alive[b])
-            self.player_hp -= total_damage
+            if self.boss_counterattack_grace:
+                # This trio's first static state since it was rolled - no
+                # counter-attack this spin, consumed once.
+                self.boss_counterattack_grace = False
+                total_damage = 0.0
+            else:
+                total_damage = sum(self.boss_dam[b] for b in self.config.boss_ids if self.boss_alive[b])
+                self.player_hp -= total_damage
             bonus_counterattack_event(self, total_damage, self.player_hp)
             player_hp_state_event(self)
             if self.player_hp <= 0:

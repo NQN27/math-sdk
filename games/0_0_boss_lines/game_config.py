@@ -58,6 +58,50 @@ class GameConfig(Config):
         self.num_rows = [5] * self.num_reels
         self.include_padding = True
 
+        # --- Controlled Deadspin Routing --------------------------------------
+        # Per game-designer spec, columns 2/3/4 (1-indexed - reel index
+        # 1/2/3; columns 1 and 5 always draw a plain random stop) each
+        # independently roll a chance to be routed to a "Force Deadspin"
+        # redraw instead of an ordinary random stop - see
+        # game_executables.create_board_reelstrips/
+        # _route_column_force_deadspin for the exact anti-match algorithm.
+        # Does NOT touch the Pool/Reel Strips/Distribution weights - purely
+        # re-picks a different, still-genuinely-random stop position for the
+        # routed column so the recorded event is a real, replayable draw.
+        # Forcing anti-match on ANY ONE of these 3 columns alone already
+        # guarantees a full-board zero-win deadspin (every payline is a
+        # contiguous run starting at reel 0 - see src/calculations/lines.py -
+        # so a broken link anywhere caps kindCount below the paytable's
+        # minimum of 3), and each column rolls independently here, so the
+        # resulting deadspin-uplift probability from this mechanism alone is
+        # 1-(1-p)^3 for chance p, not p directly (measured fallback rate -
+        # when a column's pool has no valid anti-match candidate - was
+        # ~10-12% at p=0.3-0.6 on the base game reel; higher-wild-density
+        # reels/stages will fall back more often).
+        #
+        # 2026-08-17 (base game, per game-designer spec): tunable per bet
+        # mode. Left at 0.0 (disabled) for every mode pending a real target
+        # value from the game designer - enabling this changes the natural
+        # hit-rate/RTP distribution and needs its own re-measurement pass,
+        # same discipline as every other economy lever in this project.
+        self.deadspin_force_chance = {"base": 0.0, "ante": 0.0, "feature": 0.0}
+
+        # 2026-08-18 (Bonus "grace spin", per game designer): reuses the SAME
+        # routing, gated by `grace_deadspin_pending` (see
+        # game_executables.reset_boss_battle/clear_stage/create_board_
+        # reelstrips and game_bonus.run_bonus_session) - NOT the same spin
+        # that skips the counter-attack (that flag, boss_counterattack_grace,
+        # is set and consumed within the spin that clears a stage, before the
+        # new trio's board is ever drawn). This instead lands on the very
+        # NEXT spin's opening reveal - the first time the new trio is faced
+        # from a clean board - so keeping that spin low-eventful reads as
+        # "quiet breather right after the free hit" even though it's
+        # technically the following spin. Starting value chosen deliberately
+        # high (unlike the base-game default above) for that reason - PLACE-
+        # HOLDER pending designer sign-off, not yet confirmed against a
+        # measured effect on mean/median Bonus payout.
+        self.bonus_grace_deadspin_chance = 0.65
+
         # --- Symbol map -------------------------------------------------------
         # L1..L5 = 10, J, Q, K, A (low pay, ascending). H1..H4 = Mini, Minor,
         # Major, Grand (high pay, ascending). W = Wild (never on reel/column 0).
@@ -569,15 +613,44 @@ class GameConfig(Config):
         # rather than sacrificing the shape to chase mean precision -
         # flagged here explicitly rather than papered over, per this
         # project's "report honestly" convention.
+        # 2026-08-18 RESCALE (x4.28), on top of the FINAL shape above: the
+        # Wild-col0 fix (a real bug - see gen_stage_reels.py's
+        # COL0_GETS_WILD - Wild was never supposed to land on column 1) cut
+        # how often lines connect at all, which starves BOTH of Normal
+        # Bonus's two independent payout sources (game_calculations.
+        # evaluate_and_explode's line-pay AND this reward-drop table's
+        # boss-kill bonus - see game_executables.roll_reward_drop/award_win)
+        # roughly in proportion. Measured split at the CURRENT (post-fix)
+        # mechanic, pure production, n=10000: line-pay mean=23.20x (fixed -
+        # not reachable by this table at all), reward-drop mean=13.60x
+        # (n=10000) against a combined 36.80x total vs the 80.13x target.
+        # Since the SHAPE here was already correct post-fix (ratio 39-44%,
+        # already inside the 40-50% target band - see
+        # payout_component_split.py) the fix was a pure uniform RESCALE of
+        # every tier VALUE by a constant K (weights/probabilities
+        # untouched) rather than a fresh shape redesign - this scales every
+        # possible session's reward-drop total by exactly K deterministically
+        # (same random draw path, every value in it just K times bigger),
+        # so median/mean ratio carries over unchanged; only the FIXED line-
+        # pay component (unreachable by this lever) keeps the ratio from
+        # being a mathematically exact invariant, which is why K was fit
+        # empirically (reward_table_scale_test.py) rather than solved in
+        # closed form. K=4.28 confirmed at n=25000: mean=81.14x (target
+        # 80.13x), median=36.30x (target ~32-40x), ratio=44.7% (target
+        # 40-50%) - all three land inside target. top_tiers/stage6_last_
+        # tiers reference tier VALUES (not indices - see roll_reward_drop),
+        # so they're rescaled by the same K to keep matching this dict's
+        # keys, or the "reserved for last boss"/"stage-6 chest exclusivity"
+        # checks would silently stop matching anything.
         self.reward_drop_weights_normal_bonus = {
-            0.6: 400, 0.9: 320, 1.1: 260, 1.5: 210, 1.7: 170, 2.1: 140,
-            2.5: 110, 3.0: 90, 3.8: 65, 4.8: 50, 5.9: 38, 7.7: 13, 8.4: 22,
-            10.3: 9, 12.8: 6, 15.4: 4, 20.5: 2.2, 41.1: 1.1, 77.0: 0.5,
-            179.7: 0.18, 513.5: 0.02,
+            2.57: 400, 3.85: 320, 4.71: 260, 6.42: 210, 7.28: 170, 8.99: 140,
+            10.7: 110, 12.84: 90, 16.26: 65, 20.54: 50, 25.25: 38, 32.96: 13,
+            35.95: 22, 44.08: 9, 54.78: 6, 65.91: 4, 87.74: 2.2, 175.91: 1.1,
+            329.56: 0.5, 769.12: 0.18, 2197.78: 0.02,
         }
-        self.reward_drop_top_tiers_normal_bonus = {41.1, 77.0, 179.7, 513.5}
+        self.reward_drop_top_tiers_normal_bonus = {175.91, 329.56, 769.12, 2197.78}
         self.reward_drop_stage6_last_tiers_normal_bonus = {
-            7.7, 10.3, 12.8, 15.4, 20.5, 41.1, 77.0, 179.7, 513.5,
+            32.96, 44.08, 54.78, 65.91, 87.74, 175.91, 329.56, 769.12, 2197.78,
         }
 
         # Safety cap on resolve-loop passes per spin (should never be hit by a

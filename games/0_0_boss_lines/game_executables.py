@@ -57,6 +57,123 @@ class GameExecutables(GameCalculations):
         choices = self.config.feature_spin_start_stage_choices.get(betmode_name)
         return random.choice(choices) if choices else 1
 
+    # --- Controlled Deadspin Routing -----------------------------------------
+    def create_board_reelstrips(self) -> None:
+        """Override of src.calculations.board.Board.create_board_reelstrips:
+        draws the board exactly as before (the Pool/Reel Strips/Distribution
+        are completely untouched), then applies the SAME Controlled Deadspin
+        Routing algorithm (see _route_column_force_deadspin) from one of two
+        independent triggers, each with its own chance:
+
+        1. Base game spins (self.gametype == basegame_type): this bet mode's
+           `deadspin_force_chance` - see game_config.py.
+        2. A Bonus session's "grace spin" (2026-08-18, per game designer):
+           NOT the same spin covered by `boss_counterattack_grace` - that
+           flag is set AND consumed within the spin that clears a stage
+           (the new trio's first static state is the END of that spin - it
+           isn't even alive yet when that spin's own board gets drawn here).
+           Instead this targets `grace_deadspin_pending`, which is set at
+           the same moment but read-and-cleared right here, so it naturally
+           lands on the NEXT spin's opening reveal - the first time the new
+           trio is faced from a clean board. That spin gets a real chance at
+           being quiet, via `bonus_grace_deadspin_chance`, matching the
+           "breather" intent (skip counter-attack, then a good shot at a
+           dead follow-up) as closely as the routing hook allows.
+        """
+        super().create_board_reelstrips()
+        if self.gametype == self.config.basegame_type:
+            betmode_name = getattr(self, "betmode", None)
+            chance = self.config.deadspin_force_chance.get(betmode_name, 0.0)
+        elif getattr(self, "in_bonus", False) and getattr(self, "grace_deadspin_pending", False):
+            self.grace_deadspin_pending = False
+            chance = self.config.bonus_grace_deadspin_chance
+        else:
+            return
+        if chance <= 0:
+            return
+        routed_any = False
+        for col in (1, 2, 3):  # columns 2,3,4 (1-indexed) = reel index 1,2,3
+            if random.random() < chance:
+                routed_any = True
+                self._route_column_force_deadspin(col)
+        if routed_any:
+            self.get_special_symbols_on_board()
+
+    def _route_column_force_deadspin(self, col: int) -> None:
+        """Luong A (Force Deadspin): redraw column `col`'s stop position from
+        a deterministically pre-filtered list of positions that cannot
+        extend ANY payline running through column `col-1`'s ALREADY-FIXED
+        board content - a single O(reel length) scan up front, never a
+        reject-and-reroll while loop, so there is no infinite-loop risk even
+        if the reel has zero valid candidates (falls back to leaving the
+        natural draw untouched in that rare case, counted in
+        self._deadspin_route_fallback_count for visibility).
+
+        A candidate stop position is valid only if, for EVERY row of this
+        column, ALL of the following hold (both directions of the Wild-
+        substitution gap the naive "compare symbol names" spec would miss):
+          - none of column `col-1`'s neighboring rows (r-1, r, r+1, clamped
+            to the board edges - see the spec's row-window matrix) are
+            Wild/Power-attribute (a Wild there would connect to ANY symbol
+            here, so no candidate at this column can safely avoid it),
+          - this column's own candidate symbol at that row is not itself
+            Wild/Power-attribute (a Wild here would just as surely extend
+            whatever run reaches it, regardless of column `col-1`'s
+            content),
+          - and this column's own candidate symbol's NAME does not equal any
+            of those neighboring symbols' names.
+        """
+        prev_col = col - 1
+        strip = self.reelstrip[col]
+        n = len(strip)
+        prev_rows = self.board[prev_col]
+        num_rows = self.config.num_rows[col]
+
+        def neighbor_rows(row):
+            return range(max(0, row - 1), min(num_rows - 1, row + 1) + 1)
+
+        prev_window_info = []
+        for row in range(num_rows):
+            names = set()
+            any_wild = False
+            for r in neighbor_rows(row):
+                sym = prev_rows[r]
+                if sym.check_attribute("wild"):
+                    any_wild = True
+                    break
+                names.add(sym.name)
+            prev_window_info.append((names, any_wild))
+
+        valid_positions = []
+        for pos in range(n):
+            ok = True
+            for row in range(num_rows):
+                names, any_wild = prev_window_info[row]
+                if any_wild:
+                    ok = False
+                    break
+                candidate_name = strip[(pos + row) % n]
+                if candidate_name == "W" or candidate_name in self.config.power_symbol_names:
+                    ok = False
+                    break
+                if candidate_name in names:
+                    ok = False
+                    break
+            if ok:
+                valid_positions.append(pos)
+
+        if not valid_positions:
+            self._deadspin_route_fallback_count = getattr(self, "_deadspin_route_fallback_count", 0) + 1
+            return
+
+        new_pos = random.choice(valid_positions)
+        self.reel_positions[col] = new_pos
+        for row in range(num_rows):
+            self.board[col][row] = self.create_symbol(strip[(new_pos + row) % n])
+        if self.config.include_padding:
+            self.top_symbols[col] = self.create_symbol(strip[(new_pos - 1) % n])
+            self.bottom_symbols[col] = self.create_symbol(strip[(new_pos + num_rows) % n])
+
     # --- Boss battle setup -------------------------------------------------
     def reset_boss_battle(self, start_stage: int = 1) -> None:
         """(Re)start the boss fight at `start_stage` with freshly-rolled
@@ -73,6 +190,27 @@ class GameExecutables(GameCalculations):
         self.boss_system_active = True
         self.removed_symbols = set()
         self.pruned_tiers = set()
+        # Counter-attack grace (2026-08-17, per game designer): a freshly-
+        # rolled boss trio does NOT get to counter-attack after its very
+        # first static state - only from the SECOND static state onward
+        # (with this same trio) does the normal per-spin counter-attack
+        # resume. Deliberately NOT granted here at session start (only real
+        # stage transitions via clear_stage grant it - see there and
+        # game_bonus.run_bonus_session's endless stage-6 tail re-roll),
+        # so stage 1 (or Super/Hidden's stage 2/3 opening stage) is
+        # unaffected and behaves exactly as before.
+        self.boss_counterattack_grace = False
+        # Separate from boss_counterattack_grace above: that flag is set AND
+        # consumed within the SAME spin that clears a stage (the new trio's
+        # own first static state falls at the end of that spin - see the
+        # comment there), so create_board_reelstrips never sees it True for
+        # any spin's INITIAL reveal (the trio isn't even alive yet when that
+        # spin's board is drawn). This flag instead targets the NEXT spin's
+        # opening reveal - the first time the new trio is faced from a clean
+        # board - and is read-and-cleared inside create_board_reelstrips
+        # itself (2026-08-18, per game designer: also route the grace-spin's
+        # deadspin check through Luong A).
+        self.grace_deadspin_pending = False
         self.roll_stage_bosses(self.stage)
 
     def roll_stage_bosses(self, stage: int) -> None:
@@ -286,6 +424,17 @@ class GameExecutables(GameCalculations):
         else:
             self.roll_stage_bosses(next_stage)
             self.stage = next_stage
+            # This freshly-rolled trio is exempt from counter-attack at its
+            # own first static state (see reset_boss_battle's comment) -
+            # covers every real stage transition (1->2 .. 5->6). The
+            # endless stage-6 tail's own re-roll (game_bonus.
+            # run_bonus_session) sets this same flag separately, since that
+            # re-roll does not go through clear_stage.
+            self.boss_counterattack_grace = True
+            # See reset_boss_battle's comment: this targets the NEXT spin's
+            # opening board draw (this spin's board already exists - the new
+            # trio was born mid-cascade).
+            self.grace_deadspin_pending = True
 
         # Phase 3: every stage-clear DURING a Bonus session (any of the
         # multiple spins in it, not just the first) grants +50 to Player
