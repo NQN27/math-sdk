@@ -1,0 +1,448 @@
+<title>Boss Lines — Real Book Player</title>
+<style>
+:root{
+  --bg:#0f1117; --panel:#171a24; --panel2:#1c2030; --border:#2a2f3d;
+  --text:#e4e7ee; --text-dim:#8a90a3; --text-faint:#565c70;
+  --gold:#d9a44e; --red:#e2635e; --green:#4fb286; --blue:#6c93e0;
+  --board-tile:#20263a; --board-tile-win:#3a3320;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#f2f3f7; --panel:#ffffff; --panel2:#eef0f6; --border:#d8dce6;
+    --text:#1c1f2b; --text-dim:#5b6178; --text-faint:#9096ab;
+    --gold:#a9761f; --red:#c8433d; --green:#2e8f63; --blue:#3f66b8;
+    --board-tile:#e6e9f2; --board-tile-win:#fbe9c2;
+  }
+}
+:root[data-theme="light"]{
+  --bg:#f2f3f7; --panel:#ffffff; --panel2:#eef0f6; --border:#d8dce6;
+  --text:#1c1f2b; --text-dim:#5b6178; --text-faint:#9096ab;
+  --gold:#a9761f; --red:#c8433d; --green:#2e8f63; --blue:#3f66b8;
+  --board-tile:#e6e9f2; --board-tile-win:#fbe9c2;
+}
+*{box-sizing:border-box;}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  margin:0; padding:20px; font-variant-numeric:tabular-nums;
+}
+.mono{font-family:ui-monospace,"SF Mono","Cascadia Code",Consolas,monospace;}
+h1{font-size:1.05rem; font-weight:700; margin:0; letter-spacing:.01em;}
+.subtitle{color:var(--text-dim); font-size:.8rem; margin-top:2px;}
+.topbar{
+  display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start;
+  justify-content:space-between; margin-bottom:16px; padding-bottom:14px;
+  border-bottom:1px solid var(--border);
+}
+.badge{
+  display:inline-block; font-size:.68rem; font-weight:600; padding:3px 8px;
+  border-radius:99px; background:var(--panel2); color:var(--green);
+  border:1px solid var(--border); letter-spacing:.03em; margin-top:4px;
+}
+.sessions{display:flex; gap:8px; flex-wrap:wrap;}
+.session-btn{
+  font-family:inherit; font-size:.78rem; font-weight:600; padding:7px 12px;
+  border-radius:8px; border:1px solid var(--border); background:var(--panel);
+  color:var(--text-dim); cursor:pointer; transition:border-color .15s,color .15s;
+}
+.session-btn:hover{border-color:var(--blue); color:var(--text);}
+.session-btn.active{border-color:var(--gold); color:var(--gold); background:var(--panel2);}
+.layout{display:grid; grid-template-columns:minmax(0,1.35fr) minmax(260px,0.85fr); gap:16px;}
+@media (max-width:860px){ .layout{grid-template-columns:1fr;} }
+.panel{
+  background:var(--panel); border:1px solid var(--border); border-radius:12px;
+  padding:16px;
+}
+.board-wrap{display:flex; flex-direction:column; gap:14px;}
+.board-grid{
+  display:grid; grid-template-columns:repeat(5,1fr); gap:6px; max-width:480px; margin:0 auto;
+}
+.reel-peek{
+  display:flex; justify-content:center; opacity:.45; font-size:.62rem;
+  color:var(--text-faint); height:14px; align-items:center;
+}
+.tile{
+  aspect-ratio:1/1; border-radius:8px; background:var(--board-tile);
+  display:flex; align-items:center; justify-content:center;
+  font-size:.85rem; font-weight:700; color:var(--text-dim);
+  border:1px solid transparent; transition:background .18s,border-color .18s,transform .18s;
+  position:relative;
+}
+.tile.win{background:var(--board-tile-win); border-color:var(--gold); color:var(--gold); transform:scale(1.04);}
+.tile.exploding{outline:2px solid var(--red); animation:pop .35s ease;}
+@keyframes pop{ 0%{transform:scale(1);} 50%{transform:scale(1.18); opacity:.4;} 100%{transform:scale(1);} }
+.tile.wild{color:var(--gold); background:#3a2f1c;}
+.tile.uncertain{border:1px dashed var(--text-faint); color:var(--text-faint); background:transparent;}
+.tile .attr{position:absolute; bottom:2px; right:4px; font-size:.5rem; opacity:.7;}
+.controls{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+button.ctrl{
+  font-family:inherit; border:1px solid var(--border); background:var(--panel2);
+  color:var(--text); border-radius:8px; padding:7px 11px; font-size:.85rem;
+  cursor:pointer; font-weight:600;
+}
+button.ctrl:hover{border-color:var(--blue);}
+button.ctrl.primary{background:var(--gold); color:#231a08; border-color:var(--gold);}
+input[type=range]{flex:1; min-width:120px; accent-color:var(--gold);}
+select{
+  font-family:inherit; background:var(--panel2); color:var(--text);
+  border:1px solid var(--border); border-radius:6px; padding:5px 8px; font-size:.78rem;
+}
+.evt-counter{font-size:.75rem; color:var(--text-dim); min-width:70px; text-align:right;}
+.sidebar{display:flex; flex-direction:column; gap:12px;}
+.stat-row{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2px;}
+.stat-label{font-size:.72rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:.04em;}
+.stat-value{font-size:.85rem; font-weight:700;}
+.bar-track{height:8px; border-radius:99px; background:var(--panel2); overflow:hidden; margin-top:4px;}
+.bar-fill{height:100%; border-radius:99px; transition:width .25s ease;}
+.boss-block{margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--border);}
+.boss-block:last-child{border-bottom:none; margin-bottom:0; padding-bottom:0;}
+.boss-block.dead .stat-label,.boss-block.dead .stat-value{color:var(--text-faint); text-decoration:line-through;}
+.win-total{font-size:1.6rem; font-weight:800; color:var(--gold); font-family:ui-monospace,monospace;}
+.win-total-label{font-size:.7rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em;}
+.log{
+  height:180px; overflow-y:auto; font-size:.75rem; line-height:1.55;
+  background:var(--panel2); border-radius:8px; padding:8px 10px; border:1px solid var(--border);
+}
+.log div{padding:1px 0;}
+.log .win{color:var(--gold);}
+.log .boss{color:var(--red);}
+.log .hp{color:var(--green);}
+.log .sys{color:var(--blue);}
+.log .idx{color:var(--text-faint); margin-right:6px;}
+.stage-pill{
+  display:inline-flex; align-items:center; gap:6px; background:var(--panel2);
+  border:1px solid var(--border); border-radius:99px; padding:4px 12px; font-size:.8rem; font-weight:700;
+}
+.footer-note{font-size:.7rem; color:var(--text-faint); margin-top:16px; line-height:1.5;}
+</style>
+
+<div class="topbar">
+  <div>
+    <h1>Boss Lines — Real Book Player</h1>
+    <div class="subtitle">Plays back actual recorded event logs from <span class="mono">games/0_0_boss_lines/run.py</span> — not a re-simulation.</div>
+    <span class="badge">● live data, generated Aug 23</span>
+  </div>
+  <div class="sessions" id="sessionPicker"></div>
+</div>
+
+<div class="layout">
+  <div class="panel board-wrap">
+    <div class="reel-peek" id="reelPeek">next in&hellip;</div>
+    <div class="board-grid" id="boardGrid"></div>
+    <div class="controls">
+      <button class="ctrl" id="btnStart" title="Jump to start">⏮</button>
+      <button class="ctrl" id="btnBack">◀ Step</button>
+      <button class="ctrl primary" id="btnPlay">▶ Play</button>
+      <button class="ctrl" id="btnFwd">Step ▶</button>
+      <button class="ctrl" id="btnEnd" title="Jump to end">⏭</button>
+      <select id="speedSel">
+        <option value="900">0.5×</option>
+        <option value="450" selected>1×</option>
+        <option value="180">2×</option>
+        <option value="60">4×</option>
+      </select>
+      <input type="range" id="scrubber" min="0" max="0" value="0">
+      <span class="evt-counter mono" id="evtCounter">0 / 0</span>
+    </div>
+    <div class="log mono" id="eventLog"></div>
+  </div>
+
+  <div class="sidebar">
+    <div class="panel">
+      <div class="stat-row"><span class="stat-label">Stage</span><span class="stage-pill" id="stagePill">—</span></div>
+      <div style="height:10px"></div>
+      <div id="bossPanel"></div>
+    </div>
+    <div class="panel">
+      <div class="stat-row">
+        <span class="stat-label">Player HP</span>
+        <span class="stat-value mono" id="hpText">—</span>
+      </div>
+      <div class="bar-track"><div class="bar-fill" id="hpBar" style="width:100%;background:var(--green)"></div></div>
+    </div>
+    <div class="panel">
+      <div class="win-total-label">Running Total Win</div>
+      <div class="win-total mono" id="winTotal">0.00x</div>
+      <div class="stat-row" style="margin-top:10px;">
+        <span class="stat-label">Bonus spin</span>
+        <span class="stat-value mono" id="spinIndex">—</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="footer-note">
+  Every number here — wins, boss HP/damage, player HP, stage transitions, final payout — is read directly from the recorded event log, never recomputed. Only the board-tile refill between tumbles is reconstructed (following <span class="mono">src/calculations/tumble.py</span>'s exact insertion order); in rare complex multi-win spins the event schema doesn't fully disambiguate which symbol landed in every cell, and those tiles show as a dashed "?" rather than a guess. This never affects the payout numbers shown.
+</div>
+
+<script>
+const BOOKS = __BOOKS_JSON__;
+const SESSION_META = __SESSIONS_META__;
+
+const SYMBOL_LABEL = {
+  L1:"10", L2:"J", L3:"Q", L4:"K", L5:"A",
+  H1:"Mini", H2:"Minor", H3:"Major", H4:"Grand",
+  W:"WILD", SC:"SCAT", EL:"Elixir", BO:"Boost",
+  PWM:"WildX", PGM:"GlobX", PMX:"MaxWin", PXW:"XWild", PXP:"XPower", PBS:"BigSym", PMY:"Myst", PAL:"Alter",
+};
+
+let currentBook = null;
+let idx = 0;
+let playing = false;
+let timer = null;
+let renderState = null;
+
+function fmtX(cents){ return (cents/100).toFixed(2) + "x"; }
+
+function freshRenderState(){
+  return {
+    board: null,          // [reel][7] extended rows (0=pad-top .. 6=pad-bottom)
+    winCells: new Set(),
+    stage: 1,
+    bossHp: {}, bossMaxHp: {}, bossAlive: {}, bossDam: {},
+    playerHp: 0, playerHpMax: 0,
+    totalWin: 0,
+    spinIndex: 0,
+    log: [],
+    pendingExplode: null,
+  };
+}
+
+function cellKey(reel,row){ return reel+"_"+row; }
+
+function applyEvent(st, ev){
+  switch(ev.type){
+    case "reveal": {
+      st.board = ev.board.map(col => col.slice());
+      st.winCells.clear();
+      break;
+    }
+    case "bossState": {
+      st.stage = ev.stage;
+      st.bossHp = ev.bossHp; st.bossMaxHp = ev.bossMaxHp;
+      st.bossAlive = ev.bossAlive; st.bossDam = ev.bossDam;
+      break;
+    }
+    case "playerHpState": {
+      st.playerHp = ev.playerHp; st.playerHpMax = ev.playerHpMax;
+      break;
+    }
+    case "bonusTrigger": {
+      st.playerHp = ev.playerHp; st.playerHpMax = ev.playerHpMax; st.stage = ev.startStage;
+      st.log.push({idx:ev.index, cls:"sys", text:`Bonus triggered — ${ev.tier.toUpperCase()} tier, start stage ${ev.startStage}, HP ${ev.playerHp}`});
+      break;
+    }
+    case "bonusSpinStart": {
+      st.spinIndex = ev.spinIndex;
+      st.log.push({idx:ev.index, cls:"sys", text:`— Bonus spin ${ev.spinIndex} —`});
+      break;
+    }
+    case "winInfo": {
+      st.winCells.clear();
+      for(const w of ev.wins){
+        for(const p of w.positions) st.winCells.add(cellKey(p.reel, p.row+1));
+      }
+      if(ev.wins.length){
+        const parts = ev.wins.map(w => `${SYMBOL_LABEL[w.symbol]||w.symbol}×${w.kind}→${w.win}`);
+        st.log.push({idx:ev.index, cls:"win", text:`Win: ${parts.join(", ")}`});
+      }
+      break;
+    }
+    case "boardExplode": {
+      st.pendingExplode = ev.positions;
+      break;
+    }
+    case "tumbleBoard": {
+      // Reconstruction of src/calculations/tumble.py's insertion order: for
+      // a reel with k removed cells this pass, new_symbols[reel] has length
+      // k: [0]=the NEW pad-top cache (for the future), [1..k-1]=the freshly
+      // drawn symbols entering visible rows 2..k (top to bottom). The symbol
+      // entering NEW visible row 1 is the OLD pad-top cache (prev board's
+      // row 0) - already known, not part of new_symbols.
+      //
+      // Removal set: the boardExplode event (whole-board-explode superset,
+      // already deduplicated) is the ground truth for which cells left the
+      // board, NOT this event's own "explodingSymbols" list, which mirrors
+      // win_data["wins"] positions verbatim and can repeat the same cell
+      // once per payline it belongs to. In rare complex multi-Power spins
+      // the two counts can still disagree by a symbol or two (a real gap in
+      // what this event schema exposes, not a game-math issue - the win/HP/
+      // boss numbers below are all read directly from the log, never
+      // derived from board state). When that happens we pad with a visibly
+      // marked "?" tile rather than silently guessing or breaking the grid.
+      const removedByReel = {};
+      const seen = new Set();
+      const explodeSrc = (st.pendingExplode && st.pendingExplode.length) ? st.pendingExplode : ev.explodingSymbols;
+      for(const p of explodeSrc){
+        const k = p.reel+"_"+p.row;
+        if(seen.has(k)) continue;
+        seen.add(k);
+        (removedByReel[p.reel] ||= []).push(p.row);
+      }
+      for(let r=0;r<5;r++){
+        const rows = (removedByReel[r]||[]).slice().sort((a,b)=>a-b);
+        const k = rows.length;
+        if(k===0) continue;
+        const prevCol = st.board[r];
+        const oldPadTop = prevCol[0];
+        const newSyms = ev.newSymbols[r] || [];
+        const removeSet = new Set(rows);
+        const survivors = [];
+        for(let i=1;i<=5;i++) if(!removeSet.has(i)) survivors.push(prevCol[i]);
+        let newVisible = [oldPadTop, ...newSyms.slice(1)].concat(survivors);
+        while(newVisible.length < 5) newVisible.push({name:"?", uncertain:true});
+        newVisible = newVisible.slice(0,5);
+        const newPadTop = newSyms[0] || oldPadTop;
+        st.board[r] = [newPadTop, ...newVisible, prevCol[6]];
+      }
+      st.winCells.clear();
+      st.pendingExplode = null;
+      break;
+    }
+    case "bossDefeated": {
+      st.log.push({idx:ev.index, cls:"boss", text:`${ev.bossId.toUpperCase()} defeated${ev.isLastOfStage?" (last of stage)":""} — reward ${ev.rewardAmount}x`});
+      break;
+    }
+    case "bonusCounterattack": {
+      st.playerHp = ev.playerHpAfter;
+      st.log.push({idx:ev.index, cls:"boss", text:`Boss counterattack — ${ev.totalDamage} dmg, HP now ${ev.playerHpAfter}`});
+      break;
+    }
+    case "elixirActivated": {
+      st.playerHp = ev.playerHpAfter;
+      st.log.push({idx:ev.index, cls:"hp", text:`Elixir — healed ${ev.healed} HP, now ${ev.playerHpAfter}`});
+      break;
+    }
+    case "boosterActivated": {
+      st.log.push({idx:ev.index, cls:"sys", text:`Booster collected — ×${ev.damageMultiplierNextSpin} damage next spin`});
+      break;
+    }
+    case "stageClear": {
+      st.log.push({idx:ev.index, cls:"boss", text:`Stage ${ev.stageCleared} cleared — removed ${ev.removedSymbol||"—"}, next stage ${ev.nextStage||"—"}`});
+      break;
+    }
+    case "setTotalWin": {
+      st.totalWin = ev.amount;
+      break;
+    }
+    case "bonusEnd": {
+      st.log.push({idx:ev.index, cls:"sys", text:`Bonus ended — ${ev.spinsTaken} spins, ${ev.endReason}, final HP ${ev.playerHpFinal}`});
+      break;
+    }
+    case "finalWin": {
+      st.totalWin = ev.amount;
+      st.log.push({idx:ev.index, cls:"win", text:`FINAL WIN: ${fmtX(ev.amount)}`});
+      break;
+    }
+  }
+}
+
+function computeStateAt(book, targetIdx){
+  const st = freshRenderState();
+  for(let i=0;i<=targetIdx;i++) applyEvent(st, book.events[i]);
+  return st;
+}
+
+function render(){
+  const st = renderState;
+  const grid = document.getElementById("boardGrid");
+  grid.innerHTML = "";
+  const peek = document.getElementById("reelPeek");
+  if(st.board){
+    for(let r=0;r<5;r++){
+      for(let row=1;row<=5;row++){
+        const sym = st.board[r][row];
+        const tile = document.createElement("div");
+        const isWin = st.winCells.has(cellKey(r,row));
+        const isExploding = st.pendingExplode && st.pendingExplode.some(p=>p.reel===r && p.row===row);
+        tile.className = "tile" + (isWin?" win":"") + (isExploding?" exploding":"") + (sym.wild?" wild":"") + (sym.uncertain?" uncertain":"");
+        tile.textContent = sym.uncertain ? "?" : (SYMBOL_LABEL[sym.name] || sym.name);
+        if(sym.scatter) tile.innerHTML += '<span class="attr">SC</span>';
+        grid.appendChild(tile);
+      }
+    }
+    peek.textContent = "peek: " + st.board.map(c => SYMBOL_LABEL[c[0].name]||c[0].name).join("  ·  ");
+  }
+
+  document.getElementById("stagePill").textContent = "Stage " + st.stage;
+
+  const bossPanel = document.getElementById("bossPanel");
+  bossPanel.innerHTML = "";
+  for(const bid of Object.keys(st.bossHp)){
+    const hp = Math.max(0, st.bossHp[bid]);
+    const max = st.bossMaxHp[bid] || 1;
+    const alive = st.bossAlive[bid];
+    const div = document.createElement("div");
+    div.className = "boss-block" + (alive? "" : " dead");
+    div.innerHTML = `
+      <div class="stat-row">
+        <span class="stat-label">${bid}</span>
+        <span class="stat-value mono">${alive? Math.round(hp)+" / "+max : "DEFEATED"}</span>
+      </div>
+      <div class="bar-track"><div class="bar-fill" style="width:${alive? (100*hp/max) : 0}%;background:var(--red)"></div></div>
+    `;
+    bossPanel.appendChild(div);
+  }
+
+  const hpPct = st.playerHpMax > 0 ? Math.max(0,Math.min(100, 100*st.playerHp/st.playerHpMax)) : 0;
+  document.getElementById("hpText").textContent = Math.round(st.playerHp) + " / " + Math.round(st.playerHpMax);
+  document.getElementById("hpBar").style.width = hpPct + "%";
+  document.getElementById("hpBar").style.background = hpPct < 25 ? "var(--red)" : "var(--green)";
+
+  document.getElementById("winTotal").textContent = fmtX(st.totalWin);
+  document.getElementById("spinIndex").textContent = st.spinIndex || "—";
+
+  const logEl = document.getElementById("eventLog");
+  logEl.innerHTML = st.log.slice(-60).map(l => `<div class="${l.cls}"><span class="idx">#${l.idx}</span>${l.text}</div>`).join("");
+  logEl.scrollTop = logEl.scrollHeight;
+
+  document.getElementById("scrubber").value = idx;
+  document.getElementById("evtCounter").textContent = (idx+1) + " / " + currentBook.events.length;
+}
+
+function goTo(newIdx){
+  idx = Math.max(0, Math.min(currentBook.events.length - 1, newIdx));
+  renderState = computeStateAt(currentBook, idx);
+  render();
+}
+
+function loadSession(key){
+  currentBook = BOOKS[key];
+  document.getElementById("scrubber").max = currentBook.events.length - 1;
+  document.querySelectorAll(".session-btn").forEach(b => b.classList.toggle("active", b.dataset.key===key));
+  goTo(0);
+}
+
+function stepPlay(){
+  if(idx >= currentBook.events.length - 1){ togglePlay(false); return; }
+  goTo(idx+1);
+}
+
+function togglePlay(force){
+  playing = force !== undefined ? force : !playing;
+  document.getElementById("btnPlay").textContent = playing ? "⏸ Pause" : "▶ Play";
+  if(timer){ clearInterval(timer); timer=null; }
+  if(playing){
+    const speed = parseInt(document.getElementById("speedSel").value, 10);
+    timer = setInterval(stepPlay, speed);
+  }
+}
+
+document.getElementById("btnStart").onclick = () => goTo(0);
+document.getElementById("btnEnd").onclick = () => goTo(currentBook.events.length-1);
+document.getElementById("btnBack").onclick = () => { togglePlay(false); goTo(idx-1); };
+document.getElementById("btnFwd").onclick = () => { togglePlay(false); goTo(idx+1); };
+document.getElementById("btnPlay").onclick = () => togglePlay();
+document.getElementById("scrubber").oninput = (e) => { togglePlay(false); goTo(parseInt(e.target.value,10)); };
+document.getElementById("speedSel").onchange = () => { if(playing){ togglePlay(false); togglePlay(true); } };
+
+const picker = document.getElementById("sessionPicker");
+for(const s of SESSION_META){
+  const btn = document.createElement("button");
+  btn.className = "session-btn"; btn.dataset.key = s.key;
+  btn.textContent = s.label;
+  btn.onclick = () => { togglePlay(false); loadSession(s.key); };
+  picker.appendChild(btn);
+}
+loadSession(SESSION_META[0].key);
+</script>
