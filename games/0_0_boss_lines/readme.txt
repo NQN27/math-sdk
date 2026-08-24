@@ -886,8 +886,107 @@ having met the 0.967 target, because it did not.
     subset for stage 6, etc.) matches the confirmed spec in
     QUESTIONS_FOR_YOU.md exactly and needed no independent design choice.
 
-## Deferred (still out of scope, unchanged)
+## Deferred (Phase 3 status - SUPERSEDED, see Phase 4 section below)
 
-Ante/Ultimate-Power/God-Mode/buy-N-scatter feature-spin bet modes remain
-entirely unbuilt, per the task's own stated build order ("hoan thien + validate
-base + bonus (core mechanic, khong co feature buy) truoc").
+~~Ante/Ultimate-Power/God-Mode/buy-N-scatter feature-spin bet modes remain
+entirely unbuilt~~ - built in Phase 4 (see below). Left struck through
+rather than deleted so the historical build-order note stays legible.
+
+## Phase 4 (2026-08-19 to 2026-08-24): feature-buy modes, Normal Bonus
+## rebalance, frontend integration
+
+### Feature-buy bet modes (built, contradicting the Phase 3 "Deferred" note
+### above)
+
+All 5 bet modes the Phase 3 section above called unbuilt now exist in
+`self.bet_modes`: `ante` (cost 3x), `ultimatepower`, `godmode`, `buy3`,
+`buy4` - each targeting rtp=0.965 (a safety margin under the 0.967 hard
+ceiling `utils/rgs_verification.py`'s `verify_mode_volatility` checks per
+bet mode). See the large comment block directly above `self.bet_modes` in
+game_config.py for the per-mode quota/cost reasoning; see
+`_tuning_scratch/normal_bonus_full_stats.py`'s "buy3/buy4 tier composition"
+note (buy3 lands ~92%/7.8%/0.2% normal/super/hidden; buy4 excludes Normal
+entirely, ~97.5%/2.5% super/hidden) for how the buy-N modes route to Bonus
+tier.
+
+### Normal Bonus HP/reward-table rebalance (2026-08-19, shipped + accepted)
+
+`bonus_player_hp_choices["normal"]` raised from `[50,50,50,100,100]` to a
+flat `[200,200,200,200,200]`, paired with `boss_stage_table`'s per-stage HP
+scaled up ({1: 3.7x, 2: 2.5x, 3: 2.7x, 4: 3.3x, 5: 4.75x, 6: 7.0x}, Dam
+unchanged) and a full reshape of `reward_drop_weights_normal_bonus` into a
+21+7-tier ("SEG1-7") table with dedicated rare chest tiers (400/500/800/
+1500/2500/4000x). A chain-block mechanic was added alongside this bundle.
+Measured and accepted as final for Normal tier - see game_config.py's own
+comment blocks around `boss_stage_table` and
+`reward_drop_weights_normal_bonus` for the full history and measured
+targets (single source of truth over any external memory/notes file).
+
+Two known, ACCEPTED-AS-IS gaps from this rebalance, not yet revisited:
+  - A measured gap at the stage-6 bucket (endless tail) vs the other
+    stages' otherwise-smooth progression - see
+    `_tuning_scratch/stage_funnel_payout.py` / `stage6_payout_histogram.py`
+    for the measurement.
+  - `HP_MULT`'s stage-1/stage-2 ordering is inverted relative to every
+    other stage (stage 1's HP multiplier is HIGHER than stage 2's, the only
+    such inversion in the table) - carried over from the ported candidate
+    preset and left as-is since correcting it wasn't validated to still hit
+    the accepted target numbers.
+
+Re-verify both before treating them as resolved; a fresh, zero-override
+measurement is `_tuning_scratch/normal_bonus_full_stats.py` (mean/median/
+variance overall AND broken down by max-stage-reached bucket).
+
+### Super-tier Bonus reward table - NOT rebalanced, known broken
+
+Unlike Normal, Super's reward-drop table is still the original unscaled
+placeholder - measured at roughly 5x over its intended target. This needs
+the same kind of full shape redesign Normal got (a K-rescale alone was
+tried and rejected as insufficient - see
+`_tuning_scratch/reward_table_scale_test_super.py`), not a quick multiplier
+tweak. Hidden tier was independently confirmed close to target and was
+left unchanged.
+
+### Frontend (web-sdk apps/boss-lines) wired to real backend books
+
+The Stake Engine `web-sdk` frontend (sibling repo, `D:\Stake Engine\web-sdk`)
+was connected end-to-end to this game's real generated books for the first
+time this phase: `config.ts`/`constants.ts` re-synced to the real bet
+modes/paylines/symbols/paddingReels (`config_fe_0_0_boss_lines.json`), the
+entire custom event-handling layer (`typesBookEvent.ts`/
+`bookEventHandlerMap.ts`) rewritten from an obsolete fictional "wave/chest"
+design to match `game_events.py` exactly, and Storybook fixture data
+(`src/stories/data/*_books.ts`/`*_events.ts`) regenerated from real,
+current books via a new `_tuning_scratch/convert_books_for_webfe.py`
+script (strips reveal-event padding down to web-sdk's 5-visible-row
+convention; every other event field passed through losslessly).
+
+Verifying this required moving past static/type checks to actually running
+the game in a real headless browser (Playwright) - that surfaced several
+real bugs invisible to `tsc`/HTTP-level checks alone, all now fixed and
+committed in `web-sdk`:
+  - A row-index off-by-one: real events report row in the PADDED 1-5
+    range (matching the reveal event's 7-row board), but the frontend's
+    board array is UNPADDED 0-4.
+  - `updateTumbleWin` had no registered handler at all, throwing
+    mid-cascade and stalling the game.
+  - The placeholder symbol renderer's "animation complete" signal was
+    keyed off an object reference that never actually changed between
+    animation states, so it silently stopped firing after first mount.
+  - That signal was also gated on the symbol being inside the visible
+    render frame - the top row of a freshly-landed reel could still be
+    settling into frame exactly when its state flipped, permanently
+    hanging any later win-animation wait on it.
+  - The boss HUD (`BossHealthBars.svelte`) was positioned with a large,
+    unexplained gap above the board, pushing "Boss 1" and the stage/HP
+    labels entirely off-screen on any browser window under ~900px tall
+    (very common laptop resolutions) - the boss battle was always working
+    correctly underneath, just invisible.
+
+One known, NOT-yet-resolved environment issue found during this
+verification: the pre-existing (unmodified) spine-based win-celebration
+animation crashes the browser tab on this development machine's GPU/
+WebGPU setup, reproducing identically in headed and headless mode, near
+the very end of a Bonus session. Everything up to that screen runs
+cleanly. Not yet confirmed whether this reproduces on an actual target
+deployment environment.
