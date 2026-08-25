@@ -43,6 +43,17 @@ class Symbol:
         "multiplier",
         "has_prize",
         "prize",
+        # --- Boss Lines Phase 2 "Power" attributes (base-game wild-attached
+        # powers). Deliberately NOT registered under config.special_symbols
+        # (see game_override.py assign_wild_basegame_power docstring) -
+        # Symbol.check_attribute()'s "name in special_flags" fallback would
+        # make every "W" report these as present regardless of whether that
+        # specific wild instance actually carries the power. These slots are
+        # plain per-instance values instead; always gate on the VALUE via
+        # get_attribute(), never check_attribute(), for these three.
+        "global_mult",  # int in {2,3,5,10} or None - Global Multi power
+        "expand",  # True or None - Expanded Wild power
+        "extra_lines",  # int (added active line count) or None - Extra Lines power
     )
 
     def __init__(self, defn: SymbolDefinition):
@@ -53,6 +64,9 @@ class Symbol:
         self.scatter = False
         self.multiplier = None
         self.prize = None
+        self.global_mult = None
+        self.expand = None
+        self.extra_lines = None
         self.assign_default_attribute()
 
     @property

@@ -68,10 +68,19 @@ STAGE_WILD_PCT = {
     "hidden": {3: 4.0, 4: 3.5, 5: 3.0, 6: 2.5},
 }
 POWER_FRAC_OF_WILD = {"normal": 0.0, "super": 0.35, "hidden": 0.55}
-# col0 stays permanently Wild/Power-free for super/hidden (established pattern
-# in gen_super_bm.py/gen_up_reels.py's BASELINE_COL0 - no W/Power key at all);
-# normal's col0 DOES carry wild, same target % as its other columns.
-COL0_GETS_WILD = {"normal": True, "super": False, "hidden": False}
+# col0 is permanently Wild/Power-free for ALL tiers - confirmed by the game
+# designer (2026-08-17) that Wild may only ever appear on columns 2-5
+# (1-indexed) / reel index 1-4 (0-indexed), never column 1 / reel index 0.
+# CORRECTED 2026-08-17: this used to read {"normal": True, ...} - a real bug,
+# not a deliberate design choice as the old comment here claimed. It made
+# BM_Reels_S1-S6.csv place "W" in column 0 (verified: 72/307, 41/307, 30/307,
+# 14/307, 6/307, 2/307 rows for stages 1-6 respectively), which also silently
+# violates game_config.py's own paytable comment ("Wild never lands on reel/
+# column 0"). Super/Hidden were already correct (False) - only Normal was
+# wrong. Every Normal-tier Bonus economy number tuned earlier this project
+# (CONFIRMED_CANDIDATES.md) was measured against the buggy reels and needs
+# re-verification against the corrected ones.
+COL0_GETS_WILD = {"normal": False, "super": False, "hidden": False}
 
 TIER_FILE_PREFIX = {"normal": "BM_Reels", "super": "Super_BM", "hidden": "UP_Reels"}
 

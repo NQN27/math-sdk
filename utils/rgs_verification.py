@@ -174,9 +174,25 @@ def get_num_non_zero_payouts(book_int_payouts) -> None:
     return len([p for p in book_int_payouts if p > 0])
 
 
-def verify_mode_volatility(name: str, MathStats: object) -> dict:
-    """Check math betlevel volatility limits. Returns dict of violated attributes."""
+def verify_mode_volatility(name: str, MathStats: object, limits_override: dict = None) -> dict:
+    """Check math betlevel volatility limits. Returns dict of violated attributes.
+
+    `limits_override`: optional dict merged OVER the default `mode_limits`
+    (never replacing it outright), so a caller can raise/lower a SPECIFIC
+    limit for its own game without weakening the default for every other
+    game sharing this file. Added for games/0_0_boss_lines's "Phase 4 v2"
+    flat 97.00% RTP target (see its QUESTIONS_FOR_YOU.md) - a global bump of
+    the "rtp" default here was tried and reverted: 6 other games in this repo
+    (0_0_cluster/0_0_expwilds/0_0_lines/0_0_lines_feature_match/0_0_scatter/
+    0_0_ways) target exactly 0.967, and this project's own history already
+    showed a 0.967-targeting mode can overshoot into the 0.967-0.97 band from
+    ordinary optimizer noise - a global bump would silently stop catching
+    that for those unrelated games. Only games/0_0_boss_lines/run.py passes
+    a non-default value (limits_override={"rtp": 0.97}); every other game's
+    run.py calls execute_all_tests with no override and is unaffected."""
     mode_limits = {"prob5k": 1e-2, "prob10k": 0.5e-2, "etl40b": 0.9, "etl10k": 0.8, "cvar": 800, "rtp": 0.967}
+    if limits_override:
+        mode_limits = {**mode_limits, **limits_override}
     violated_attributes = {}
 
     for key, limit in mode_limits.items():
@@ -193,7 +209,8 @@ def verify_mode_volatility(name: str, MathStats: object) -> dict:
 
 
 def get_lut_statistics(
-    name, win_distribution, bet_cost, unique_payouts, weight_range, min_win, max_win, num_events
+    name, win_distribution, bet_cost, unique_payouts, weight_range, min_win, max_win, num_events,
+    limits_override: dict = None,
 ) -> object:
     """Run RGS statistic tests for upload verification."""
 
@@ -234,12 +251,17 @@ def get_lut_statistics(
     else:
         MathStats.m2m = 0
 
-    verify_mode_volatility(name, MathStats)
+    verify_mode_volatility(name, MathStats, limits_override=limits_override)
     return MathStats
 
 
-def execute_all_tests(config, excluded_modes=[]):
-    """Run all tests for a given game"""
+def execute_all_tests(config, excluded_modes=[], limits_override: dict = None):
+    """Run all tests for a given game.
+
+    `limits_override`: see `verify_mode_volatility`'s docstring - passed
+    straight through, merged over the default per-key limits, never
+    replacing them outright. Defaults to None (every game except
+    games/0_0_boss_lines keeps the original 0.967 rtp ceiling unchanged)."""
     mode_stats = []
     mode_rtps = []
     for bet_mode in config.bet_modes:
@@ -286,7 +308,8 @@ def execute_all_tests(config, excluded_modes=[]):
                 compare_payout_values(book_payouts, lut_payouts)
 
             StatsObject = get_lut_statistics(
-                name, win_dist, cost, lut_payouts, weights_range, min_win, max_win, num_events
+                name, win_dist, cost, lut_payouts, weights_range, min_win, max_win, num_events,
+                limits_override=limits_override,
             )
             mode_rtps.append(StatsObject.rtp)
             setattr(StatsObject, "name", name)

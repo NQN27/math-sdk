@@ -48,7 +48,17 @@ class PrintXLSX:
         self.game_info = game_info
         self.global_ranges = list(self.game_info.win_ranges)
         self.setup_xlsx()
-        for mode in self.game_info.all_modes:
+        # Iterate the ANALYSED subset, not every configured bet mode -
+        # `all_modes` (every bet_mode name in game_config.py) can be a
+        # strict superset of `modes_to_analyse` (see GameInformation.__init__
+        # / games/0_0_boss_lines's run.py for why: that game scopes analysis
+        # to a subset of its 6 bet modes on rounds that only resimulate some
+        # of them) - hr_summary/av_win_summary/etc. are only ever populated
+        # for modes_to_analyse, so looping all_modes here KeyErrors on any
+        # excluded mode. modes_to_analyse defaults to all_modes when the
+        # caller doesn't scope it, so this is a no-op change for every other
+        # existing caller.
+        for mode in self.game_info.modes_to_analyse:
             self.write_mode_probs(str(mode), 0, 0)
             self.write_range_hit_counts(str(mode), 0, self.top_row_col_end)
             self.write_custom_key_info(str(mode), self.last_row_end + 2)

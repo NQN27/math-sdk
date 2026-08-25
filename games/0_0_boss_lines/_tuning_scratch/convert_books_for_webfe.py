@@ -59,20 +59,36 @@ def load_books(zst_path, limit=None):
 def pick_representative(books, limit):
     """Keep the fixture small but interesting: prefer a spread of outcomes
     (bonus-triggering, winning, and losing books) over the first N in file
-    order, which are overwhelmingly small base-game losses."""
+    order, which are overwhelmingly small base-game losses.
+
+    Within each bucket, sample evenly ACROSS the sorted payout range rather
+    than taking the top-N by payout - taking only the very highest payouts
+    means almost every book triggers the biggest win-celebration tier, which
+    crashes this dev machine's spine/GPU renderer within seconds of any
+    random pick (see the 2026-08-26 investigation). A spread of typical AND
+    occasional big outcomes is both more representative and far more usable
+    for real manual testing."""
     is_bonus = {b["id"]: any(e["type"] == "bonusTrigger" for e in b["events"]) for b in books}
     bonus = [b for b in books if is_bonus[b["id"]]]
     wins = [b for b in books if not is_bonus[b["id"]] and b["payoutMultiplier"] > 0]
     zeros = [b for b in books if not is_bonus[b["id"]] and b["payoutMultiplier"] == 0]
 
-    bonus.sort(key=lambda b: -b["payoutMultiplier"])
-    wins.sort(key=lambda b: -b["payoutMultiplier"])
+    bonus.sort(key=lambda b: b["payoutMultiplier"])
+    wins.sort(key=lambda b: b["payoutMultiplier"])
+
+    def sample_evenly(pool, n):
+        if n <= 0 or not pool:
+            return []
+        if n >= len(pool):
+            return pool
+        # evenly-spaced percentile indices, always including the extremes
+        return [pool[round(i * (len(pool) - 1) / (n - 1))] if n > 1 else pool[len(pool) // 2] for i in range(n)]
 
     quota_bonus = min(len(bonus), max(1, limit // 2))
     quota_wins = min(len(wins), max(1, limit // 3))
     quota_zeros = max(0, limit - quota_bonus - quota_wins)
 
-    picked = bonus[:quota_bonus] + wins[:quota_wins] + zeros[:quota_zeros]
+    picked = sample_evenly(bonus, quota_bonus) + sample_evenly(wins, quota_wins) + zeros[:quota_zeros]
     return picked[:limit]
 
 
