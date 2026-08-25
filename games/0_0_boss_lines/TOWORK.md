@@ -5,6 +5,11 @@ full narrative history/reasoning behind each item - this file is just the
 tracker. Update this alongside `readme.txt` at the same checkpoints (see
 `CLAUDE.md`'s "commit at checkpoints" rule).
 
+**Testing on a new machine?** See `PIPELINE.md` for the full clone-to-
+running-demo steps (both math-sdk and web-sdk) - verified end-to-end and
+fully reproducible (regenerating the frontend files from the current
+backend state produces byte-identical output to what's committed).
+
 ## Blocking / high severity
 
 - [ ] **RTP optimizer doesn't hit target when 2+ non-identity fences coexist**
