@@ -1,22 +1,26 @@
 """Converts real math-sdk generated books into the TS story-data format
 web-sdk's Storybook apps expect.
 
-This is a STRAIGHT PASS-THROUGH: no board or position data is altered at all.
-That was verified against the framework's own cascading-reel implementation
-(packages/utils-slots/src/createReelForCascading.svelte.ts) and against the
-officially-tracked apps/scatter fixtures, which Boss Lines' frontend is built
-on. Cascading reels keep the reveal event's FULL padded board (7 rows per reel
-for a 5-row game) and map array index i to visible row i-1, so:
+Reveal boards are stripped down to the 5 VISIBLE rows per reel (padding
+removed) - Boss Lines' own frontend (apps/boss-lines/src/game/
+stateGame.svelte.ts) is wired to `createReelForSpinning`, the SAME
+reel-animation component `apps/lines` uses (confirmed directly: both files
+import createReelForSpinning, not createReelForCascading) - and apps/lines'
+own committed fixtures (src/stories/data/base_books.ts) show 5-row reveal
+boards, confirming that's this component family's real convention, not a
+one-off. `createReelForCascading` (used by apps/scatter/cluster/ways, whose
+fixtures ARE 7-row padded) is a DIFFERENT component Boss Lines does not use,
+despite Boss Lines' gameplay also having tumble/cascade mechanics - it was
+scaffolded from the `lines` app template, so its frontend reel plumbing
+follows lines' convention, not scatter's. Do not "fix" this back to padded
+without first re-pointing stateGame.svelte.ts at createReelForCascading (a
+much bigger change, unverified) - see readme.txt's Phase 4 section / the
+2026-08-25 investigation for the full reasoning.
 
-  * reveal boards must keep their padding rows, and
-  * the PADDED row indices (1..5) that game_events.py emits on every
-    `position` are already the correct array indices.
-
-apps/scatter's own committed fixtures show the same 7-row boards and 1..5 row
-values, confirming this is the framework's convention rather than a quirk of
-this game. (Non-cascading, `lines`-style spinning reels use unpadded 5-row
-boards instead - do not copy this script's behaviour to such a game without
-re-checking.)
+Every OTHER event type (winInfo/boardExplode/tumbleBoard/etc, which report
+row in the padded 1-5 range per game_events.py's _padded_row helper) is
+passed through unchanged - the frontend's bookEventHandlerMap.ts already
+subtracts 1 from those before indexing into the unpadded board array.
 
 Usage:
   python convert_books_for_webfe.py <mode> <out_books.ts> <out_events.ts> [limit]
@@ -31,6 +35,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 GAME_DIR = os.path.dirname(HERE)
 
 
+def strip_padding_from_reveal(board):
+    return [reel[1:-1] for reel in board]
+
+
 def load_books(zst_path, limit=None):
     dctx = zstandard.ZstdDecompressor()
     with open(zst_path, "rb") as f:
@@ -38,7 +46,11 @@ def load_books(zst_path, limit=None):
     lines = data.decode().splitlines()
     books = []
     for line in lines:
-        books.append(json.loads(line))
+        b = json.loads(line)
+        for e in b["events"]:
+            if e["type"] == "reveal":
+                e["board"] = strip_padding_from_reveal(e["board"])
+        books.append(b)
     if limit:
         books = pick_representative(books, limit)
     return books
