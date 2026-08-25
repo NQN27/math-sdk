@@ -53,18 +53,39 @@ STAGE_WILD_PCT = {
     # than assumed from an earlier smaller/different-seed check - see
     # scratchpad for the current measurement.
     "normal": {1: 23.0, 2: 16.0, 3: 10.0, 4: 4.0, 5: 2.0, 6: 1.0},
-    "super":  {2: 8.0, 3: 7.0, 4: 6.0, 5: 5.0, 6: 4.0},
+    # Super: REPLACED 2026-08-26 (was 8/7/6/5/4, hard-tuned independently of
+    # Normal and never revisited when the 2026-08-19 shared boss_stage_table
+    # rebalance made Super's first stage (2) noticeably tougher than
+    # Normal's first stage (1)). Root-caused Super's 79-80% stage-2 death
+    # rate (see TOWORK.md's "Super-tier Bonus is badly UNDER target" entry)
+    # almost entirely to this taper being ~3x lower than Normal's at the
+    # equivalent "stages since bonus start" - not a joint HP+Wild% problem
+    # as first hypothesized. Reuses NORMAL's own taper values directly
+    # (23/16/10/4/2, Normal's stage1-5 mapped onto Super's stage2-6), power
+    # fraction and HP pool both left exactly as they were - isolated via a
+    # 4-condition in-memory A/B (_tuning_scratch/super_normal_idea_experiment.py,
+    # confirmed at n=8000: mean 28.45x -> 206.12x, stage-2 death 80.0% ->
+    # 3.4%, vs the 240.77x target). Cascade-safety re-checked for this
+    # SPECIFIC combination (23% wild + Super's existing 35% power fraction,
+    # a combo that never existed before - Normal only ever ran high-wild%
+    # WITHOUT power) via
+    # _tuning_scratch/super_resolve_pass_safety_check.py: zero
+    # max_resolve_passes hits across 113,999 internal spins at n=10000 - not
+    # a risk here despite the "CLIFF FOUND"/hidden-taper history above
+    # warning that high-wild%+power combos CAN blow up resolve-pass counts.
+    "super":  {2: 23.0, 3: 16.0, 4: 10.0, 5: 4.0, 6: 2.0},
     # Revised DOWN from the original 6.5/5.5/4.5/3.5 proposal: empirical
     # testing (pass_count_sweep.py) found hidden's Both-Ways pay + 55%
     # power-fraction combination pushes resolve-pass counts into the
     # heavy tail hard enough to occasionally hit max_resolve_passes (300) -
     # measured hit-rate ~0.5-2% at 6.5%/55%pow on stage 3, vs 0% (max
     # observed pass count 134 across 1200 sims / 2 reel-generation seeds)
-    # at 5.0%/55%pow - not a risk super/normal share (super's peak stage
-    # tops out at 14 passes even at its full 8%/35%pow target, no Both
-    # Ways). Scaled the whole hidden curve down proportionally (x0.769) to
-    # keep the same taper SHAPE while landing stage 3 in the verified-safe
-    # zone.
+    # at 5.0%/55%pow. Scaled the whole hidden curve down proportionally
+    # (x0.769) to keep the same taper SHAPE while landing stage 3 in the
+    # verified-safe zone. NOTE: the "not a risk super shares" clause this
+    # comment originally had is gone - Super's own taper changed
+    # significantly on 2026-08-26 (see above) and was re-verified safe
+    # independently, not by reference to this hidden-specific measurement.
     "hidden": {3: 4.0, 4: 3.5, 5: 3.0, 6: 2.5},
 }
 POWER_FRAC_OF_WILD = {"normal": 0.0, "super": 0.35, "hidden": 0.55}
