@@ -178,6 +178,83 @@ backend state produces byte-identical output to what's committed).
       correct call - Wild% alone got mean within ~11% of target without
       touching it, don't add a 3rd lever pre-emptively).
 
+      **REWARD TABLE REDESIGNED 2026-08-27** - closes the item above, per
+      explicit request: "i like the mean and median but the distribution i
+      want it alike the normal bonus with 3 vertices." Key finding first
+      (`_tuning_scratch/payout_component_split_super.py`, n=8000): Super's
+      economy is **line-pay-DOMINATED** (197.12x, 75.4% of the 261.58x
+      total) - the OPPOSITE of Normal's likely reward-drop-dominated split
+      - because Super survives far more spins/session than Normal AND has
+      Power's Wild/Global Multi compounding line-pay in a way Normal's
+      `power_frac=0.0` reels never do. This constrains what the reward
+      table alone can achieve: it only ever moves the ~64x reward-drop
+      slice, not the dominant ~197x line-pay slice.
+      Tested 3 candidates (all in-memory overrides, real files untouched
+      until the final apply):
+        1. Normal's exact table plugged onto Super as-is: mean=304.84x
+           (overshoots - Super rolls far more often than Normal per
+           session, so the same table produces more EV here).
+        2. Normal's table SHAPE (weights unchanged) with every VALUE
+           rescaled by K=0.5985 to hit the ~64x reward-drop budget:
+           mean=249.82x, median=168.70x - close to target, but histogram
+           showed only ONE visible peak (80-150x), same shape as before -
+           the chest tiers (spread 239-2394x post-rescale) produced no
+           visible bump.
+        3. Same LOW/MID pool, but chest weight CONCENTRATED into a narrow
+           900-1100x band instead of spread: mean=251.92x, median=168.55x -
+           STILL no visible bump (that band's counts were lower than its
+           own neighboring bins, i.e. not a local peak at all).
+      Conclusion, directly demonstrated not just theorized: a genuine 3rd
+      (chest) peak needs ~3-5x more EV concentrated there than the current
+      ~64x budget allows without pushing total mean well past 266.84x -
+      not achievable while also preserving current mean/median, since
+      line-pay (the other 75%) isn't reward-table-adjustable.
+      **Game designer's explicit decision when presented with this
+      tradeoff**: keep current mean/median, accept 2 peaks (not 3) rather
+      than let mean drift up to force a 3rd. Applied Candidate 2's table
+      (K=0.5985) to production. A useful side effect of reusing Normal's
+      exact chest WEIGHTS (28.37 total, only values rescaled): Super's
+      chest-pool-weight-sum now exactly matches Normal's, which also fixes
+      the earlier-flagged "Super's natural-maxwin rate running ~7x hotter
+      than intended" finding (was 1-in-16,667, now shares Normal's
+      calibrated ~1-in-23,509 rate) - not the primary goal of this pass,
+      but a real, verified improvement (0 hits at n=15000, consistent with
+      the lower rate).
+      **CONFIRMED against the actual committed `game_config.py`** (not
+      just the in-memory candidate) at n=15000: mean=249.24x, median=
+      169.30x, ratio=67.9% - 6.6% below the original 266.84x target,
+      within this project's usual 15% tolerance band. Chest tiers weight
+      sum verified =28.37 (matches Normal exactly).
+      **Not yet done**: a tighter K-fit closing that 6.6% gap fully was
+      not pursued further (n=8000-scale iterations showed this specific
+      gap is within normal run-to-run sampling noise at that n) - revisit
+      with a larger-n sweep if exact mean precision becomes a priority.
+
+      **RE-CONFIRMED at n=100,000 2026-08-26** (per the game designer's own
+      request - endless mode + Power make this distribution volatile
+      enough that 5000-10000 might not have converged). Ran as 10 foreground
+      chunks of 10,000 (`_tuning_scratch/super_n100k_chunk.py`, appending to
+      `super_n100k_payouts.txt`/`super_n100k_summary.json`) rather than one
+      long background call, after a first attempt at one single n=100000
+      background run got silently killed by the environment before its
+      first 10k-session checkpoint - the same "long-lived background
+      process doesn't survive a gap between turns" failure class already
+      seen with the Storybook dev server earlier in this project; chunking
+      into foreground calls that each finish within one turn sidesteps it.
+      Every one of the 10 chunks landed within a tight band of the others
+      (chunk means 262.92-271.96x, chunk medians 176.45-179.50x, chunk
+      stage-funnels all within ~1pp of each other) - confirms the smaller-
+      sample estimates above were NOT noise. Full n=100,000 aggregate:
+      **mean=266.84x** (240.77x target, 10.83% off), **median=178.40x**
+      (66.9% of mean, same skew-too-high-vs-target-band finding as before -
+      still needs the reward-table pass), **stdev=350.53x** (coefficient of
+      variation 1.31 - genuinely volatile, as flagged), percentiles
+      p90=540.30x/p95=764.50x/p99=1570.50x/max=19999.90x, stage-reach
+      funnel s2=4.76%/s3=13.83%/s4=45.98%/s5=31.49%/s6=3.95% (stable across
+      every chunk). Safety: **zero** `max_resolve_passes` hits across
+      1,165,077 internal spins - the strongest confirmation yet that the
+      new high-wild%+35%-power combination is safe.
+
 ## Known, accepted-as-is (revisit only if priorities change)
 
 - [ ] Normal Bonus stage-6 bucket has a measured gap vs the other stages'

@@ -549,17 +549,63 @@ class GameConfig(Config):
         # from this subset of the very same table (spec's stage-6 special
         # case), rather than a further-pruned normal list.
         self.reward_drop_stage6_last_tiers = {500, 1000, 2000, 5000, 20000}
-        # Super-tier-Bonus-ONLY reward-drop table (2026-08-15 hard-tune, IN
-        # PROGRESS - see scratchpad/super_shape_v1.py). PLACEHOLDER: exact
-        # copy of the shared table above pending the redesign's final
-        # values - see game_executables.roll_reward_drop's Super branch.
+        # Super-tier-Bonus-ONLY reward-drop table (2026-08-27 REDESIGN,
+        # supersedes the unscaled-placeholder table below the history
+        # comment). Per the game designer's request ("i like the mean and
+        # median but the distribution i want it alike the normal bonus
+        # with 3 vertices") - shape adapted from
+        # reward_drop_weights_normal_bonus's LOW/MID + exclusive-chest
+        # structure (same VALUES, same WEIGHTS), value-rescaled by
+        # K=0.5985 (_tuning_scratch/super_reward_redesign_v2.py) so the
+        # reward-drop component lands near Super's own measured budget
+        # (~64.46x of its ~261-267x total mean - see
+        # payout_component_split_super.py: Super's economy is line-pay-
+        # DOMINATED, 75.4% of total, the OPPOSITE of Normal's ~72%
+        # reward-drop-dominated split, because Super survives far more
+        # spins per session and has Power's Wild/Global Multi compounding
+        # line-pay in a way Normal's power_frac=0.0 reels never do).
+        # MEASURED (n=8000): mean=249.82x median=168.70x ratio=67.5% -
+        # close to the pre-redesign placeholder's own measured mean
+        # (~261-267x) and median (~178x), by design (see K derivation).
+        # A genuine visible 3rd (chest) peak was explicitly tried and
+        # REJECTED as not achievable at this budget without raising the
+        # mean past target: both reusing Normal's spread chest tiers
+        # (super_reward_redesign_v2.py) AND concentrating the same total
+        # chest weight into a narrow 900-1100x band
+        # (super_reward_redesign_v3.py) produced no locally-visible bump -
+        # Super's dominant, smooth line-pay component swamps any
+        # reward-table-driven cluster at the current ~24.6%-of-mean
+        # reward-drop budget. Game designer's explicit decision (2026-08-27,
+        # given this tradeoff): keep current mean/median, accept the
+        # resulting single-peak shape rather than push mean above target
+        # to force a 3rd peak. Revisit only if the designer wants to
+        # trade mean precision for a real 3rd peak, or wants to instead
+        # shrink line-pay's dominance (Power multiplier compounding /
+        # Wild% - see TOWORK.md).
         self.reward_drop_weights_super_bonus = {
-            1: 400, 2: 320, 3: 260, 4: 210, 5: 170, 6: 140, 8: 110, 10: 90,
-            15: 65, 20: 50, 25: 38, 50: 22, 100: 13, 150: 9, 200: 6, 250: 4,
-            500: 2.2, 1000: 1.1, 2000: 0.5, 5000: 0.18, 20000: 0.02,
+            0.6: 150, 1.2: 120, 1.8: 380, 2.4: 300, 3: 320, 3.6: 260,
+            4.8: 210, 6: 110, 7.2: 85, 9: 65, 10.8: 48, 12: 60, 15: 44,
+            18: 36, 20.9: 29.3, 23.9: 24.1, 29.9: 19.6, 35.9: 16.1,
+            47.9: 13.2, 59.9: 10.8, 71.8: 8.8, 89.8: 7.2, 107.7: 5.0,
+            119.7: 4.1, 149.6: 2.0, 179.6: 1.7, 209.5: 1.4, 359.1: 0.8,
+            598.5: 0.5,
+            # Chest tiers (stage-6-last-kill exclusive, same convention as
+            # Normal's own table - applied last, matches
+            # {**REGULAR_WEIGHTS, **CHEST} dict-collision-wins semantics):
+            239.4: 15, 299.2: 8, 478.8: 4, 897.8: 0.9, 1496.2: 0.35, 2394: 0.12,
         }
-        self.reward_drop_top_tiers_super_bonus = {2000, 5000, 20000}
-        self.reward_drop_stage6_last_tiers_super_bonus = {500, 1000, 2000, 5000, 20000}
+        self.reward_drop_top_tiers_super_bonus = {239.4, 299.2, 478.8, 897.8, 1496.2, 2394}
+        self.reward_drop_stage6_last_tiers_super_bonus = {239.4, 299.2, 478.8, 897.8, 1496.2, 2394}
+        # --- OLD placeholder table (2026-08-15, unscaled copy of the
+        # shared table) - SUPERSEDED 2026-08-27 by the redesign above, kept
+        # here only as a historical reference, not read by any code:
+        # self.reward_drop_weights_super_bonus = {
+        #     1: 400, 2: 320, 3: 260, 4: 210, 5: 170, 6: 140, 8: 110, 10: 90,
+        #     15: 65, 20: 50, 25: 38, 50: 22, 100: 13, 150: 9, 200: 6, 250: 4,
+        #     500: 2.2, 1000: 1.1, 2000: 0.5, 5000: 0.18, 20000: 0.02,
+        # }
+        # self.reward_drop_top_tiers_super_bonus = {2000, 5000, 20000}
+        # self.reward_drop_stage6_last_tiers_super_bonus = {500, 1000, 2000, 5000, 20000}
         # On the dedicated "wincap" fence only, heavily bias the last-of-stage
         # roll toward the Maxwin (20000) tier so the fence converges in a
         # reasonable number of repeats (see game_executables.roll_reward_drop
