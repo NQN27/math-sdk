@@ -255,6 +255,90 @@ backend state produces byte-identical output to what's committed).
       1,165,077 internal spins - the strongest confirmation yet that the
       new high-wild%+35%-power combination is safe.
 
+      **FUNNEL + DISTRIBUTION RE-TUNE 2026-08-28**, per an explicit target
+      shape from the game designer: stage-death% s2~10/s3~30/s4~35/s5~20/
+      s6~5, plus a stage-6 endless clear-chance curve of
+      `max(5%, 25% - N*0.5%)` (N = loops already cleared going into that
+      attempt). Baseline going in (n=15000): s2=4.82/s3=13.87/s4=45.89/
+      s5=31.33/s6=4.09, attempt#1 clear-chance only 10.6% (the base,
+      unescalated stage-6 trio was already too hard, independent of
+      escalation entirely).
+
+      **Levers used, in order tried:**
+      1. Wild% taper reshape (`_tuning_scratch/super_funnel_reshape.py`) -
+         iterative single-lever tuning. Found and fixed a real harness bug
+         along the way: the scratch reel-generation seed was keyed to the
+         candidate's tag string, so EVERY candidate silently re-randomized
+         ALL 5 stages' reel content, even stages whose wild% target didn't
+         change - confounding every "isolate one lever" comparison with
+         the already-known reel-content-seed sensitivity. Fixed by keying
+         the seed to (stage, target wild%) instead. After the fix, also
+         discovered a real (not artifact) HP-depletion coupling effect:
+         hardening an EARLY stage costs survivors more HP for every LATER
+         stage too (more spins needed to clear it = more counterattacks
+         land), confirmed by holding downstream reel content byte-identical
+         across two tests and still seeing a later stage's death% shift
+         when only an earlier stage's wild% changed.
+      2. `stage6_dam_escalation["super"]`: 1.20 -> 1.06. The old value
+         crashed the endless-clear-chance curve almost immediately
+         (attempt#2=4.6%, attempt#3=0%) against the requested gentle
+         decay; 1.06 tracks it much better (survives 6 attempts deep
+         instead of crashing by #3).
+      3. `power_multi_factor_weights` and `booster_damage_multiplier`
+         (Wild Multi/Global Multi factor table, and Booster's boss-damage
+         multiplier) - found to be a SURPRISINGLY effective lever for the
+         funnel shape, more so than direct wild% tuning for stage 5
+         specifically (s5's OWN wild% was tested at 5/7/8.5/11% with NO
+         monotonic response - survivors reaching s5 are already too
+         HP-depleted for its own density to matter; restoring the wider
+         Power Multi table + raising Booster to 3x closed most of that gap
+         instead). **Real cross-tier regression caught before applying**:
+         both these config values were GLOBAL, not tier-scoped - applying
+         Super's new values regressed Normal from ~80x to 141.82x mean
+         (measured directly). Fixed properly (not worked around) by
+         tier-scoping both: `power_multi_factor_weights` is now
+         `{"default": ..., "normal": ..., "hidden": ...}` (all = the prior
+         global "temp test" value, unchanged) plus `"super"`: the restored
+         original wider table; `booster_damage_multiplier` is now
+         `{"normal": 2.0, "super": 3.0, "hidden": 2.0}`. Required editing
+         the actual consumption sites (`game_calculations.py`'s Wild Multi
+         roll, `game_executables.activate_global_multi_cells`,
+         `game_bonus.py`'s booster-multiplier-current-spin assignment,
+         `game_events.booster_activated_event`), not just config values -
+         verified Normal is byte-behavior-unchanged after the refactor
+         (n=8000: mean=78.69x, consistent with prior ~80x measurements).
+
+      **A second, separate reel-content-seed surprise caught before
+      committing**: the production reel-regeneration process
+      (`gen_stage_reels.py`'s `main()`, which lands Super's 5 files on a
+      running seed counter - 783-787, since Normal's 6 files come first in
+      the dict) produced a MEANINGFULLY DIFFERENT result (n=15000:
+      mean=304.43x, median ratio 37.9% - below the 40-50% target band, s2
+      nearly double at 19.21%) than the scratch-tested seed
+      (`super_funnel_reshape.py`'s stage+pct-keyed formula) that all the
+      tuning above was actually validated against (mean=232.50x, median
+      ratio 46.2%). Caught by re-verifying against the real committed
+      files before calling this done - did NOT commit the main()-generated
+      reels. Fixed by copying the exact validated scratch reel files
+      (seed = 6000 + stage*1000 + round(pct*10)) directly into
+      `reels/Super_BM_S2-6.csv` instead, and added an explicit warning in
+      `gen_stage_reels.py` so a future `main()` run doesn't silently
+      regress this again.
+
+      **FINAL, verified against the actual committed files** (n=15000):
+      mean=235.29x, median=107.85x (45.8% of mean - inside the 40-50%
+      target band), funnel s2=10.13%/s3=27.59%/s4=34.60%/s5=18.68%/
+      s6=8.99% (4 of 5 stages within ~2.5pp of target; s6-reach is the one
+      persistent gap, target 5%, not fully closed), endless-curve
+      attempt#1-3 running a bit hot (34.7%/35.5%/29.5% vs target
+      25%/24.5%/24%) while attempts 4+ undershoot, line-pay/reward-drop
+      split 174.49x(74.2%)/61.00x(25.9%) (still line-pay-dominated, same
+      structural finding as the reward-table pass above).
+      **Still open**: s6-reach and the endless-curve's early-attempt
+      overshoot were not fully closed (accepted per game designer
+      decision after diminishing-returns iteration); Hidden Bonus's own
+      under-target state remains uninvestigated.
+
 ## Known, accepted-as-is (revisit only if priorities change)
 
 - [ ] Normal Bonus stage-6 bucket has a measured gap vs the other stages'

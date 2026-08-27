@@ -73,7 +73,55 @@ STAGE_WILD_PCT = {
     # max_resolve_passes hits across 113,999 internal spins at n=10000 - not
     # a risk here despite the "CLIFF FOUND"/hidden-taper history above
     # warning that high-wild%+power combos CAN blow up resolve-pass counts.
-    "super":  {2: 23.0, 3: 16.0, 4: 10.0, 5: 4.0, 6: 2.0},
+    # RE-TUNED 2026-08-28 (was 23/16/10/4/2, the "reuse Normal's taper"
+    # candidate from 2026-08-26 above) - that candidate fixed the funnel
+    # collapse but concentrated death almost entirely at stage 4 (45.98%
+    # vs a requested 35%) with stage2/3 far too safe (4.76%/13.83% vs a
+    # requested 10%/30%). Game designer specified an explicit target shape
+    # (stage-death%: s2~10, s3~30, s4~35, s5~20, s6~5) plus a stage-6
+    # endless clear-chance curve (~25% decaying by 0.5pp/loop, floor 5% -
+    # see game_config.stage6_dam_escalation["super"]). Reached via iterative
+    # single-lever empirical tuning (_tuning_scratch/super_funnel_reshape.py)
+    # - confirmed real reel-content-seed sensitivity along the way (a
+    # harness bug initially re-randomized every stage's reel on every
+    # candidate, even unchanged ones - fixed by keying the generation seed
+    # to (stage, target%) instead of the candidate label) and a genuine
+    # HP-depletion coupling effect (hardening an early stage costs
+    # survivors more HP for every LATER stage too, not just its own -
+    # confirmed by holding downstream reel content byte-identical across
+    # two tests and still seeing s5 shift when only s4 changed). s5's own
+    # wild% was found to NOT meaningfully control its death rate in
+    # isolation (tested at 5/7/8.5/11%, no monotonic response - survivors
+    # reaching s5 are already too HP-depleted for its own density to
+    # matter) - what actually closed most of s5's gap was
+    # booster_damage_multiplier["super"]=3.0 (see game_config.py), not a
+    # further wild% change. Final measured funnel (n=15000, against the
+    # SCRATCH-harness seed - see the seed warning below):
+    # s2=10.17%, s3=28.09%, s4=34.43%, s5=18.20%,
+    # s6-reach=9.11% (target 5% - the one persistent gap, not fully
+    # closed). Payout: mean=232.50x, median=107.30x (46.2% of mean, now
+    # inside the original 40-50% target band). See TOWORK.md for the full
+    # candidate-by-candidate history.
+    #
+    # *** SEED WARNING (2026-08-28) - do NOT regenerate Super's reels by
+    # running this file's main() and expect to reproduce the numbers
+    # above. *** main()'s running-seed-counter lands Super's 5 files on
+    # seed 783-787 (Normal's 6 files come first in this dict) - measured
+    # DIRECTLY at n=15000 against those exact seeds: mean=304.43x,
+    # median=115.50x (37.9% of mean, BELOW the 40-50% target band), stage
+    # funnel s2=19.21%/s3=24.20%/s4=28.45%/s5=15.96%/s6=12.18% - a real,
+    # substantially different result from the one this taper was actually
+    # validated and shipped against, purely from reel-CONTENT seed
+    # (aggregate wild% identical) - the same cliff-sensitivity class
+    # documented elsewhere in this file. The reels actually on disk right
+    # now were generated with seed = 6000 + stage*1000 + round(pct*10)
+    # (see _tuning_scratch/super_funnel_reshape.py's gen_reels()) and
+    # copied in directly, NOT produced by this file's main(). If you need
+    # to regenerate Super's reels for any reason, use that same formula
+    # (or re-derive and re-verify a new one against a real harness at
+    # n>=15000) rather than assuming main()'s natural sequence reproduces
+    # the validated state.
+    "super":  {2: 18.0, 3: 13.0, 4: 10.0, 5: 8.5, 6: 3.0},
     # Revised DOWN from the original 6.5/5.5/4.5/3.5 proposal: empirical
     # testing (pass_count_sweep.py) found hidden's Both-Ways pay + 55%
     # power-fraction combination pushes resolve-pass counts into the

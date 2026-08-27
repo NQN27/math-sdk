@@ -623,9 +623,14 @@ class GameExecutables(GameCalculations):
         """One or more Global Multi cells connected this pass (already
         deduplicated by physical cell by the caller) - each independently
         rolls an increment from the shared factor list and adds it to the
-        running total, in column-major order for determinism."""
+        running total, in column-major order for determinism.
+        power_multi_factor_weights is tier-scoped (2026-08-28) - "default"
+        covers base-game combat (self.bonus_tier is None there)."""
+        multi_weights = self.config.power_multi_factor_weights.get(
+            getattr(self, "bonus_tier", None) or "default", self.config.power_multi_factor_weights["default"]
+        )
         for r, ro in sorted(cells):
-            added = get_random_outcome(self.config.power_multi_factor_weights)
+            added = get_random_outcome(multi_weights)
             self.global_multi_total += added
             power_activated_event(
                 self,

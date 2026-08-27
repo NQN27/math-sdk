@@ -191,10 +191,13 @@ class GameCalculations(Executables):
         # every line that cell is part of); multiple Wild Multi cells
         # within the SAME winning line multiply together, not add. Affects
         # payout only, never boss damage (damage is computed further down
-        # from the fixed wild_damage_multiplier, entirely independently). --
-        wild_multi_rolls = {
-            cell: get_random_outcome(self.config.power_multi_factor_weights) for cell in wild_multi_cells
-        }
+        # from the fixed wild_damage_multiplier, entirely independently).
+        # power_multi_factor_weights is tier-scoped (2026-08-28) - "default"
+        # covers base-game combat (self.bonus_tier is None there). ---------
+        multi_weights = self.config.power_multi_factor_weights.get(
+            getattr(self, "bonus_tier", None) or "default", self.config.power_multi_factor_weights["default"]
+        )
+        wild_multi_rolls = {cell: get_random_outcome(multi_weights) for cell in wild_multi_cells}
 
         # --- Global Multi: immediate activation - update the accumulator
         # now so it applies to the REST of this same pass's wins (its own

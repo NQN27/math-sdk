@@ -348,12 +348,17 @@ class GameBonus(GameExecutables):
         end_reason = "safety_cap"
         while self.player_hp > 0 and spin_count < self.config.bonus_safety_cap_spins:
             spin_count += 1
-            # Booster's x2-boss-damage flag (set at the END of the PREVIOUS
-            # spin, if a Booster was collected there) applies for this
-            # entire spin, then is consumed (never stacks further) - see
-            # game_config.py's booster_damage_multiplier docstring.
+            # Booster's x2/x3-boss-damage flag (set at the END of the
+            # PREVIOUS spin, if a Booster was collected there) applies for
+            # this entire spin, then is consumed (never stacks further) -
+            # see game_config.py's booster_damage_multiplier docstring.
+            # Tier-scoped (2026-08-28) - `self.bonus_tier` is always set by
+            # this point (line ~324 above), Booster only ever exists during
+            # an active Bonus session, so no "default" fallback is needed
+            # here (unlike power_multi_factor_weights, which also has to
+            # cover base-game combat).
             self.booster_multiplier_current_spin = (
-                self.config.booster_damage_multiplier if self.booster_pending_for_next_spin else 1.0
+                self.config.booster_damage_multiplier[self.bonus_tier] if self.booster_pending_for_next_spin else 1.0
             )
             self.booster_pending_for_next_spin = False
 

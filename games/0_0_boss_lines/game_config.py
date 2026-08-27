@@ -287,13 +287,35 @@ class GameConfig(Config):
         # from uniform before the natural/raw RTP was in a tunable range.
         # Weighted heavily toward 2x, geometric-ish decay toward 10x.
         self.power_multi_factors = [2, 3, 4, 5, 6, 8, 10]
-        self.power_multi_factor_weights = {2: 50, 3: 25, 4: 12, 5: 6, 6: 3, 8: 2, 10: 1}
-        # TEMP TEST VALUE (2026-08-10, being probed for Hidden median/variance
-        # compression - see D:\Stake Engine\BOSS_LINES_SPEC_REVISION_2026-08-10.md
-        # - revert to the line above if not adopted): softened tail, less mass
-        # on big single-tick jumps, to test whether Global Multi can raise the
-        # mean without reintroducing a fat tail.
-        self.power_multi_factor_weights = {2: 90, 3: 10, 4: 0, 5: 0, 6: 0, 8: 0, 10: 0}
+        # TIER-SCOPED 2026-08-28 (was a single global dict - see git history
+        # for the pre-scoping value/comment). The 2026-08-10 "TEMP TEST
+        # VALUE" compression ({2:90,3:10,rest:0}) was meant to probe Hidden
+        # specifically (per BOSS_LINES_SPEC_REVISION_2026-08-10.md) but,
+        # being a bare global, silently applied to EVERY tier (and base-game
+        # combat) for 18 days - Normal's own 79.90-80.85x-mean validation
+        # this whole time was measured WITH it in effect. Discovered while
+        # restoring the original wider table for Super specifically (part of
+        # the game designer's funnel/distribution re-tune, 2026-08-28):
+        # applying the wider table globally regressed Normal from ~80x to
+        # 141.82x mean (measured directly, not assumed) - confirms the
+        # compression is load-bearing for Normal/base/Hidden's current
+        # calibration, not just an unused leftover. Scoped per-tier so
+        # Super can use the wider table without touching the other two.
+        # "default" covers base-game combat (self.bonus_tier is None there)
+        # and any bonus tier without its own explicit entry - see
+        # game_calculations.evaluate_and_explode / game_executables.
+        # activate_global_multi_cells for the lookup.
+        self.power_multi_factor_weights = {
+            "default": {2: 90, 3: 10, 4: 0, 5: 0, 6: 0, 8: 0, 10: 0},
+            "normal": {2: 90, 3: 10, 4: 0, 5: 0, 6: 0, 8: 0, 10: 0},
+            "hidden": {2: 90, 3: 10, 4: 0, 5: 0, 6: 0, 8: 0, 10: 0},
+            # Super only: restored the original, wider, un-compressed table
+            # (2026-08-28 re-tune) - measured as a real, substantial
+            # contributor to spreading Super's stage-death funnel toward
+            # the requested 10/30/35/20/5 shape (see TOWORK.md), not just a
+            # payout-side change.
+            "super": {2: 50, 3: 25, 4: 12, 5: 6, 6: 3, 8: 2, 10: 1},
+        }
 
         # FIFO-group effect ranges/choices. Counts are uniform-random integers
         # in the inclusive range given.
@@ -331,7 +353,19 @@ class GameConfig(Config):
         # very next spin, never stacking (multiple Boosters collected at
         # once still only apply one x2, matching "effect expires after that
         # one next spin"). See readme.txt for the full reasoning.
-        self.booster_damage_multiplier = 2.0
+        # TIER-SCOPED 2026-08-28 (was a bare 2.0 for every tier - see git
+        # history). Super only: raised to 3.0 as part of the game
+        # designer's funnel/distribution re-tune - measured (real harness,
+        # not assumed) as a meaningfully effective, previously-untested
+        # lever for spreading Super's stage-death distribution: combined
+        # with the power_multi_factor_weights restoration above, moved the
+        # stage funnel from a poor fit (total abs. deviation from the
+        # 10/30/35/20/5 target ~18.6) to a much closer one (~9), including
+        # closing most of stage 5's gap that direct Wild%/HP tuning alone
+        # could not move (see TOWORK.md for the full candidate history).
+        # Normal/Hidden left at the original 2.0 (unchanged, not
+        # re-verified against a higher value this pass).
+        self.booster_damage_multiplier = {"normal": 2.0, "super": 3.0, "hidden": 2.0}
 
         # --- Phase 3: Scatter -> 3-tier Bonus ---------------------------------
         self.bonus_scatter_tier_by_count = {3: "normal", 4: "super", 5: "hidden"}
@@ -487,7 +521,18 @@ class GameConfig(Config):
         # enough - 3.7%/15.8% - that the fix likely matters far less for
         # them than for Hidden, but this is not yet confirmed by
         # measurement) - flagged for the same follow-up pass.
-        self.stage6_dam_escalation = {"normal": 1.20, "super": 1.20, "hidden": 2.0}
+        # Super: RE-TUNED 2026-08-28 from 1.20 to 1.06, as part of the
+        # funnel/distribution re-tune (see gen_stage_reels.py's
+        # STAGE_WILD_PCT["super"] comment for the full context). 1.20 was
+        # crashing the stage-6 endless clear-chance curve almost
+        # immediately (attempt#1=10.6%, attempt#2=4.6%, attempt#3=0% - see
+        # TOWORK.md) against a requested gentle ~25%-decaying-by-0.5pp/
+        # loop-floor-5% target. 1.06 tracks that target much better
+        # (measured n=15000: attempt#1=20.1%, #2=27.5%, #3=20.0%, #4=0% -
+        # survives several loops deep instead of crashing by #3). Normal/
+        # Hidden left at their prior values, not re-verified against a
+        # gentler escalation this pass.
+        self.stage6_dam_escalation = {"normal": 1.20, "super": 1.06, "hidden": 2.0}
         # Per-tier gate on the endless stage-6 tail. Hidden: enabled (see
         # escalation comment above - the earlier exclusion was based on a
         # diagnosis since found to be wrong). Normal: DISABLED (2026-08-14

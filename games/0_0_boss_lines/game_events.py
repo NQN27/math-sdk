@@ -234,11 +234,14 @@ def elixir_activated_event(gamestate, position, healed, player_hp_after):
 
 def booster_activated_event(gamestate, positions):
     """1+ Booster instances activated together this pass: sets (does not
-    stack) the x2-boss-damage flag for the NEXT bonus spin."""
+    stack) the boss-damage-multiplier flag for the NEXT bonus spin.
+    booster_damage_multiplier is tier-scoped (2026-08-28) - only ever
+    called from within an active Bonus session, so gamestate.bonus_tier is
+    always set here."""
     event = {
         "index": len(gamestate.book.events),
         "type": BOOSTER_ACTIVATED,
         "positions": [{"reel": r, "row": _padded_row(gamestate, ro)} for r, ro in positions],
-        "damageMultiplierNextSpin": gamestate.config.booster_damage_multiplier,
+        "damageMultiplierNextSpin": gamestate.config.booster_damage_multiplier[gamestate.bonus_tier],
     }
     gamestate.book.add_event(event)
