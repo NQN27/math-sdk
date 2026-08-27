@@ -1,0 +1,12 @@
+
+=== n=15000 seed_offset=44201 ===
+sessions with total >= 19999.0x (effectively hit the wincap ceiling): 0/15000 = 0.0000%
+sessions where AT LEAST ONE award got clamped at all (any_clamp_event>0): 0/15000 = 0.0000%
+top 5 totals this run: [8444.9, 8507.039999999999, 15357.61, 17436.17, 17509.61]
+
+=== n=15000 seed_offset=44202 ===
+sessions with total >= 19999.0x (effectively hit the wincap ceiling): 0/15000 = 0.0000%
+sessions where AT LEAST ONE award got clamped at all (any_clamp_event>0): 0/15000 = 0.0000%
+top 5 totals this run: [8463.19, 8523.19, 15360.740000000002, 17513.05, 17528.39]
+
+combined: 0/30000 = 0.0000% hit the cap threshold

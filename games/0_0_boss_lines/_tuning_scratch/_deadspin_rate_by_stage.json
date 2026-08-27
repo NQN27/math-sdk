@@ -1,0 +1,38 @@
+{
+  "1": {
+    "grace_attempts": 0,
+    "grace_success_rate": null,
+    "chain_attempts": 38932,
+    "chain_success_rate": 64.55
+  },
+  "2": {
+    "grace_attempts": 23319,
+    "grace_success_rate": 81.07,
+    "chain_attempts": 19721,
+    "chain_success_rate": 67.89
+  },
+  "3": {
+    "grace_attempts": 10686,
+    "grace_success_rate": 86.59,
+    "chain_attempts": 10569,
+    "chain_success_rate": 74.27
+  },
+  "4": {
+    "grace_attempts": 4947,
+    "grace_success_rate": 94.24,
+    "chain_attempts": 5037,
+    "chain_success_rate": 82.71
+  },
+  "5": {
+    "grace_attempts": 2000,
+    "grace_success_rate": 96.55,
+    "chain_attempts": 2048,
+    "chain_success_rate": 91.94
+  },
+  "6": {
+    "grace_attempts": 532,
+    "grace_success_rate": 98.68,
+    "chain_attempts": 1326,
+    "chain_success_rate": 95.48
+  }
+}

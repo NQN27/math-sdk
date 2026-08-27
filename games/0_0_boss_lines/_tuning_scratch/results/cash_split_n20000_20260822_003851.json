@@ -1,0 +1,18 @@
+{
+  "n": 20000,
+  "seed_offset": 501001,
+  "total": {
+    "mean": 84.15075000000022,
+    "median": 38.1
+  },
+  "reward_cash": {
+    "mean": 60.96095,
+    "median": 19.0
+  },
+  "line_cash": {
+    "mean": 23.189799999999952,
+    "median": 16.0
+  },
+  "reward_frac_of_mean": 0.7244255101707334,
+  "line_frac_of_mean": 0.27557448982926347
+}

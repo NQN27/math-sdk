@@ -1,0 +1,32 @@
+{
+  "1": {
+    "count": 18264,
+    "mean_spins_to_clear_or_die": 4.33,
+    "median_spins": 4.0
+  },
+  "2": {
+    "count": 7986,
+    "mean_spins_to_clear_or_die": 3.54,
+    "median_spins": 3.0
+  },
+  "3": {
+    "count": 3819,
+    "mean_spins_to_clear_or_die": 4.3,
+    "median_spins": 4
+  },
+  "4": {
+    "count": 1519,
+    "mean_spins_to_clear_or_die": 6.0,
+    "median_spins": 6
+  },
+  "5": {
+    "count": 424,
+    "mean_spins_to_clear_or_die": 6.6,
+    "median_spins": 6.0
+  },
+  "6": {
+    "count": 213,
+    "mean_spins_to_clear_or_die": 7.57,
+    "median_spins": 7
+  }
+}

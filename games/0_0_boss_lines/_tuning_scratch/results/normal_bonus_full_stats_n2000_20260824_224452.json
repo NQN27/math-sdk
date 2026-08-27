@@ -1,0 +1,80 @@
+{
+  "n": 2000,
+  "seed_offset": 940101,
+  "overall": {
+    "mean": 82.89850000000017,
+    "median": 40.14999999999999,
+    "variance": 22782.880387943977,
+    "stdev": 150.93998935982464,
+    "min": 0.0,
+    "max": 2438.5
+  },
+  "by_max_stage_reached": {
+    "1": {
+      "count": 772,
+      "pct_of_all": 38.6,
+      "mean": 14.822150259067344,
+      "median": 8.9,
+      "variance": 629.1826085999613,
+      "stdev": 25.083512684629348,
+      "min": 0.0,
+      "max": 357.3,
+      "pct_advanced_past_this_stage_of_those_who_reached_it": 61.4
+    },
+    "2": {
+      "count": 649,
+      "pct_of_all": 32.45,
+      "mean": 65.86394453004618,
+      "median": 45.1,
+      "variance": 6931.436290589518,
+      "stdev": 83.25524782612516,
+      "min": 15.799999999999999,
+      "max": 1066.6,
+      "pct_advanced_past_this_stage_of_those_who_reached_it": 47.14983713355049
+    },
+    "3": {
+      "count": 304,
+      "pct_of_all": 15.2,
+      "mean": 103.71184210526309,
+      "median": 81.7,
+      "variance": 4973.3611134271305,
+      "stdev": 70.5220611824919,
+      "min": 35.3,
+      "max": 750.8,
+      "pct_advanced_past_this_stage_of_those_who_reached_it": 47.49568221070812
+    },
+    "4": {
+      "count": 166,
+      "pct_of_all": 8.3,
+      "mean": 176.73674698795182,
+      "median": 143.45000000000002,
+      "variance": 9542.729732384085,
+      "stdev": 97.68689642108652,
+      "min": 77.39999999999999,
+      "max": 700.5,
+      "pct_advanced_past_this_stage_of_those_who_reached_it": 39.63636363636363
+    },
+    "5": {
+      "count": 75,
+      "pct_of_all": 3.75,
+      "mean": 306.20799999999997,
+      "median": 270.0,
+      "variance": 14884.320745945946,
+      "stdev": 122.00131452548348,
+      "min": 165.29999999999998,
+      "max": 852.9999999999999,
+      "pct_advanced_past_this_stage_of_those_who_reached_it": 31.192660550458715
+    },
+    "6": {
+      "count": 34,
+      "pct_of_all": 1.7,
+      "mean": 816.9499999999999,
+      "median": 533.35,
+      "variance": 271623.71893939393,
+      "stdev": 521.1753245688,
+      "min": 345.3,
+      "max": 2438.5,
+      "pct_advanced_past_this_stage_of_those_who_reached_it": 0.0
+    }
+  }
+}

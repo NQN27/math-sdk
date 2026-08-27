@@ -1,0 +1,9 @@
+n=20000, sessions reaching stage6 chest: 219 (1.095%)
+pre-chest total distribution: min=405.0 p25=468.7 median=492.9 p75=517.8 max=614.9
+
+solved weight for target SELECTION rate 1/25000: w=0.131989
+  -> P(maxwin_tier selected | chest reached) = 0.3653%
+  -> P(maxwin_tier selected per session, i.e. 'the mechanic fires') = 1/25000
+  -> of those selections, paid amount: min=19385.0x median=19507.0x
+  -> P(session actually gets a near-full ~20000x payout, >=19000x paid) = 1/25000
+  -> EV contribution to mean: 0.7801x  (as % of mean~80.13x: 0.974%)

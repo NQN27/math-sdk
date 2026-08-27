@@ -1,0 +1,29 @@
+n=500  elapsed=13.9s
+
+mean=101.36x  median=38.66x  ratio=38.14%
+zero%=0.200%
+mean spins=8.44
+
+percentiles:
+  p 10.00 =       5.30x
+  p 25.00 =      15.49x
+  p 50.00 =      38.69x
+  p 75.00 =      75.59x
+  p 90.00 =     136.17x
+  p 95.00 =     199.71x
+  p 99.00 =    2507.12x
+  p 99.50 =    2983.33x
+  p 99.90 =    8436.63x
+  p 99.99 =    8436.63x
+  max observed = 8436.63x
+
+bucket (max stage reached) breakdown:
+  stage 1: n=   190 (38.00%)  mean=    13.61x  median=    10.65x  min=    0.00x  max=    74.49x
+  stage 2: n=   166 (33.20%)  mean=    44.05x  median=    41.83x  min=   17.69x  max=    96.23x
+  stage 3: n=    79 (15.80%)  mean=    87.68x  median=    84.28x  min=   49.50x  max=   155.79x
+  stage 4: n=    38 ( 7.60%)  mean=   141.90x  median=   138.22x  min=   98.78x  max=   199.87x
+  stage 5: n=    19 ( 3.80%)  mean=   224.68x  median=   215.04x  min=  162.00x  max=   343.74x
+  stage 6: n=     8 ( 1.60%)  mean=  3024.34x  median=  2532.69x  min=  341.00x  max=  8436.63x
+
+stage6 chest reached: 8/500 (1.6000%)
+maxwin tier (20000x) fired: 0/500  (0 observed this run)
