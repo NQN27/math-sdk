@@ -57,6 +57,11 @@ class GameBonus(GameExecutables):
         self.bonus_spin_count = 0
         self.bonus_end_reason = None
         self.stage6_loop_count = 0
+        # Bosses defeated so far in the CURRENT Bonus session (incremented in
+        # game_executables.on_boss_defeated). Only run_bonus_session's
+        # finishing-blow guard reads it - see that method's comment for why
+        # `stage_defeat_order` can NOT be used for this.
+        self.bonus_kill_count = 0
 
     # --- Scatter tally (base-spin side only) ----------------------------------
     def accumulate_scatter_columns(self) -> None:
@@ -331,6 +336,7 @@ class GameBonus(GameExecutables):
         self.booster_pending_for_next_spin = False
         self.booster_multiplier_current_spin = 1.0
         self.stage6_loop_count = 0
+        self.bonus_kill_count = 0
 
         start_stage = self.config.bonus_start_stage[tier]
         self.reset_boss_battle(start_stage=start_stage)
@@ -435,6 +441,90 @@ class GameBonus(GameExecutables):
 
         self.bonus_spin_count = spin_count
         self.bonus_end_reason = end_reason
+
+        # --- Finishing blow (2026-09-02, per game designer: "0-10x ~ 0%") ---
+        # A session that defeats NO boss never calls roll_reward_drop at all,
+        # so the tier's reward table - the only thing tuning can reach - cannot
+        # touch it. Its payout is line pay alone, which always lands under 5x.
+        # Measured on production config (_tuning_scratch/zerokill_why.py,
+        # n=4000/tier): 21.6% of Normal, 28.2% of Super and 4.0% of Hidden
+        # sessions end this way. Since the lowest reward tier is 12x (Super) /
+        # 42x (Hidden), ANY session with >=1 kill automatically clears 10x, so
+        # the whole "0-10x ~ 0%" requirement reduces to: never end a session
+        # with 0 kills.
+        #
+        # WHY A GUARANTEE AND NOT A BUFF. The same measurement showed the
+        # zero-kill group already deals 172-187% of the easiest boss's HP -
+        # they out-damage a kill and still get none, because damage is split
+        # three ways by the column->boss routing (boss_primary_zone /
+        # boss_fallback_zone). So the finishing blow is not charity: it lets
+        # the last hit land on the boss the player had almost killed. Two
+        # buff-shaped alternatives were measured and rejected:
+        #   Both Ways for Super  -> zero-kill 28.2% to 0.40%, but mean 19.2x
+        #     target and line pay ALONE 3271x against a 240.77x budget. Both
+        #     Ways doubles session length AND quadruples per-spin damage, so
+        #     it compounds to x8.2 damage / x14 line pay. Line pay cannot be
+        #     lowered by the reward table (it is the floor of the mean, see
+        #     _tuning_scratch/decompose.py), so this is unreachable.
+        #   Hidden HP floor 414->724 -> zero-kill 4.0% to 0.93%, mean 1.21x
+        #     target; correctable by cutting C 21%, but that spends 21% of the
+        #     reward budget to buy 3.5 points, versus 0.38% for this.
+        # A buff only SHIFTS a probability; "~0%" requires a guarantee.
+        #
+        # Implemented as a plain on_boss_defeated call so it reuses every
+        # existing path: the tier's own table (in_bonus is still True here -
+        # rolling after run_bonus_session returns would silently fall through
+        # to the SHARED table, whose 1x/2x/3x tiers leave the session under 5x
+        # anyway; that exact bug was measured once already), the ordinary
+        # (non-stage-6-chest) pool, award_win's wincap headroom guard, record()
+        # and boss_defeated_event - so the frontend needs no new event type.
+        #
+        # `is_last_of_stage` evaluates False inside on_boss_defeated because
+        # stage_defeat_order is empty here, so this never triggers clear_stage
+        # and never reaches the stage-6 chest or Maxwin pools. pruned_tiers is
+        # likewise empty (reset_boss_battle clears it per session and only
+        # clear_stage populates it, which needs 3 kills).
+        #
+        # DO NOT rewrite the guard as `not self.stage_defeat_order`:
+        # clear_stage resets that list, so a session that killed exactly 3
+        # bosses and advanced a stage would read as zero-kill and get a free
+        # reward. The dedicated counter is the reason it exists.
+        #
+        # Validated: Super 4 seeds x 20,000 and Hidden 4 seeds x 20,000 on the
+        # live tables (_tuning_scratch/consolation_test.py, which patches this
+        # exact call site), plus 160,000 sessions per tier inside the two-
+        # cluster validation. 0-10x and =0x both land at 0.0000% on every seed.
+        # Cost to the mean: +3.1% of target for Super, +0.38% for Hidden, both
+        # already absorbed into the C values in game_config.py.
+        if self.bonus_kill_count == 0 and end_reason != "wincap":
+            alive = [b for b in self.config.boss_ids if self.boss_alive[b]]
+            if alive:
+                # This award happens AFTER the last run_one_bonus_spin has
+                # already closed its books, so it needs its own open/close
+                # bracket - the same pair that method uses. award_win only
+                # feeds win_manager.spin_win / running_bet_win; it is
+                # update_gametype_wins that files the amount under
+                # freegame_wins. Without this bracket the money reaches
+                # running_bet_win but no gametype column, and
+                # src.state.state.update_final_win's
+                # "Base + Free game payout mismatch!" assertion kills the
+                # worker thread mid-run (the pipeline then dies further
+                # downstream with a confusing missing-books FileNotFoundError).
+                # reset_spin_win MUST come first: the final spin's own
+                # spin_win is still sitting there and has already been filed,
+                # so closing without resetting would count it twice.
+                #
+                # Every scratch harness missed this because they all read
+                # running_bet_win, which was correct throughout - only the
+                # basegame/freegame SPLIT was broken, and that is only checked
+                # when a real book is written.
+                self.win_manager.reset_spin_win()
+                # The boss the player came closest to killing.
+                self.on_boss_defeated(min(alive, key=lambda b: self.boss_hp[b]))
+                # self.gametype is still freegame_type here - it is reset to
+                # basegame_type at the very end of this method.
+                self.win_manager.update_gametype_wins(self.gametype)
+
         bonus_end_event(self, tier, spin_count, self.player_hp, end_reason)
 
         self.in_bonus = False

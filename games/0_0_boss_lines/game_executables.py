@@ -274,6 +274,10 @@ class GameExecutables(GameCalculations):
         stage."""
         self.boss_alive[boss_id] = False
         self.stage_defeat_order.append(boss_id)
+        # Session-scoped kill tally, reset per book (reset_bonus_state) and
+        # per Bonus session (run_bonus_session). Base-game combat increments
+        # it too; nothing outside a Bonus session reads it.
+        self.bonus_kill_count += 1
         is_last_of_stage = len(self.stage_defeat_order) == 3
 
         tier, amount = self.roll_reward_drop(is_last_of_stage, self.stage)
