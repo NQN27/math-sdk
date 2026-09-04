@@ -545,6 +545,52 @@ class GameConfig(Config):
         # this same hard-tuning pass (only Normal was hard-tuned so far -
         # Super is next).
         self.stage6_endless_tiers = {"normal": False, "super": True, "hidden": True}
+
+        # Per-spin "rescue roll" safety net (2026-09-04, game designer's own
+        # idea, refined in discussion). Every Bonus spin, while the session's
+        # running total is still under `floor`, roll `trigger_prob` chance to
+        # top the session up directly into [floor, band_high]. Deliberately
+        # NOT a guarantee (that's the separate finishing-blow mechanic below,
+        # game_bonus.run_bonus_session) - some sessions still end genuinely
+        # low if the coin-flip never lands, by design ("van de ngo kha nang
+        # den cuoi van k duoc gi").
+        #
+        # "Roll until you get something" is resolved as ONE direct draw from
+        # the already-successful [floor, band_high] range once the trigger
+        # fires, NOT a literal reel-reroll loop - rejection-sampling the full
+        # cascade engine until a specific payout band hits is unbounded (some
+        # game states may never naturally land there) and would leave a
+        # visible "how many attempts" audit trail. A single conditional draw
+        # gives the mathematically identical outcome distribution with zero
+        # loop risk and zero visible retries.
+        #
+        # `trigger_prob` = 1/8, matched to Super's own ~8-spin average
+        # session length per the designer's framing ("trung binh game 8
+        # spin, thi moi spin co ty le 1/8 nha").
+        #
+        # Only calls award_win (never touches boss_hp/player_hp/stage), so it
+        # is mechanically decoupled from the funnel re-tune (2117cfe) and the
+        # finishing-blow guarantee (756f968) by construction - confirmed by
+        # measurement, not just this reasoning: n=8000 stage-death% held at
+        # s2=10.03/s3=28.69/s4=34.07/s5=18.15/s6=9.07 (baseline) - see
+        # TOWORK.md for the combined-effect numbers this was validated
+        # against (_tuning_scratch/perspin_rescue_roll.py):
+        #   mean 245.38x->243.14x, median 105.25x->108.46x (both within
+        #   noise), 0-5x 1.14%->0.69% (target was "<1%"), 0-10x 4.06%->2.46%,
+        #   =0x 0.00%->0.00%, rescue actually triggers in ~16.3% of sessions
+        #   (average ~1.33 under-floor check opportunities/session).
+        #
+        # Only "super" is configured - this was designed and tested against
+        # Super's specific 0-5x request and average spin count. A tier
+        # absent from this dict gets no rescue roll at all (see the `.get()`
+        # call site in run_bonus_session). Hidden's own economy is still
+        # completely untuned (see reward_drop_weights_hidden_bonus falling
+        # through to the shared base table) - extending this there needs its
+        # own floor/band/trigger_prob tuned to Hidden's own scale and average
+        # spin count first, not a copy of Super's numbers.
+        self.bonus_rescue_roll = {
+            "super": {"trigger_prob": 1.0 / 8.0, "floor": 5.0, "band_high": 10.0},
+        }
         self.max_stage = max(self.boss_stage_table.keys())
         self.boss_variance_range = (0.75, 1.25)
         # Reroll cap for the "3 bosses' HP must be within 35% of each other"

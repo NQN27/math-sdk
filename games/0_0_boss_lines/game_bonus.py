@@ -371,6 +371,31 @@ class GameBonus(GameExecutables):
             bonus_spin_start_event(self, spin_count)
             self.run_one_bonus_spin(both_ways)
 
+            # --- Rescue roll (2026-09-04, per-spin safety net - see
+            # game_config.bonus_rescue_roll's docstring for the full
+            # design/validation history). `.get()` returns None for any tier
+            # not in the config dict, so this is a no-op unless configured.
+            rescue_cfg = self.config.bonus_rescue_roll.get(tier)
+            if (
+                rescue_cfg is not None
+                and self.win_manager.running_bet_win < rescue_cfg["floor"]
+                and random.random() < rescue_cfg["trigger_prob"]
+            ):
+                current = self.win_manager.running_bet_win
+                topup = round(
+                    random.uniform(max(0.0, rescue_cfg["floor"] - current), rescue_cfg["band_high"] - current), 2
+                )
+                # Same reset/award/file bracket as the finishing blow below -
+                # run_one_bonus_spin already filed ITS OWN spin_win into
+                # freegame_wins at its own end (line ~293), so award_win here
+                # would otherwise add to a spin_win that never gets filed,
+                # reaching running_bet_win but not the basegame/freegame
+                # split (see the finishing-blow comment further down for the
+                # exact assertion failure this causes if skipped).
+                self.win_manager.reset_spin_win()
+                self.award_win(topup)
+                self.win_manager.update_gametype_wins(self.gametype)
+
             if self.wincap_triggered:
                 end_reason = "wincap"
                 break
