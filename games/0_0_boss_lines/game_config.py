@@ -58,6 +58,22 @@ class GameConfig(Config):
         self.num_rows = [5] * self.num_reels
         self.include_padding = True
 
+        # EXPERIMENTAL (2026-09-04, game designer's idea, not yet adopted -
+        # see game_executables._tumble_board_in_place for the full design/
+        # safety-audit writeup and TOWORK.md for measured before/after
+        # numbers). False = SDK default cascade/gravity refill (drop
+        # surviving symbols, refill from top). True = replace exploded
+        # symbols in their own cell, nothing else moves - requested to make
+        # line-pay hit rate easier to reason about (cascades let symbols
+        # realign into brand-new lines across passes; in-place only
+        # refreshes what actually exploded). Defaults False: this is a
+        # fundamental board-refill mechanic change that reshapes hit
+        # frequency/chain depth across the whole game, and every reward
+        # table / wild% / HP number tuned so far was calibrated against
+        # cascade's specific statistics - flip only after the measured
+        # impact below is reviewed and accepted, not by default.
+        self.use_inplace_tumble = False
+
         # --- Controlled Deadspin Routing --------------------------------------
         # Per game-designer spec, columns 2/3/4 (1-indexed - reel index
         # 1/2/3; columns 1 and 5 always draw a plain random stop) each

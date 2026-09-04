@@ -12,6 +12,43 @@ backend state produces byte-identical output to what's committed).
 
 ## Blocking / high severity
 
+- [ ] **PENDING DECISION (handoff, 2026-09-04): in-place tumble mechanic,
+      implemented + tested but NOT adopted.** Game designer's idea: replace
+      exploded symbols in their own cell (nothing else moves) instead of the
+      SDK's cascade/gravity refill (drop survivors, refill from top) -
+      motivation was making line-pay hit-rate easier to reason about
+      (cascades let symbols realign into brand-new lines across passes,
+      compounding hit frequency in a way that's hard to isolate per lever).
+      Implemented as `game_config.use_inplace_tumble` (defaults **False** -
+      current production behavior is completely unaffected right now) +
+      `game_executables._tumble_board_in_place` (see that method's docstring
+      for the full dependency-safety audit - confirmed via a dedicated
+      repo-wide review, not assumed, that the resolve loop, both-ways
+      evaluation, and every one of this game's own board-mutating mechanics
+      are gravity-agnostic and needed no changes).
+      Sanity-tested clean: 200 base spins + 200 Super Bonus sessions, zero
+      crashes, board column size held correct every time
+      (`_tuning_scratch/inplace_tumble_test.py`).
+      Measured economic impact (n=8000, Super Bonus, same seeds, cascade OFF
+      vs ON, everything else identical to the current committed state):
+        mean 238.24x -> 178.23x (-25.2%), median 110.24x -> 94.00x (-14.7%),
+        median/mean ratio 46.3% -> 52.7% (DOES get more consistent/
+        predictable - supports the designer's stated goal), avg spins/
+        session 11.04 -> 10.44, 0-5x 0.50% -> 0.80%, 0-10x 2.41% -> 3.19%
+        (both WORSE, i.e. this erases the near-zero-tail work from
+        756f968/a27f6be if adopted without a re-tune).
+      **Why this isn't a lever, it's a re-tune trigger**: a ~25% mean swing
+      from a board-refill mechanic change means every reward-table/wild%/HP
+      number tuned for Normal, Super, AND Hidden this whole project was
+      calibrated against cascade's specific hit-rate/chain-depth statistics.
+      Adopting this for real needs a full re-tune pass across all 3 tiers,
+      not a config flip.
+      **Needs a decision**: (a) flip the flag and commit to the full re-tune
+      project across all tiers, or (b) leave it shelved (code stays, flag
+      stays False, revisit later). Not decided as of this entry - do not
+      flip `use_inplace_tumble` to True in production config without
+      re-running the full tuning pass first.
+
 - [ ] **RTP optimizer doesn't hit target when 2+ non-identity fences coexist**
       (Phase 3, `math-sdk`). Base mode measures ~0.6071 RTP vs the 0.967
       target whenever the `freegame` fence is present alongside `basegame`

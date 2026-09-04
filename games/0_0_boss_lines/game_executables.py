@@ -14,9 +14,11 @@ does so on `self.board`/gamestate-instance data only.
 
 import random
 import warnings
+from copy import copy
 
 from game_calculations import GameCalculations
 from src.calculations.statistics import get_random_outcome
+from src.events.events import tumble_board_event
 from game_events import (
     board_explode_event,
     boss_state_event,
@@ -496,10 +498,76 @@ class GameExecutables(GameCalculations):
         two tumble call sites in this game) fixes both in one place instead
         of patching every call site individually.
         """
-        super().tumble_game_board()
+        if getattr(self.config, "use_inplace_tumble", False):
+            self._tumble_board_in_place()
+        else:
+            super().tumble_game_board()
         self.enforce_removed_symbols()
         if getattr(self, "in_bonus", False):
             self._maybe_apply_chain_block()
+
+    def _tumble_board_in_place(self) -> None:
+        """EXPERIMENTAL (2026-09-04, game designer's idea): replace exploded
+        symbols in their own row/column - nothing else moves - instead of
+        the SDK's default cascade/gravity refill (src.calculations.tumble.
+        tumble_board, which drops surviving symbols down and refills from the
+        top). Requested to make line-pay behavior easier to reason about:
+        cascades let symbols realign into brand-new lines across passes
+        (falling together can connect symbols that weren't adjacent before),
+        which compounds line-hit frequency in a way that's hard to isolate
+        from a single lever. In-place replace only refreshes the exact cells
+        that exploded, so each pass's line-hit rate is closer to independent
+        per-cell odds.
+
+        SAFE BY CONSTRUCTION per a full dependency audit (2026-09-04) before
+        this was written, not by assumption:
+          - The resolve loop (gamestate's per-spin pass loop, both directions
+            of _both_ways_reversed_wins) re-derives every win position FRESH
+            from the live board every single pass - nothing anywhere assumes
+            a row/col index from a previous pass survives a tumble.
+          - Every one of this game's OWN board-mutating mechanics (the 5 FIFO
+            Power handlers, _route_column_force_deadspin, chain_block,
+            enforce_removed_symbols) already writes board[r][ro] by absolute
+            position with no gravity assumption - none of them needed to
+            change for this.
+          - reel_positions[reel] normally encodes "board is a contiguous
+            window into reelstrip[reel]" - decrementing it per replacement
+            (same as the SDK's own tumble_board) breaks that window property
+            after the first tumble, but nothing reads it again afterward
+            except the ONE-TIME initial padding-positions event (already
+            fired before any tumble happens) - confirmed via repo-wide
+            search, not assumed.
+          - `board_before_tumble` (SDK writes it, never reads it anywhere -
+            confirmed via repo-wide search) is kept here for parity but is
+            dead weight either way.
+        Symbol SOURCE is unchanged from the SDK's own approach (sequential
+        pull from the same per-reel weighted reelstrip, via self.create_symbol
+        so special-symbol functions/Power assignment still run) - only the
+        DESTINATION changes (the exploded cell itself, not always the top of
+        the column) - so this doesn't alter per-symbol selection statistics,
+        only board layout/adjacency after a pass.
+
+        KNOWN GAP, not yet resolved: tumble_board_event's `new_symbols_from_
+        tumble` payload is a per-reel LIST with no row attached - the
+        frontend currently infers landing row from gravity (drop count from
+        the top). This still populates that same list (so the event doesn't
+        crash or misreport counts), but a frontend/animation update is
+        needed separately to actually render "replace in place" instead of
+        "fell from the top" - this commit is math-side only.
+        """
+        self.board_before_tumble = copy(self.board)
+        self.new_symbols_from_tumble = [[] for _ in range(len(self.board))]
+        for reel, column in enumerate(self.board):
+            for row, sym in enumerate(column):
+                if not sym.explode:
+                    continue
+                reel_pos = (self.reel_positions[reel] - 1) % len(self.reelstrip[reel])
+                self.reel_positions[reel] = reel_pos
+                new_name = self.reelstrip[reel][reel_pos % len(self.reelstrip[reel])]
+                new_sym = self.create_symbol(new_name)
+                self.board[reel][row] = new_sym
+                self.new_symbols_from_tumble[reel].append(new_sym)
+        tumble_board_event(self)
 
     def _maybe_apply_chain_block(self) -> None:
         """Chain-block reactive check (see game_config.chain_block_threshold/
