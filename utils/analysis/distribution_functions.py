@@ -122,35 +122,59 @@ def conditional_value_at_risk(cutoff: float, dist: dict, total_weight) -> float:
     return tail_value / tail_prob
 
 
-def get_prob_scale(bet_cost: float) -> float:
-    """Leniency factor applied to tail-probability checks for high bet-cost modes."""
-    if bet_cost >= 1000:
-        return 0.2
-    if bet_cost >= 500:
-        return 0.5
-    if bet_cost >= 200:
-        return 0.8
-    return 1.0
+def get_math_verification_values(dist: dict, bet_cost: float, total_weight=None) -> list[float]:
+    """Compute the official Stake Engine math-verification metrics (see
+    stake-engine.com/docs/approval-guidelines/math-verification).
 
+    Tail probabilities (`prob5k`/`prob10k`) are raw multiplier thresholds
+    (win >= 5000 / win >= 10000) and are NEVER scaled by bet cost - the
+    official docs say so explicitly ("raw probabilities... not scaled by
+    cost multiplier"). A previous local version applied an invented
+    "leniency factor" here for high-cost modes; that contradicted the real
+    rule and has been removed.
 
-def get_etl_cvar_p5k_10k_vales(dist: dict, bet_cost: float, total_weight=None) -> list[float]:
-    """Get Math Validation Values"""
+    ETL (`etl40`/`etl10k`) is defined as "the share of a mode's RTP that
+    comes from heavy-tail wins, normalized by cost multiplier" - since `win`
+    values here are absolute multiplier units (matching how `rtp` itself is
+    computed as dot(win, weight)/bet_cost), the tail expectation must also
+    be divided by `bet_cost` to land on the same scale as RTP. A previous
+    local version omitted this division, which inflated etl10k roughly in
+    proportion to a mode's cost multiplier - the exact bug that made
+    high-cost modes (e.g. godmode, 500x cost) look impossible to satisfy no
+    matter how the underlying reels/weights were reshaped (see
+    games/0_0_boss_lines/QUESTIONS_FOR_YOU.md's godmode etl10k history).
+
+    `etl40`'s THRESHOLD does scale with bet_cost (win >= 40 * bet_cost, per
+    the docs); `etl10k`'s threshold does not (win >= 10000 flat) - these two
+    are genuinely different from each other, not a bug.
+
+    Returns per-mode `(prob5k, prob10k, etl40, etl10k, etl_sum,
+    cvar_per_stake, cvar_absolute)`. CVaR has two official variants: the
+    per-stake (normalized) value is `cvar_raw / bet_cost`; the absolute
+    value is the un-normalized expected tail payout.
+    """
     if total_weight is None:
         total_weight = sum(list(dist.values()))
 
-    p5k, p10k, cvar, etl40, etl10k = 0, 0, 0, 0, 0
+    p5k, p10k, etl40, etl10k = 0.0, 0.0, 0.0, 0.0
     for win, weight in dist.items():
+        prob = weight / total_weight
         if win >= 10000:
-            p10k += weight / total_weight
-            etl10k += win * (weight / total_weight)
+            p10k += prob
+            etl10k += win * prob
         if win >= 5000:
-            p5k += weight / total_weight
+            p5k += prob
         if win >= 40 * bet_cost:
-            etl40 += win * (weight / total_weight)
-    cvar = conditional_value_at_risk(0.999, dist, total_weight)
-    prob_scale = get_prob_scale(bet_cost)
+            etl40 += win * prob
+    etl40 /= bet_cost
+    etl10k /= bet_cost
+    etl_sum = etl40 + etl10k
 
-    return p5k * prob_scale, p10k * prob_scale, etl10k, etl40, cvar / bet_cost
+    cvar_raw = conditional_value_at_risk(0.999, dist, total_weight)
+    cvar_per_stake = cvar_raw / bet_cost
+    cvar_absolute = cvar_raw
+
+    return p5k, p10k, etl40, etl10k, etl_sum, cvar_per_stake, cvar_absolute
 
 
 def get_maxwin_hitrate(dist: dict, total_weight=None) -> float:

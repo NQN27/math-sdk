@@ -80,34 +80,26 @@ if __name__ == "__main__":
         create_stat_sheet(gamestate, modes_to_analyse=target_modes)
 
     if run_conditions["run_format_checks"]:
-        # Phase 4 v2: flat 97.00% RTP target for base/ante/buy3/buy4, QA'd
-        # against the spec's own explicit +-0.05% tolerance (see
-        # QUESTIONS_FOR_YOU.md's "Phase 4 v2" QA plan) - so the format-check
-        # ceiling here is 0.97+0.0005=0.9705, not a bare 0.97 (measured
-        # achieved values landed at 0.9702-0.971, i.e. within/at the edge of
-        # that tolerance - a bare 0.97 ceiling would reject a result the
-        # spec's own QA plan explicitly calls a pass). Passed as a PER-GAME
-        # override (see utils/rgs_verification.py's verify_mode_volatility
-        # docstring) rather than touching the shared default, so every other
-        # game in this repo keeps its original 0.967 ceiling unchanged.
-        # ultimatepower/godmode use the SHARED DEFAULT 0.967 ceiling instead
-        # (not 0.9705) since their own target is 0.965, not 97.00% - the
-        # default ceiling still has margin above their target (0.967>0.965)
-        # but is NOT the same as verifying against 0.965 itself, so
-        # stats_summary.json's rtp is checked directly against 0.965 in the
-        # session report rather than trusting this format-check pass/fail
-        # alone for these 2 modes.
-        # IMPORTANT: execute_all_tests OVERWRITES stats_summary.json from
-        # scratch every call (write_all_stats truncates - see
-        # utils/rgs_verification.py) - calling it twice (once per target
-        # ceiling) silently wipes the first call's modes from the file. Must
-        # be exactly ONE call covering every mode in target_modes. The
-        # 0.9705 ceiling is loose enough to not falsely reject
-        # ultimatepower/godmode too (their own target is 0.965, well under
-        # 0.9705) - it is only a ceiling check, not a target-band check, so
-        # ultimatepower/godmode's actual RTP is still separately verified
-        # against 0.965 by reading stats_summary.json directly (see the
-        # session report), not by trusting this format-check pass/fail
-        # alone for those 2 modes.
+        # utils/rgs_verification.py's execute_all_tests is post-hoc reporting
+        # only now ("hau kiem") - it prints the real math-verification
+        # numbers (rtp, std, prob5k/10k, etl40b/etl10k/etl_sum,
+        # cvar_per_stake/absolute) per mode and writes them to
+        # stats_summary.json, with no pass/fail gate and no per-game RTP
+        # ceiling override (that mechanism was removed - see
+        # report_math_verification_stats' docstring for why the old flat
+        # 0.967/0.9705-style ceiling gate was actively wrong, not just
+        # loose). IMPORTANT: it still OVERWRITES stats_summary.json from
+        # scratch every call (write_all_stats truncates) - must be exactly
+        # ONE call covering every mode in target_modes.
+        #
+        # Read the real limits at stake-engine.com/docs/approval-guidelines/
+        # math-verification before treating any run's numbers as
+        # approval-ready. Flagging now because it's already known to matter
+        # here: base/ante/buy3/buy4 target ~97.00-97.05% RTP (Phase 4 v2),
+        # but the official Critical "RTP band" test caps at 96.70% - that
+        # target sits outside the real band regardless of what this repo's
+        # own tooling reports, and needs an explicit decision (re-target the
+        # RTP, or knowingly accept it's outside the documented band) before
+        # this round is called approval-ready.
         excluded_modes = [bm.get_name() for bm in config.bet_modes if bm.get_name() not in target_modes]
-        execute_all_tests(config, excluded_modes=excluded_modes, limits_override={"rtp": 0.9705})
+        execute_all_tests(config, excluded_modes=excluded_modes)
