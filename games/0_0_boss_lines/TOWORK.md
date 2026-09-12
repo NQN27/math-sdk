@@ -81,6 +81,31 @@ backend state produces byte-identical output to what's committed).
       different lever, not another reward-table pass, may be needed to move
       the tail without moving mean/body).
 
+- [ ] **PENDING, IN PROGRESS (2026-09-05/06): flat/deterministic damage
+      system, replacing the random-range damage-to-boss/damage-to-player
+      system.** Game designer's idea, per-tier switch
+      (`game_config.use_flat_damage`, currently `{"normal": False, "super":
+      False, "hidden": False}` - production behavior completely unaffected).
+      Fully wired at all 5 call sites (verified 2026-09-12, not assumed):
+      damage-to-boss (`game_calculations.evaluate_and_explode` ->
+      `flat_symbol_damage`/`flat_wild_damage`), boss HP scaling
+      (`game_executables.roll_stage_bosses` -> `flat_damage_boss_hp_mult`),
+      counter-attack damage, initial Player HP grant, and the +50
+      stage-clear HP bonus (all three in `game_bonus.py` ->
+      `flat_boss_counterattack_damage`/`flat_damage_player_hp_initial_mult`/
+      `flat_damage_player_hp_bonus_mult`). Smoke-tested (200 Normal Bonus
+      sessions, `use_flat_damage["normal"]=True`, zero crashes) - but
+      **numerically NOT re-validated**: current multipliers
+      (`flat_damage_boss_hp_mult["normal"]=0.113`,
+      `flat_damage_player_hp_initial_mult`/`_bonus_mult["normal"]=0.08`)
+      were derived from a single n=30 sanity run and give mean=1087x
+      against Normal's ~85-90x target - **over 12x too high**, confirmed by
+      re-running it directly. Unlike in-place-tumble (measured, decided,
+      forked out), this one is mid-development, not at a decision point yet
+      - needs its own HP-rescale measurement pass (both multipliers) before
+      it's even ready to evaluate, let alone adopt or fork out. Scratch:
+      `_tuning_scratch/flat_damage_measure.py`, `flat_damage_trace.py`.
+
 - [ ] **RTP optimizer doesn't hit target when 2+ non-identity fences coexist**
       (Phase 3, `math-sdk`). Base mode measures ~0.6071 RTP vs the 0.967
       target whenever the `freegame` fence is present alongside `basegame`
