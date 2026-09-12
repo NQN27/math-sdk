@@ -89,15 +89,46 @@ class GameExecutables(GameCalculations):
         elif getattr(self, "in_bonus", False) and getattr(self, "grace_deadspin_pending", False):
             self.grace_deadspin_pending = False
             chance = self.config.bonus_grace_deadspin_chance
+        elif getattr(self, "in_bonus", False):
+            # EXPERIMENTAL (2026-09-06): per-tier, per-stage deadspin chance,
+            # applied every ordinary (non-grace) Bonus spin within a
+            # configured stage - reuses the same Controlled Deadspin Routing
+            # primitive as the base-game/grace cases above, just keyed by
+            # (tier, stage) instead of bet mode or the one-time grace flag.
+            # Slows that stage's clear speed (fewer wins -> fewer boss-damage
+            # instances per spin -> more spins needed -> more counterattacks
+            # survived), pushing more of the funnel's death mass INTO that
+            # stage instead of letting sessions coast past it. See
+            # game_config.bonus_stage_deadspin_chance's docstring for
+            # measured effect.
+            tier = getattr(self, "bonus_tier", None)
+            chance = self.config.bonus_stage_deadspin_chance.get(tier, {}).get(self.stage, 0.0)
         else:
             return
-        if chance <= 0:
-            return
         routed_any = False
-        for col in (1, 2, 3):  # columns 2,3,4 (1-indexed) = reel index 1,2,3
-            if random.random() < chance:
-                routed_any = True
-                self._route_column_force_deadspin(col)
+        if chance > 0:
+            for col in (1, 2, 3):  # columns 2,3,4 (1-indexed) = reel index 1,2,3
+                if random.random() < chance:
+                    routed_any = True
+                    self._route_column_force_deadspin(col)
+
+        # EXPERIMENTAL (2026-09-06): the "reverse deadspin" counterpart to
+        # bonus_stage_deadspin_chance above - per-tier, per-stage chance to
+        # bias a column toward CONNECTING to its neighbor instead of
+        # breaking, via _route_column_force_connect. Independent of the
+        # deadspin roll above (a stage would normally be configured with
+        # only one of the two, not both, but nothing stops trying both at
+        # once). Built to ease stages that are overshooting their death%
+        # target (too many dying there) - the opposite problem
+        # bonus_stage_deadspin_chance was built for.
+        if getattr(self, "in_bonus", False):
+            tier = getattr(self, "bonus_tier", None)
+            connect_chance = self.config.bonus_stage_connect_chance.get(tier, {}).get(self.stage, 0.0)
+            if connect_chance > 0:
+                for col in (1, 2, 3):
+                    if random.random() < connect_chance:
+                        routed_any = True
+                        self._route_column_force_connect(col)
         if routed_any:
             self.get_special_symbols_on_board()
 
@@ -176,6 +207,70 @@ class GameExecutables(GameCalculations):
             self.top_symbols[col] = self.create_symbol(strip[(new_pos - 1) % n])
             self.bottom_symbols[col] = self.create_symbol(strip[(new_pos + num_rows) % n])
 
+    def _route_column_force_connect(self, col: int) -> None:
+        """EXPERIMENTAL (2026-09-06, game designer's idea): inverse of
+        _route_column_force_deadspin above - redraw column `col`'s stop
+        toward a position that DOES connect to column `col-1`'s already-
+        fixed content, instead of guaranteeing it can't.
+
+        NOT a symmetric guarantee the way deadspin's is: breaking one column
+        already caps the whole board's kindCount below the paytable minimum
+        (a hard, board-wide guarantee of zero wins), but making one column
+        "connect" to its neighbor only raises the LOCAL match probability at
+        one row - a full payline win still needs every other column to line
+        up too. Useful as a soft assist lever, not a forced-win mechanic.
+
+        Same conservative row-window (r-1,r,r+1) as the deadspin routine,
+        inverted: a candidate position is accepted if ANY of its own window
+        rows either lands Wild/Power-attribute, or matches a name already
+        present in that row's column `col-1` window (ignoring Wild neighbors
+        there, same as deadspin does, since a Wild neighbor already connects
+        to anything - not a useful target to "match" against specifically).
+        """
+        prev_col = col - 1
+        strip = self.reelstrip[col]
+        n = len(strip)
+        prev_rows = self.board[prev_col]
+        num_rows = self.config.num_rows[col]
+
+        def neighbor_rows(row):
+            return range(max(0, row - 1), min(num_rows - 1, row + 1) + 1)
+
+        prev_window_names = []
+        for row in range(num_rows):
+            names = set()
+            for r in neighbor_rows(row):
+                sym = prev_rows[r]
+                if not sym.check_attribute("wild"):
+                    names.add(sym.name)
+            prev_window_names.append(names)
+
+        connecting_positions = []
+        for pos in range(n):
+            ok = False
+            for row in range(num_rows):
+                candidate_name = strip[(pos + row) % n]
+                if candidate_name == "W" or candidate_name in self.config.power_symbol_names:
+                    ok = True
+                    break
+                if candidate_name in prev_window_names[row]:
+                    ok = True
+                    break
+            if ok:
+                connecting_positions.append(pos)
+
+        if not connecting_positions:
+            self._connect_route_fallback_count = getattr(self, "_connect_route_fallback_count", 0) + 1
+            return
+
+        new_pos = random.choice(connecting_positions)
+        self.reel_positions[col] = new_pos
+        for row in range(num_rows):
+            self.board[col][row] = self.create_symbol(strip[(new_pos + row) % n])
+        if self.config.include_padding:
+            self.top_symbols[col] = self.create_symbol(strip[(new_pos - 1) % n])
+            self.bottom_symbols[col] = self.create_symbol(strip[(new_pos + num_rows) % n])
+
     # --- Boss battle setup -------------------------------------------------
     def reset_boss_battle(self, start_stage: int = 1) -> None:
         """(Re)start the boss fight at `start_stage` with freshly-rolled
@@ -222,12 +317,18 @@ class GameExecutables(GameCalculations):
         spread ((max-min)/max) exceeds boss_hp_spread_max."""
         base = self.config.boss_stage_table[stage]
         lo, hi = self.config.boss_variance_range
+        tier = getattr(self, "bonus_tier", None)
+        hp_mult = (
+            self.config.flat_damage_boss_hp_mult.get(tier, 1.0)
+            if tier and self.config.use_flat_damage.get(tier, False)
+            else 1.0
+        )
         hp, dam = {}, {}
         for _ in range(self.config.boss_hp_reroll_attempts):
             for b in self.config.boss_ids:
                 base_dam, base_hp = base[b]
                 dam[b] = int(round(base_dam * random.uniform(lo, hi)))
-                hp[b] = int(round(base_hp * random.uniform(lo, hi) / 10.0) * 10)
+                hp[b] = int(round(base_hp * hp_mult * random.uniform(lo, hi) / 10.0) * 10)
             max_hp, min_hp = max(hp.values()), min(hp.values())
             if max_hp <= 0 or (max_hp - min_hp) / max_hp <= self.config.boss_hp_spread_max:
                 break
@@ -463,8 +564,12 @@ class GameExecutables(GameCalculations):
         if getattr(self, "in_bonus", False) and not (
             stage == self.config.max_stage and getattr(self, "stage6_loop_count", 0) > 0
         ):
-            self.player_hp += 50
-            self.player_hp_max += 50
+            tier = getattr(self, "bonus_tier", None)
+            hp_bonus = 50.0
+            if tier and self.config.use_flat_damage.get(tier, False):
+                hp_bonus *= self.config.flat_damage_player_hp_bonus_mult.get(tier, 1.0)
+            self.player_hp += hp_bonus
+            self.player_hp_max += hp_bonus
             player_hp_state_event(self)
 
         stage_clear_event(self, stage, removed_symbol, pruned, next_stage)

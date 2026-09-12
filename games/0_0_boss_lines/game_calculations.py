@@ -271,12 +271,17 @@ class GameCalculations(Executables):
         # same resolve loop ... use the redirected target").
         exploding.sort(key=lambda t: (t[0], t[1]))
 
+        flat_damage_tier = getattr(self, "bonus_tier", None)
+        use_flat_damage = flat_damage_tier and self.config.use_flat_damage.get(flat_damage_tier, False)
         for r, ro, kind, ref_name in exploding:
             self.board[r][ro].explode = True
-            lo, hi = self.config.symbol_damage_range[ref_name]
-            damage = random.uniform(lo, hi)
-            if kind == "wild":
-                damage *= self.config.wild_damage_multiplier
+            if use_flat_damage:
+                damage = self.config.flat_wild_damage if kind == "wild" else self.config.flat_symbol_damage[ref_name]
+            else:
+                lo, hi = self.config.symbol_damage_range[ref_name]
+                damage = random.uniform(lo, hi)
+                if kind == "wild":
+                    damage *= self.config.wild_damage_multiplier
             self.deal_damage_to_boss(r, damage)
 
         self.pass_exploded_positions = [{"reel": r, "row": ro} for (r, ro, _, _) in exploding]

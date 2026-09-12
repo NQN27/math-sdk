@@ -331,6 +331,8 @@ class GameBonus(GameExecutables):
         both_ways = self.config.bonus_both_ways[tier]
 
         granted = random.choice(self.config.bonus_player_hp_choices[tier])
+        if self.config.use_flat_damage.get(tier, False):
+            granted = granted * self.config.flat_damage_player_hp_initial_mult.get(tier, 1.0)
         self.player_hp = float(granted)
         self.player_hp_max = float(granted)
         self.booster_pending_for_next_spin = False
@@ -455,6 +457,11 @@ class GameBonus(GameExecutables):
                 # counter-attack this spin, consumed once.
                 self.boss_counterattack_grace = False
                 total_damage = 0.0
+            elif self.config.use_flat_damage.get(tier, False):
+                total_damage = sum(
+                    self.config.flat_boss_counterattack_damage for b in self.config.boss_ids if self.boss_alive[b]
+                )
+                self.player_hp -= total_damage
             else:
                 total_damage = sum(self.boss_dam[b] for b in self.config.boss_ids if self.boss_alive[b])
                 self.player_hp -= total_damage

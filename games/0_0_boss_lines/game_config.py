@@ -140,8 +140,65 @@ class GameConfig(Config):
         # _route_column_force_deadspin's own fallback), the attempt carries
         # over as chain_block_pending and retries unconditionally on the very
         # next pass rather than re-rolling.
+        # 2026-09-09: chain_block_threshold/step are FLAT constants - same
+        # values at every stage, confirmed directly in
+        # game_executables._maybe_apply_chain_block (no self.stage
+        # reference anywhere in that logic). But the EFFECTIVE outcome is
+        # NOT flat: _route_column_force_deadspin's success rate climbs
+        # sharply by stage (each stage's reel differs, cumulative symbol
+        # removal shrinks board diversity) - measured previously at ~65%
+        # stage1 up to ~95-99% stage5-6 - so this mechanic disproportionately
+        # suppresses exactly the deep-stage sessions that would otherwise
+        # feed p85-p99 of the payout distribution. A step=0.22 candidate
+        # (down from 0.30) was measured in an earlier round (n=20000 AND
+        # n=80000) to close most of a similar stage-6 shortfall at the
+        # cost of a modest mean increase - built and verified then but
+        # never applied to this file. Testing it now against the current
+        # iteration-5d reward-table/chest state.
+        # ITERATION 9b: user relaxed the mean target to a ceiling of 90
+        # (not necessarily exactly 85); iteration 9's reward-table cuts
+        # are hitting diminishing returns (94.56, still over ceiling, only
+        # -2.1% from a further -50% cut on 300-1000). Chain-block's mean
+        # cost runs largely through line-pay (a separate income channel,
+        # untouched by any reward-table edit), so no amount of
+        # reward-table trimming alone closes this - nudging the actual
+        # source back up partway (0.22 -> 0.26, between the original 0.30
+        # and the aggressive 0.22) trades a little tail benefit for a real
+        # cut at the mean's actual driver, now that p85-p95 are mostly
+        # carried by the 100-250 reward-table boost rather than
+        # chain-block alone.
         self.chain_block_threshold = 2
-        self.chain_block_step = 0.30
+        self.chain_block_step = 0.26
+
+        # EXPERIMENTAL (2026-09-06, game designer's idea): per-tier, per-
+        # stage deadspin chance, reusing the same Controlled Deadspin
+        # Routing primitive as deadspin_force_chance/bonus_grace_deadspin_
+        # chance above, but keyed by (tier, stage) and applied on EVERY
+        # ordinary (non-grace) spin within that stage - see
+        # game_executables.create_board_reelstrips's new elif branch. Built
+        # to correct the flat-damage Normal re-tune's remaining funnel gap
+        # after initial_mult=0.060/bonus_mult=0.04 locked in s1 (37.20% vs
+        # target 38.30%) and s6 (2.25% vs target 1.55%, well under the
+        # designer's "5% or lower" bar): s2 was overshooting (44.20% vs
+        # target 32.70%) while s3-s5 were all undershooting (12.80/2.55/
+        # 1.00 vs target 16.45/7.40/3.60) - too many sessions coasting past
+        # s3-s5 into s6 rather than dying along the way. A tier/stage absent
+        # from this dict gets no extra deadspin at all (0.0 default via
+        # .get()). NOT YET VALIDATED - starting point for the same
+        # measure-and-iterate pass as every other lever here.
+        self.bonus_stage_deadspin_chance = {"normal": {}}
+        # "Reverse deadspin" counterpart - see game_executables.
+        # _route_column_force_connect's docstring for the mechanism (biases
+        # a column toward CONNECTING to its neighbor instead of breaking).
+        # Built for s2, which was overshooting (44.20% vs target 32.70%)
+        # after s1/s3/s6 were already locked in via initial_mult=0.060/
+        # bonus_mult=0.04/s3 deadspin=1.0 - the opposite problem
+        # bonus_stage_deadspin_chance solves. NOT a hard win guarantee like
+        # deadspin's is (see that method's docstring for why the asymmetry
+        # exists) - expect a weaker/softer response, same as deadspin itself
+        # needed to go all the way to 1.0 to hit its target. NOT YET
+        # VALIDATED - starting point for the same measure-and-iterate pass.
+        self.bonus_stage_connect_chance = {"normal": {}}
 
         # --- Symbol map -------------------------------------------------------
         # L1..L5 = 10, J, Q, K, A (low pay, ascending). H1..H4 = Mini, Minor,
@@ -198,6 +255,85 @@ class GameConfig(Config):
         # it took part in this pass (see game_calculations.py). Ranking order:
         self.symbol_rank_order = ["L1", "L2", "L3", "L4", "L5", "H1", "H2", "H3", "H4"]
         self.wild_damage_multiplier = 2.0
+
+        # EXPERIMENTAL (2026-09-05, game designer's idea): flat, deterministic
+        # damage-to-boss/damage-to-player, replacing the random-range system
+        # above. Per-tier switch - defaults False everywhere (old system
+        # unchanged) until a tier's HP has been re-tuned against it; Normal is
+        # first. See game_calculations.evaluate_and_explode (damage-to-boss)
+        # and game_bonus.run_bonus_session (counterattack) for the two call
+        # sites this gates.
+        #
+        # Damage-to-boss: low-pay (L1-L5) = 1, high-pay (H1-H4) = 2, Wild AND
+        # every Power-tagged Wild variant = 3 ALWAYS - unlike the old system,
+        # a Wild's flat-mode damage does NOT depend on which symbol it
+        # substituted for (no more symbol_rank_order/wild_damage_multiplier
+        # lookup). Booster/Elixir deal 0 - true by construction already (they
+        # never enter the win-based `exploding` list at all; only marked
+        # .explode via _activate_elixir_booster, which never calls
+        # deal_damage_to_boss), so no explicit 0-entry is needed for them.
+        #
+        # Damage-to-player (boss counterattack): every ALIVE boss deals a
+        # flat `flat_boss_counterattack_damage`, replacing boss_dam's
+        # per-stage/per-boss random-scaled value entirely. NOTE: this bypasses
+        # stage6_dam_escalation's per-loop boss_dam scaling - a non-issue for
+        # Normal (stage6_endless_tiers["normal"]=False, no endless tail to
+        # escalate), but needs revisiting before extending flat damage to
+        # Super/Hidden, which both use the endless tail.
+        #
+        # Boss HP (boss_stage_table) and Player HP
+        # (bonus_player_hp_choices) still reflect the OLD damage scale as of
+        # this commit - average damage-per-instance is dropping roughly
+        # 10-15x (old symbol ranges ~5-50, Wild up to 100; new flat values
+        # 0-3), so both HP pools need their own empirically-derived rescale
+        # pass once real average-damage-per-spin is measured under this
+        # system - not yet done, tracked as the immediate next step.
+        self.use_flat_damage = {"normal": False, "super": False, "hidden": False}
+        self.flat_symbol_damage = {
+            "L1": 1, "L2": 1, "L3": 1, "L4": 1, "L5": 1,
+            "H1": 2, "H2": 2, "H3": 2, "H4": 2,
+        }
+        self.flat_wild_damage = 3
+        self.flat_boss_counterattack_damage = 1
+        # Per-tier boss HP multiplier, ONLY applied when use_flat_damage[tier]
+        # is True (game_executables.roll_stage_bosses) - boss_stage_table
+        # itself stays untouched/shared so Super/Hidden (still on the old
+        # damage system) are unaffected. Derived from a real measurement, not
+        # a guess: n=30 sanity run on Normal with flat damage ON and this
+        # multiplier still at 1.0 gave avg damage-to-boss per spin=28.52 vs
+        # the old system's 252.65 (an 8.86x drop, matching the ~10-15x
+        # predicted from the raw symbol-range/flat-value ratio) - sessions
+        # ballooned to ~488 spins/session and 100% ended at stage 6 (never
+        # actually clearing it) before this multiplier existed.
+        # 0.113 = 1/8.86, i.e. shrink boss HP by the same ratio damage output
+        # shrank by, to preserve roughly the same spins-to-kill. NOT YET
+        # RE-VALIDATED at this value - still needs its own measurement pass
+        # before trusting the resulting stage-death%/mean.
+        self.flat_damage_boss_hp_mult = {"normal": 0.113, "super": 1.0, "hidden": 1.0}
+        # Same idea, player-side: counterattack dropped from an old average
+        # base Dam of ~38.65/boss (mean of boss_stage_table's Dam column
+        # across all 6 stages: 21.3,25.3,30.3,38.3,50,66.7) down to a flat 1,
+        # so bonus_player_hp_choices' 200 must shrink by a similar ratio or
+        # players become nearly unkillable (measured: with boss HP already
+        # rescaled but player HP still at 200, avg spins/session was ~59 and
+        # 100% of sessions reached stage 6, vs baseline's ~8.3 spins/session
+        # - counterattack was no longer able to end a session at all).
+        #
+        # SPLIT INTO TWO MULTIPLIERS (2026-09-06) - a single shared scalar
+        # (scaling the initial grant AND the +50/stage-clear bonus together)
+        # produced an extremely sharp, near-discontinuous threshold: s1
+        # death% barely moved across 0.030-0.044 (89.35%->66.60%) then
+        # crashed to 11.85% at 0.045 - a 0.001 step in the shared scalar
+        # (8.8 vs 9.0 raw HP) swinging s1 by 55 points. Coupling "how much
+        # HP you start with" to "how much you get topped up per stage
+        # cleared" compounds into that kind of cliff; splitting them lets
+        # each be tuned independently and should smooth the response.
+        # Applied as a multiplier on whichever choice bonus_player_hp_choices
+        # rolls / on the flat 50 stage-clear bonus, not a replacement value.
+        # NEITHER re-validated yet at these starting numbers - still needs
+        # its own measurement pass.
+        self.flat_damage_player_hp_initial_mult = {"normal": 0.08, "super": 1.0, "hidden": 1.0}
+        self.flat_damage_player_hp_bonus_mult = {"normal": 0.08, "super": 1.0, "hidden": 1.0}
 
         # --- 15 paylines across 5 rows (0=top .. 4=bottom) -------------------
         # Own design (not specified beyond "15 lines, continuous left-to-
@@ -414,6 +550,77 @@ class GameConfig(Config):
         # (boss_lines_normal_slot_demo.html) - see game_config.py's own
         # boss_stage_table comment for the measured target this whole
         # bundle was validated against.
+        # 2026-09-08 ITERATION 4 (mechanic lever, unverified): the flat
+        # [200]*5 pool has ZERO session-length variance - every Normal
+        # session starts with the exact same HP budget, which caps how
+        # much the reward table alone can spread p50 vs p85-p99.5 (3
+        # reward-table-only passes squeezed p85-p95 while chasing
+        # p99.5/p99.9, without ever widening this). Introduced real
+        # spread instead: shorter-HP draws die faster/cheaper (pulls
+        # p50-p75 down toward target), longer-HP draws survive deeper
+        # (feeds p85-p99.5 independently of reward-table VALUES). Kept the
+        # average close to the old flat 200 (new mean=210, +5%) rather
+        # than solving it exactly - per this file's own established
+        # convention, measure the real effect before assuming the guess.
+        # ITERATION 4b: [110,155,200,255,330] (avg 210, +5% vs flat 200)
+        # measured mean=131.87 - a +53% RELATIVE mean blowout from a +5%
+        # average HP change. HP is a highly convex lever - the high end of
+        # the spread crosses into reaching the endless stage-6 loop far
+        # more often, which pays out disproportionately vs. the HP
+        # increase itself. Direction was right (p99.5 gap -52%->-18%,
+        # p99.9 -57%->-36%) but magnitude was far too strong. Cut the
+        # spread from +-45% to +-9% around 200, same average.
+        # ITERATION 4c: 4b's +-9% uniform spread barely moved anything
+        # (p99.5 1204->1246, +3.5%); the earlier +-45% spread moved p99.5
+        # to 2039 (+69%) but blew mean out to 131.87 (+53%). The response
+        # to spread WIDTH is highly convex, but a UNIFORM 5-way spread
+        # can't target p99-p99.9 specifically without dragging the whole
+        # body with it. Redesigned as a WEIGHTED pool instead (via
+        # repetition - random.choice treats list entries uniformly, so
+        # repeats encode probability): 98.6% of sessions keep ordinary
+        # ~200 HP (protects the already-close p50-p95 body), with 3 rare
+        # tiers mapped directly onto the target's own percentile
+        # ITERATION 4d: 4c (990/6/3/1 @ 200/500/900/2000 - see below, this
+        # replaces the 986/9/4/1 @ 200/350/550/900 shape) measured
+        # mean=94.53 (target 85, worse than 4's 86.10), p99=1160.91
+        # (OVERSHOT the 800-1000 band), p99.5=1415.30 (target 2500, still
+        # -43%), p99.9=2432.30 (target 5000+, still -51%) - the 350 tier
+        # was pushing too much mass right at p99 while 900 wasn't nearly
+        # enough for p99.9. Dropped 350 entirely, pushed the top tier
+        # 900->2000 at a smaller 0.1% share, added an intermediate 500 @
+        # 0.6% to replace 350's old job without overshooting p99 as hard.
+        # Mean HP = 205.70 (+2.85%) - still isolating the HP-pool lever
+        # alone this pass (reward table unchanged from iteration 3/4) to
+        # keep the diagnosis clean before doing a final joint compensation
+        # pass.
+        # ITERATION 4e: 4d (990/6/3/1 @ 200/500/900/2000) measured
+        # mean=97.15 (worse than 4c's 94.53) and p99=1202.20 (overshot the
+        # 800-1000 band even harder than 4c's 1160.91) - 500 HP (+150%) is
+        # STILL too strong for what should be a modest p99 boundary case;
+        # the convexity is steeper than assumed. Cut the closest/most-
+        # frequent rare tier way down (500->250, a much gentler +25%) to
+        # aim p99 at the 800-1000 band directly, kept a middle tier for
+        # p99.5, and left the extreme tier high for p99.9 (still
+        # unverified whether 2000 is even enough there - 4d only reached
+        # 2640 total session payout from it, not 5000+, so may need
+        # pushing further next pass).
+        # ITERATION 4f: found the actual bug in 4c/4d/4e - total rare-tier
+        # frequency was exactly 1.0% (0.6+0.3+0.1), which EXACTLY coincides
+        # with the p99 cutoff, so p99 was being set by the bottom of the
+        # rare population, not the baseline. That's why 350->250 HP barely
+        # moved p99 (1160->1116) - the wrong variable was being tuned.
+        # Even at 0.5% (below the p99 cutoff), p99 STILL climbed
+        # (1127.92) - the real cause: a session's total is a SUM of many
+        # draws, and a small rare-HP tail shifts the effective percentile
+        # rank WITHIN the baseline population itself at any fixed sample
+        # index (99.0th->~99.5th), and baseline's own p99->p99.5 climb is
+        # already steep (947->1204). REVERTED to flat 200 (all HP-pool
+        # sub-iterations abandoned) - a smooth HP spread cannot create the
+        # near-2.5x CLIFF the target wants between p99 and p99.5 without
+        # dragging p99 up too; that requires a genuinely discrete jump,
+        # which only the reward table's rare/exclusive chest draw can
+        # provide (see reward_drop_weights_normal_bonus's chest-tier
+        # rebalance below).
         self.bonus_player_hp_choices = {
             "normal": [200, 200, 200, 200, 200],
             "super": [300, 350, 400, 450],
@@ -737,7 +944,16 @@ class GameConfig(Config):
         # old-shared-pool placeholder (0.00000796, 1-in-500k) before this
         # change; only Normal's own chest pool weight sum was used to
         # derive the new number.
-        self.stage6_chest_natural_maxwin_weight = 0.0651
+        # 2026-09-08 RETARGETED (supersedes the 1-in-23509/2026-08-19 note
+        # above - that number is now stale, do not resurrect it): explicit
+        # new spec is 1-in-35000 session-level Max Win rate, verified at
+        # n=35000 (one expected hit per run). Re-solved again for
+        # ITERATION 5's chest-weight flip (400/500/800/1500/2500/4000:
+        # 15/8/4/2.2/1.0/0.5 -> 2/1.5/1.5/9/6/3, pool sum 30.7 -> 23),
+        # same ~1.75% P(chest reached) measurement (stage-clear mechanic,
+        # untouched): p_needed = (1/35000)/0.0175 = 0.16327%,
+        # w = p_needed*pool/(1-p_needed) = 0.03761.
+        self.stage6_chest_natural_maxwin_weight = 0.03761
 
         # Normal-tier-Bonus-ONLY reward-drop table (2026-08-14/15 hard-tune
         # + shape redesign, SUPERSEDES the earlier two-band-compression
@@ -876,14 +1092,143 @@ class GameConfig(Config):
         # actually reachable at these 3 values - the seg6 weights that
         # would collide (1.1/0.9/0.6) are dead code, kept only for fidelity
         # with the original candidate's literal numbers.
+        # 2026-09-08 ITERATION 2 (unverified, not yet measured). Iteration 1
+        # (n=20000: mean=86.04, median=40.80, p75=88.50, p80=108.82,
+        # p85=136.21, p90=186.11, p95=292.51, p99=877.61, target mean=84.93/
+        # median=38.35/p75=84.60/p80=105.10/p85=140.00/p90=196.10/
+        # p95=306.90/p99=1012.80) cut p99's gap from -25% to -13% (real
+        # win) but barely moved p90 (-5.1% -> -5.1%, unchanged) and median
+        # (+6.8% -> +6.4%, unchanged) - reducing tiers 200/250 to feed the
+        # tail apparently hurt p90 directly (sessions that land AROUND p90
+        # often do so via a 200/250 draw), a genuine trade-off, not a bug.
+        # This pass: partially restore 200/250 toward their original
+        # values (stop taxing the exact tier that builds p90) while
+        # pushing 300/350/600/1000 further (p99 still needs +13%); nudge
+        # the 1-8 tiers up slightly to pull mean/median back down (mean
+        # crept from 85.10 to 86.04 last pass, wrong direction). Still a
+        # first-order guess, not solved analytically - see this file's own
+        # established convention (game_config.py's Hidden/Super sections)
+        # of empirical measure-adjust-remeasure over closed-form solving.
+        # ITERATION 3 (unverified). iter2 measured (n=20000): mean=87.18
+        # (target 85, +2.6%), median=40.50 (target 37.5, +8%), p90=186.41
+        # (target 200, stuck across 2 different attempts - NOT retried
+        # this pass, likely a stage-clear/HP mechanic, not a reward-table
+        # value issue), p95=301.10 (target 350, +16.3% still short),
+        # p99=974.71 (target 800-1000, ALREADY IN BAND - left 300-1000
+        # tiers untouched this pass), p99.5=1216.67 (target 2500, +105%
+        # short), p99.9=1647.18 (target 5000+, +200% short). This pass:
+        # boost chest-exclusive 1500/2500/4000 hard (only lever for
+        # p99.5/p99.9, untouched by iter1/2) - see
+        # stage6_chest_natural_maxwin_weight's recalibration above, the
+        # chest pool sum changing means Max Win rate would silently drift
+        # if that weren't re-solved. Push 1-8 up further and 100-250 down
+        # further to fight the mean/median drift iter1->iter2 made worse,
+        # not better (85.10->86.04->87.18 mean, wrong direction).
+        # ITERATION 5 (HP-mechanic sub-iterations 4/4b-4f abandoned/
+        # reverted - see bonus_player_hp_choices above for why a smooth
+        # spread can't make the cliff the target wants). Root cause of the
+        # p99/p99.5 gap: chest weights 400/500/800 (15/8/4=27 of the 30.7
+        # pool, 88%) dominate the chest draw, so "reaching chest" usually
+        # means only a modest 400-800 top-up, not a real jump - it blends
+        # into the top of the ordinary-session range instead of creating
+        # separation. Flipped the emphasis: cut 400/500/800 down hard,
+        # concentrate weight on 1500/2500/4000 instead (now 18/23=78% of
+        # chest draws land >=1500, was 12%) so reaching chest reliably
+        # means a big jump. Regular pool's own top tiers (300-1000) left
+        # untouched this pass to isolate the chest-weight effect alone.
+        # ITERATION 5b: iter5's chest rebalance nailed p99/p99.5/p99.9
+        # (947->1010/1204->2164/2166->4489, all now within ~10-13% of
+        # target or better) while leaving p50-p95 completely undisturbed -
+        # confirms the chest is now a genuine isolated "cliff" lever. Only
+        # cost: mean overshot to 96.03 (target 85, +13%) - chest's higher
+        # average value (from concentrating on 1500-4000) inflates mean
+        # even though it barely shows below p99 (chest reach rate 1.75%
+        # sits above the p99 cutoff). Trimmed 1-8 tiers ~8% and 10-250
+        # tiers ~5% to pull mean back down - this also happens to be
+        # exactly what p50-p80 need anyway (all running ~6-7% high).
+        # ITERATION 5c: 5b's mean got WORSE (96.03->97.29), not better -
+        # traced the real cause via game_executables.roll_reward_drop:
+        # the stage-6 chest draw pool is `{k: w for k,w in weights.items()
+        # if k in stage6_last_tiers}` - ONLY the 6 chest values, fully
+        # isolated from the regular pool (confirmed from the actual code,
+        # not assumed). So trimming ONLY 1-8/10-250 while leaving
+        # 300/350/600/1000 untouched didn't scale the regular pool down -
+        # it shifted RELATIVE mass upward within it (less weight on cheap
+        # outcomes = proportionally more on the expensive ones left
+        # alone), raising the regular pool's own average. That was the
+        # actual bug in 5b, not sampling noise (same seeds both runs).
+        # Reverted 1-8/10-250 to iteration 3's original values (correctly
+        # calibrated for the regular pool's own mean/median). This time
+        # trimming 300/350/600/1000 instead - their original job (helping
+        # p99) is now redundant since the rebalanced chest handles that
+        # cliff on its own; they're pure extra mean cost at this point.
+        # ITERATION 7: iter6b (n=35000) closed the tail well (p85 basically
+        # exact, p90-p99.9 all within ~5-16%) but the -45% cut on
+        # 300/350/600/1000 barely moved mean/p50 (chain-block's inflation
+        # runs largely through line-pay, untouched by this table) - p50-p80
+        # ran uniformly +13-14% high, mean +17.6%. Boosting 1-8 by +30%
+        # (the historically reliable lever from iterations 1-3 - makes
+        # minimal-kill sessions proportionally more common, pulling both
+        # mean AND median down together) rather than cutting high tiers
+        # further, which risks the relative-mass-shifts-upward bug from
+        # iteration 5b again.
+        # ITERATION 8 (user priority: mean first, then grow p85/p90
+        # specifically, explicit room to push p60/70/80 lower). iter7's
+        # blanket +30% on 1-8 pulled p50-p80/mean closer but ALSO pulled
+        # p85/p90/p95 down further (127.70/175.00/273.91, worse than
+        # iter6b) since it reduced every other tier's relative share
+        # equally, including 100-250 which is what actually populates the
+        # p85-p90 zone. This pass: push 1-8 further still (more room for
+        # p60-p80 to drop, matches instruction), AND separately grow
+        # 100-250 substantially (~2.5-3x) to directly target p85/p90
+        # rather than leaving them to whatever's left over.
+        # ITERATION 8b: iter8's ~2.7x boost on 100-250 grew p85-p99.5 close
+        # to target (real win: p85 +6.8%, p90 +5.2%, p95 -7.0%, p99.5
+        # -4.1%, all far tighter than before) but had a much bigger
+        # inflating effect on mean than expected (94.99->103.97, WORSE,
+        # contrary to the stated first priority). Dialing 100-250 back
+        # from ~2.7x to ~1.5x, keeping 1-8's boost as-is.
+        # ITERATION 11: user wants p10/p20/p30/p40 pushed down specifically
+        # to free mean-budget for growing p85/p90/p95, on top of
+        # iteration 10's state (mean=89.00, PASSED the <=90 ceiling;
+        # p50-p75 essentially exact; p85-p99.9 all undershooting since
+        # chain_block_step=0.26 traded tail richness for that precision).
+        # Current p10/p20/p30/p40 (from iter10 raw data): 9.30/13.50/
+        # 20.77/29.10 - governed almost entirely by the 1-8 tiers (very-
+        # few-kill sessions). Boosted 1-8 further (+20% from iteration
+        # 8/9/10's level) to push those down, and spent the freed budget
+        # re-growing 100-250 partway back toward iteration 8's stronger
+        # level (was dialed back to 1.5x in 8b to save mean - now going
+        # to ~2.2x) to grow p85/p90/p95. Watching mean carefully to stay
+        # near/under 90.
         self.reward_drop_weights_normal_bonus = {
-            1: 150, 2: 120, 3: 380, 4: 300, 5: 320, 6: 260, 8: 210,
+            1: 288, 2: 230, 3: 720, 4: 568, 5: 605, 6: 492, 8: 400,
             10: 110, 12: 85, 15: 65, 18: 48, 20: 60, 25: 44,
             30: 36, 35: 29.3, 40: 24.1, 50: 19.6, 60: 16.1, 80: 13.2,
-            100: 10.8, 120: 8.8, 150: 7.2, 180: 5.0, 200: 4.1, 250: 2.0,
-            300: 1.7, 350: 1.4, 600: 0.8, 1000: 0.5,
+            100: 17, 120: 13.5, 150: 11, 180: 7.5, 200: 8, 250: 4.3,
+            # ITERATION 5d: 5c's -60% cut on 300/350/600/1000 overcorrected
+            # - mean improved (96.03->90.27) but p85/p90/p95/p99 all
+            # dropped BELOW target too (p99 685.03, undershot the 800-1000
+            # band; iter5's 1010.28 was closer). These tiers matter for
+            # the body too, not just mean. Splitting the difference: ~25%
+            # cut instead of ~60%.
+            # ITERATION 6: chain_block_step 0.30->0.22 (see above) let
+            # sessions survive deeper before being cut off - nailed p85
+            # (130.70->140.60) and closed p90/p95/p99.5/p99.9 gaps
+            # significantly, but raised the WHOLE distribution (mean
+            # 93.70->101.77, p50 40.05->42.60, p99 855->1055, overshooting
+            # the band again) since it's a different mechanic entirely,
+            # not routed through reward-table weights at all. Needs a
+            # stronger compensating cut than 5d's -25% - pushing to ~-45%.
+            # ITERATION 9: user relaxed the mean target - ceiling of 90 is
+            # acceptable (not necessarily exactly 85). iter8b's 96.57 is
+            # over that ceiling. 300/350/600/1000 are the best remaining
+            # cut - p85/p90 are now mostly carried by the 100-250 boost
+            # and chest, not these, so trimming further should cost little
+            # there. Cutting another ~50% on top of iter6b's already -45%.
+            300: 0.83, 350: 0.72, 600: 0.50, 1000: 0.33,
             # Chest tiers (applied last, same as {**REGULAR_WEIGHTS, **SEG7_CHEST}):
-            400: 15, 500: 8, 800: 4, 1500: 0.9, 2500: 0.35, 4000: 0.12,
+            400: 2, 500: 1.5, 800: 1.5, 1500: 9, 2500: 6, 4000: 3,
         }
         self.reward_drop_top_tiers_normal_bonus = {400, 500, 800, 1500, 2500, 4000}
         self.reward_drop_stage6_last_tiers_normal_bonus = {400, 500, 800, 1500, 2500, 4000}
