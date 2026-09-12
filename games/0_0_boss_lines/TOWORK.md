@@ -43,11 +43,43 @@ backend state produces byte-identical output to what's committed).
       calibrated against cascade's specific hit-rate/chain-depth statistics.
       Adopting this for real needs a full re-tune pass across all 3 tiers,
       not a config flip.
-      **Needs a decision**: (a) flip the flag and commit to the full re-tune
-      project across all tiers, or (b) leave it shelved (code stays, flag
-      stays False, revisit later). Not decided as of this entry - do not
-      flip `use_inplace_tumble` to True in production config without
-      re-running the full tuning pass first.
+      **DECIDED 2026-09-12: forked out instead of (a)/(b) above.** Rather
+      than flip the flag here (which would force the full re-tune project
+      onto this game's own tuning history) or leave it permanently dormant,
+      the idea now lives in its own game folder, `games/0_0_boss_lines_inplace`
+      (`use_inplace_tumble=True` there by default; this folder keeps `False`,
+      completely unaffected). That fork's own README states plainly that
+      every reward-table/HP/wild% number it inherited is a known-wrong
+      starting point until it gets its own tuning pass - this item is
+      CLOSED for `0_0_boss_lines` itself; any further in-place-tumble work
+      happens in the fork, tracked by its own TOWORK-equivalent going
+      forward, not here.
+
+- [ ] **Normal Bonus percentile-distribution retune - open, iteration 11 is
+      current state, NOT confirmed better than iteration 10.** Target
+      (game designer-specified, see `reward_drop_weights_normal_bonus`'s
+      own inline iteration log for full history): p50=37.5, p60~50,
+      p70~67.5, p75=80, p80~105, p85=140, p90=200, p95=350, p99~800-1000,
+      p99.5~2500, p99.9>=5000+, mean<=90 ceiling, all measured at n>=35000
+      with sessions >=20000x (Max Win) excluded from percentiles and
+      tracked as a separate rate (target ~1-in-35000).
+      Iteration 10 (verified, n=35000): mean=89.00 (under the 90 ceiling),
+      p50-p75 essentially exact, p85-p99.9 all undershooting target -
+      chain_block_step=0.26 traded tail richness for that mean/body
+      precision.
+      Iteration 11 (currently on disk, per this session's commit): pushed
+      1-8 tiers +20% and regrew 100-250 back toward ~2.2x to target
+      p85/p90/p95 while freeing budget from p10-p40. Measured result was
+      mixed, not a clean win: mean marginally exceeded the ceiling (90.13)
+      and p85/p90/p95 barely moved - weaker than iteration 10 by the
+      numbers, but left in place rather than reverted since neither was
+      declared final.
+      **Needs a decision**: revert to iteration 10's values (verified,
+      under ceiling, but tail undershoots) as the accepted checkpoint, or
+      continue iterating toward p85-p99.9 (this has resisted ~11 rounds of
+      hand-tuning the reward table + chain-block step - a genuinely
+      different lever, not another reward-table pass, may be needed to move
+      the tail without moving mean/body).
 
 - [ ] **RTP optimizer doesn't hit target when 2+ non-identity fences coexist**
       (Phase 3, `math-sdk`). Base mode measures ~0.6071 RTP vs the 0.967
@@ -412,13 +444,22 @@ backend state produces byte-identical output to what's committed).
 
 ## Housekeeping
 
-- [ ] `math-sdk` has uncommitted working-tree changes outside this phase's
-      own commits: modified `_tuning_scratch/boss_lines_normal_slot_demo.html`,
+- [x] ~~`math-sdk` has uncommitted working-tree changes outside this
+      phase's own commits...~~ **STALE, checked 2026-09-12**: none of
+      `_tuning_scratch/boss_lines_normal_slot_demo.html`,
       `_tuning_scratch/gen_stage_reels.py`, `optimization_program/src/setup.toml`,
-      `src/calculations/symbol.py`, and a deleted
-      `_tuning_scratch/boss_lines_normal_console_demo.html`. Review and
-      either commit (if verified) or discard - don't let them sit
-      indefinitely per this game's own CLAUDE.md guidance.
+      or `src/calculations/symbol.py` are dirty in `git status` anymore -
+      committed at some point in this project's normal commit cadence since
+      this item was written. `boss_lines_normal_console_demo.html` no longer
+      exists on disk. No action needed.
+- [ ] **Current actual uncommitted state (re-checked 2026-09-12)**: this
+      game's `_tuning_scratch/` has real untracked/modified scratch content
+      from the Super-tier funnel/reward-table work above (`super_funnel_reshape.py`
+      modified; ~80 `Super_BM_S*_*.csv` reel candidates, `super_s2_lever_test.py`,
+      `wild_damage_measure.py`, finishing-blow/rescue-roll/flat-damage
+      diagnostic scripts, all untracked) - per this game's own CLAUDE.md,
+      scratch doesn't need committing on the same cadence as production
+      files; left as-is, flagging only so it isn't mistaken for lost work.
 - [ ] Ante/Ultimate-Power/God-Mode/buy3/buy4 bet modes are structurally
       built (Phase 4) but should be double-checked for the same level of
       measured/validated rigor Normal Bonus and the base engine have had -
