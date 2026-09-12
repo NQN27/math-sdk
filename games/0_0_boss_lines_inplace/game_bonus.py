@@ -1,0 +1,563 @@
+"""Phase 3: scatter-triggered 3-tier Bonus engine (Player-HP-gated
+multi-spin loop) + the 2 Bonus-exclusive collectibles (Elixir/Booster).
+
+Layered entirely on top of the existing base-spin cascade engine
+(game_calculations.evaluate_and_explode / game_executables.py's boss-battle
++ Power system) - a Bonus session is just that SAME engine run spin after
+spin, with three things now persisted ACROSS those internal spins instead of
+reset each time (boss/stage state, Global Multi - see
+game_executables.reset_boss_battle/reset_power_system, both only called ONCE
+per session here, not once per internal spin), plus a brand-new Player HP
+resource that only exists during Bonus and decides when the session ends.
+
+Scope note (see readme.txt): this file intentionally does NOT build Ante/
+Ultimate Power/God Mode/direct-buy-3+/direct-buy-4+ (Phase 4's job) - but
+`run_bonus_session`'s only tier-specific inputs (starting stage, Player HP
+pool, Power-rate reel, Both-Ways flag) are all looked up from
+game_config.py's bonus_* dicts, so Phase 4 can add new entry points that
+plug different starting conditions into the SAME `run_bonus_session`/
+`run_one_bonus_spin` machinery without changing this file.
+"""
+
+import random
+import warnings
+
+from game_executables import GameExecutables
+from src.events.events import reveal_event
+from src.calculations.statistics import get_random_outcome
+from game_events import (
+    bonus_trigger_event,
+    bonus_spin_start_event,
+    bonus_counterattack_event,
+    bonus_end_event,
+    player_hp_state_event,
+    elixir_activated_event,
+    booster_activated_event,
+    boss_state_event,
+)
+
+
+class GameBonus(GameExecutables):
+    """Scatter tally (across the whole base-spin cascade) + the Bonus
+    session loop + Elixir/Booster."""
+
+    # --- Per-book reset ------------------------------------------------------
+    def reset_bonus_state(self) -> None:
+        """Called once per book attempt from game_override.reset_book -
+        Player HP/Bonus-tier state does not exist outside an active Bonus
+        session, so this is also what it looks like "at rest" for every
+        Base/Ante/feature-spin book."""
+        self.in_bonus = False
+        self.player_hp = 0.0
+        self.player_hp_max = 0.0
+        self.scatter_columns = set()
+        self.booster_pending_for_next_spin = False
+        self.booster_multiplier_current_spin = 1.0
+        self.bonus_tier = None
+        self.bonus_spin_count = 0
+        self.bonus_end_reason = None
+        self.stage6_loop_count = 0
+        # Bosses defeated so far in the CURRENT Bonus session (incremented in
+        # game_executables.on_boss_defeated). Only run_bonus_session's
+        # finishing-blow guard reads it - see that method's comment for why
+        # `stage_defeat_order` can NOT be used for this.
+        self.bonus_kill_count = 0
+
+    # --- Scatter tally (base-spin side only) ----------------------------------
+    def accumulate_scatter_columns(self) -> None:
+        """Add every column CURRENTLY showing a Scatter to the running,
+        never-shrinking set of columns seen so far this spin - called after
+        the initial reveal AND after every tumble refill of the outer base
+        spin (see gamestate.run_spin), so Scatters that land mid-cascade
+        count too, matching the spec's "finalized after cascade reaches
+        static state" rule. A set that only ever grows is immune to a LATER
+        Extra Wild/Extra Power placement overwriting a Scatter cell (it
+        already landed - that already counts, regardless of what happens to
+        the cell afterwards), and naturally caps at 5 (5 columns) via the
+        reel strip's own "max 1 Scatter/column" spacing guarantee - no extra
+        clamping needed. Never called during a Bonus session's internal
+        spins (Scatter isn't on FR0/FR1/FR2, and there is no Bonus
+        retrigger)."""
+        for col in range(self.config.num_reels):
+            for row in range(self.config.num_rows[col]):
+                if self.board[col][row].check_attribute("scatter"):
+                    self.scatter_columns.add(col)
+                    break
+
+    def resolve_bonus_tier(self):
+        """None (no trigger) / "normal" / "super" / "hidden", from this
+        spin's final Scatter column count."""
+        return self.config.bonus_scatter_tier_by_count.get(len(self.scatter_columns))
+
+    # --- Phase 4: floor-forced (guaranteed minimum, overshoot allowed)
+    # Scatter board - ORIGINALLY used by the buy-3+/buy-4+-scatter direct
+    # bonus-buy modes. Phase 4 v2 (see QUESTIONS_FOR_YOU.md) replaced that
+    # usage with an exact-count force_special_board draw from an explicit
+    # tier-mix weight table (game_config.py's buy3_scatter_count_weights/
+    # buy4_scatter_count_weights, applied in gamestate.run_spin) - an EXACT
+    # required composition (92/7.6/0.4 / 95/5) cannot coexist with this
+    # function's "let it overshoot naturally" semantics. Left defined,
+    # unused, rather than deleted (same convention as FR0-2.csv/PWR1.csv).
+    def force_min_scatter_board(self, min_count: int) -> None:
+        """Force exactly `min_count` DISTINCT reels to a Scatter stop (picked
+        from that reel's own strip - never an invented position), leaving
+        every OTHER reel to draw a completely ordinary random stop from the
+        SAME reelstrip. Unlike `src.calculations.board.Board.
+        force_special_board` (which enforces an EXACT final count and
+        retries - via an unbounded `while True` - until it gets one, making
+        it structurally unusable for "at least N, overshoot OK": forcing
+        min_count=3 there would reject-and-redraw forever on the ~7% of
+        attempts where one of the 2 un-forced reels ALSO naturally lands a
+        Scatter), this calls `force_board_from_reelstrips` directly with a
+        PARTIAL stop-position dict (only `min_count` of the 5 reels are
+        pinned - see src.calculations.board.Board.force_board_from_reelstrips,
+        which already draws any reel absent from that dict fully at random),
+        so a natural extra Scatter on one of the un-forced reels simply
+        overshoots the tier upward (Normal -> Super/Hidden) instead of
+        triggering a retry - exactly the spec's "guaranteed minimum, roll the
+        real count with a floor, don't cap it" requirement. One deterministic
+        call, no retry loop, no risk of the infinite-loop landmine
+        `force_special_board` would hit if reels ran out of un-forced
+        capacity (see readme.txt's Phase 3 section for that documented
+        landmine - this deliberately avoids reusing that primitive here)."""
+        conditions = self.get_current_distribution_conditions()
+        reelstrip_id = get_random_outcome(conditions["reel_weights"][self.gametype])
+        reelstops = self.get_syms_on_reel(reelstrip_id, "scatter")
+        possible_reels = [i for i in range(self.config.num_reels) if len(reelstops[i]) > 0]
+        n = min(min_count, len(possible_reels))
+        chosen_reels = random.sample(possible_reels, n)
+        force_stop_positions = {r: random.choice(reelstops[r]) for r in chosen_reels}
+        self.force_board_from_reelstrips(reelstrip_id, force_stop_positions)
+
+    # --- Reel-selection override (Phase 4 plug point) -------------------------
+    def get_current_distribution_conditions(self) -> dict:
+        """Wraps the base implementation with a per-(tier, stage) reel
+        override for the freegame_type key ONLY, active only while
+        `self.in_bonus` (i.e. only during an active Bonus session - see
+        run_bonus_session below). Looked up LIVE from
+        `config.bonus_tier_stage_reel[self.bonus_tier][self.stage]` every
+        call (not cached once at session start) so the reel automatically
+        follows `self.stage` as it advances mid-session - including the
+        endless stage-6 tail, where `self.stage` stays pinned at 6 across
+        every loop, so it naturally keeps resolving to the same stage-6
+        reel with no extra bookkeeping. Returns a shallow copy, never
+        mutating the underlying dict in place - that dict is literally the
+        singleton BetMode/Distribution's own `_conditions` object (see
+        src.config.distributions.Distribution / src.state.state.
+        GeneralGameState.get_current_distribution_conditions), and mutating
+        it would leak across every later simulation that reuses the same
+        Distribution (the exact singleton-leak class of bug this project's
+        notes repeatedly warn about for `self.config`)."""
+        conditions = super().get_current_distribution_conditions()
+        if getattr(self, "in_bonus", False):
+            forced_reel = self.config.bonus_tier_stage_reel[self.bonus_tier][self.stage]
+            conditions = dict(conditions)
+            conditions["reel_weights"] = dict(conditions["reel_weights"])
+            conditions["reel_weights"][self.config.freegame_type] = {forced_reel: 1}
+        return conditions
+
+    # --- Elixir / Booster ------------------------------------------------------
+    def _board_has_elixir_or_booster(self) -> bool:
+        return self.count_symbols_on_board("EL") > 0 or self.count_symbols_on_board("BO") > 0
+
+    def _activate_elixir_booster(self) -> None:
+        """Both activate together, right as a Bonus spin's resolve loop is
+        about to declare static state (see run_one_bonus_spin): mark every
+        current EL/BO cell exploded (the next tumble_game_board() call
+        refills them exactly like any other explode), heal Player HP per
+        Elixir instance (rolled/applied in board-scan order - each
+        instance's 10%-100% roll is of Player HP's CURRENT value AT THAT
+        MOMENT, so a second Elixir this same activation heals off of the
+        first one's already-applied result, capped at max, rounded to the
+        nearest 10), and set the x2-boss-damage flag for the NEXT bonus spin
+        if 1 or more Boosters are present (no stacking beyond x2 - see
+        game_config.py's booster_damage_multiplier docstring for the
+        "immediately-following spin" interpretation call)."""
+        el_positions = sorted((p["reel"], p["row"]) for p in self.get_symbol_positions("EL")["EL"])
+        bo_positions = sorted((p["reel"], p["row"]) for p in self.get_symbol_positions("BO")["BO"])
+
+        for r, ro in el_positions:
+            self.board[r][ro].explode = True
+            lo, hi = self.config.elixir_heal_pct_range
+            pct = random.uniform(lo, hi)
+            round_to = self.config.elixir_heal_round_to
+            raw_heal = self.player_hp * pct
+            heal = round(raw_heal / round_to) * round_to
+            new_hp = min(self.player_hp_max, self.player_hp + heal)
+            actual_healed = new_hp - self.player_hp
+            self.player_hp = new_hp
+            elixir_activated_event(self, (r, ro), actual_healed, self.player_hp)
+
+        if bo_positions:
+            for r, ro in bo_positions:
+                self.board[r][ro].explode = True
+            self.booster_pending_for_next_spin = True
+            booster_activated_event(self, bo_positions)
+
+        if el_positions or bo_positions:
+            player_hp_state_event(self)
+
+    # --- One internal Bonus spin ----------------------------------------------
+    def run_one_bonus_spin(self, both_ways: bool) -> None:
+        """One Bonus 'spin': the SAME cascade engine a base spin uses
+        (payline eval + whole-board explode/damage + Power FIFO/immediate
+        activation - see game_calculations.evaluate_and_explode /
+        gamestate.run_spin), but: boss/stage state and Global Multi are NOT
+        reset here (only once, at run_bonus_session's start - persisted
+        across every spin in this session per spec), the board is drawn
+        from this session's fixed tier reel (see
+        get_current_distribution_conditions above) with self.gametype
+        already set to freegame_type, `both_ways` is threaded through to
+        evaluate_and_explode, and the loop's continuation condition gets one
+        extra disjunct for Elixir/Booster (see class docstring / spec:
+        activation happens at the exact moment a pass has produced no new
+        wins/connections AND the FIFO queue is empty - i.e. right as the
+        loop is about to declare static state - not immediately on
+        collection)."""
+        self.win_manager.reset_spin_win()
+        self.pass_exploded_positions = []
+        self.chain_pass_count = 0
+        self.chain_block_pending = False
+        self.create_board_reelstrips()
+        # BUG FIX (found via a bounded direct-call harness, not left as a
+        # surprise - see readme.txt's Phase 3 section): `removed_symbols`
+        # persists for the WHOLE Bonus session (unlike a base spin, where it
+        # always starts empty - see game_override.reset_book), so every
+        # internal spin AFTER the first one can freely draw a straight
+        # create_board_reelstrips() initial reveal that still contains a
+        # symbol an EARLIER spin in this same session already removed (the
+        # raw reel strip has no idea about `removed_symbols` - only
+        # `enforce_removed_symbols` does). game_executables.tumble_game_board
+        # already re-enforces this after every TUMBLE, but that alone isn't
+        # enough if this spin's very first reveal has zero wins (no tumble
+        # ever happens that spin) - which is exactly what was observed: a
+        # since-removed low-pay symbol sitting untouched on the board at
+        # session end. Enforcing once more right after the initial reveal
+        # closes that gap.
+        self.enforce_removed_symbols()
+        reveal_event(self)
+
+        self.evaluate_and_explode(both_ways=both_ways)
+        self.emit_tumble_win_events()
+        self.emit_pass_extra_events()
+
+        passes = 1
+        while not self.wincap_triggered and passes < self.config.max_resolve_passes:
+            has_win = self.win_data["totalWin"] > 0
+            has_fifo = bool(self.power_queue)
+            if has_win or has_fifo:
+                self.tumble_game_board()
+                self.activate_next_power()
+                self.evaluate_and_explode(both_ways=both_ways)
+                self.emit_tumble_win_events()
+                self.emit_pass_extra_events()
+                passes += 1
+                continue
+            if self._board_has_elixir_or_booster():
+                self._activate_elixir_booster()
+                self.tumble_game_board()
+                self.evaluate_and_explode(both_ways=both_ways)
+                self.emit_tumble_win_events()
+                self.emit_pass_extra_events()
+                passes += 1
+                continue
+            break
+        if passes >= self.config.max_resolve_passes:
+            warnings.warn(
+                f"\nHit max_resolve_passes ({self.config.max_resolve_passes}) on a "
+                f"Bonus spin (sim {self.sim}, criteria {self.criteria}, tier "
+                f"{self.bonus_tier}) - forcing this spin's cascade to end.\n"
+            )
+            if self.power_queue:
+                # Defensive-only: by construction, "static state" (the
+                # ordinary loop-exit condition) requires an EMPTY queue, so
+                # this can only be reached via the max_resolve_passes safety
+                # valve above - which "should never be hit by a legitimate
+                # board" (see game_config.max_resolve_passes docstring).
+                # Unlike a base spin (where reset_book/reset_power_system
+                # gives every attempt a fresh empty queue), a Bonus session
+                # does NOT reset the Power queue between its own internal
+                # spins (see run_bonus_session - only Boss/Global Multi state
+                # is meant to persist, never leftover FIFO powers), so
+                # without this, a queue non-empty at this rare safety-valve
+                # exit would otherwise silently leak into the NEXT internal
+                # spin's resolve loop instead of vanishing with this one.
+                warnings.warn(
+                    f"\n{len(self.power_queue)} Power(s) still queued when "
+                    f"max_resolve_passes was hit (sim {self.sim}) - clearing "
+                    "rather than leaking into the next Bonus spin.\n"
+                )
+                self.power_queue = []
+
+        self.set_end_tumble_event()
+        self.win_manager.update_gametype_wins(self.gametype)
+
+    # --- Full Bonus session ----------------------------------------------------
+    def run_bonus_session(self, tier: str) -> None:
+        """Entry point, called from gamestate.run_spin once the base spin's
+        cascade reaches static state with a final Scatter tally of 3+ (see
+        resolve_bonus_tier). Grants Player HP, sets the starting stage/Both-
+        Ways flag (reel is now chosen live per-stage - see
+        get_current_distribution_conditions), then loops internal spins
+        until Player HP<=0, the endless stage-6 tail also ends (wincap), or
+        the defensive safety cap is hit.
+
+        Design decision (supersedes the earlier "stop the session the
+        instant stage 6 clears" behavior): stage 6 no longer goes dormant
+        permanently. Every time its 3 bosses are cleared, `clear_stage`
+        still grants its usual +50/+50 Player HP (unconditional on
+        in_bonus, not stage-specific) and still rolls the stage-6 reward-
+        drop, but instead of ending the session we immediately re-roll a
+        fresh stage-6 trio and keep going - Dam AND HP both scaled up by
+        `stage6_dam_escalation ** stage6_loop_count` each additional loop
+        (see game_config.py) so the tail is bounded by rising risk, not by
+        a hardcoded stop. Scaling HP too (not just Dam) matters for a
+        strong-damage tier: the counter-attack damage step below only
+        fires if the freshly-rolled trio is STILL ALIVE at the end of that
+        spin (see the `continue` a few lines down) - a trio that's usually
+        one-shot-cleared within its own rolling spin never reaches that
+        step at all, so Dam's escalation would have nothing to act on
+        without also escalating HP to make the trio survive past spin 1
+        more often as loops accumulate. `self.stage` stays pinned at 6
+        throughout (so the reel/reward-drop pool used stays stage 6's),
+        only `self.stage6_loop_count` advances.
+
+        This endless tail is per-tier gated via
+        `config.stage6_endless_tiers` (see the config comment for the
+        measured detail)."""
+        self.in_bonus = True
+        self.bonus_tier = tier
+        self.gametype = self.config.freegame_type
+        both_ways = self.config.bonus_both_ways[tier]
+
+        granted = random.choice(self.config.bonus_player_hp_choices[tier])
+        if self.config.use_flat_damage.get(tier, False):
+            granted = granted * self.config.flat_damage_player_hp_initial_mult.get(tier, 1.0)
+        self.player_hp = float(granted)
+        self.player_hp_max = float(granted)
+        self.booster_pending_for_next_spin = False
+        self.booster_multiplier_current_spin = 1.0
+        self.stage6_loop_count = 0
+        self.bonus_kill_count = 0
+
+        start_stage = self.config.bonus_start_stage[tier]
+        self.reset_boss_battle(start_stage=start_stage)
+        # Global Multi (and the FIFO queue, though that's always empty
+        # between spins by construction anyway) reset ONCE here for the
+        # whole session - persisted across every one of this session's own
+        # internal spins, per spec ("giu nguyen HP boss va Global Multi").
+        self.reset_power_system()
+
+        bonus_trigger_event(self, tier, self.player_hp, self.player_hp_max, start_stage)
+        player_hp_state_event(self)
+        boss_state_event(self)
+
+        spin_count = 0
+        end_reason = "safety_cap"
+        while self.player_hp > 0 and spin_count < self.config.bonus_safety_cap_spins:
+            spin_count += 1
+            # Booster's x2/x3-boss-damage flag (set at the END of the
+            # PREVIOUS spin, if a Booster was collected there) applies for
+            # this entire spin, then is consumed (never stacks further) -
+            # see game_config.py's booster_damage_multiplier docstring.
+            # Tier-scoped (2026-08-28) - `self.bonus_tier` is always set by
+            # this point (line ~324 above), Booster only ever exists during
+            # an active Bonus session, so no "default" fallback is needed
+            # here (unlike power_multi_factor_weights, which also has to
+            # cover base-game combat).
+            self.booster_multiplier_current_spin = (
+                self.config.booster_damage_multiplier[self.bonus_tier] if self.booster_pending_for_next_spin else 1.0
+            )
+            self.booster_pending_for_next_spin = False
+
+            bonus_spin_start_event(self, spin_count)
+            self.run_one_bonus_spin(both_ways)
+
+            # --- Rescue roll (2026-09-04, per-spin safety net - see
+            # game_config.bonus_rescue_roll's docstring for the full
+            # design/validation history). `.get()` returns None for any tier
+            # not in the config dict, so this is a no-op unless configured.
+            rescue_cfg = self.config.bonus_rescue_roll.get(tier)
+            if (
+                rescue_cfg is not None
+                and self.win_manager.running_bet_win < rescue_cfg["floor"]
+                and random.random() < rescue_cfg["trigger_prob"]
+            ):
+                current = self.win_manager.running_bet_win
+                topup = round(
+                    random.uniform(max(0.0, rescue_cfg["floor"] - current), rescue_cfg["band_high"] - current), 2
+                )
+                # Same reset/award/file bracket as the finishing blow below -
+                # run_one_bonus_spin already filed ITS OWN spin_win into
+                # freegame_wins at its own end (line ~293), so award_win here
+                # would otherwise add to a spin_win that never gets filed,
+                # reaching running_bet_win but not the basegame/freegame
+                # split (see the finishing-blow comment further down for the
+                # exact assertion failure this causes if skipped).
+                self.win_manager.reset_spin_win()
+                self.award_win(topup)
+                self.win_manager.update_gametype_wins(self.gametype)
+
+            if self.wincap_triggered:
+                end_reason = "wincap"
+                break
+            if not self.boss_system_active:
+                if not self.config.stage6_endless_tiers.get(tier, False):
+                    # This tier is excluded from the endless tail (see
+                    # stage6_endless_tiers in game_config.py) - stage 6
+                    # clearing ends the session, same as the original
+                    # "stop the session the instant stage 6 clears"
+                    # behavior.
+                    end_reason = "stage_cleared"
+                    break
+                # Stage 6 just cleared (clear_stage already granted its
+                # +50/+50 HP and paid the stage-6 reward-drop) - endless
+                # tail: re-roll a fresh stage-6 trio, scale Dam AND HP up
+                # for this next loop, and keep going instead of ending the
+                # session.
+                #
+                # BUG FOUND (measurement, not assumption): escalating only
+                # Dam did almost nothing for a strong-damage tier like
+                # Hidden - the counter-attack damage step below only runs
+                # if the freshly-rolled trio is STILL ALIVE at the end of
+                # this spin (see the `continue` above, which skips it
+                # entirely the instant `boss_system_active` goes False
+                # again). For Hidden, a fresh stage-6 trio is usually
+                # one-shot-cleared within the SAME spin it's rolled
+                # (measured: ~1.17 spins/loop at low escalation), so the
+                # damage step - and therefore Dam's escalation multiplier -
+                # never even gets a chance to apply on most loops,
+                # regardless of how extreme the multiplier is. Escalating
+                # HP too forces the trio to actually survive past the first
+                # spin more often as loops accumulate, so the damage step
+                # (and Dam's escalation) actually fires with meaningful
+                # frequency instead of being skipped almost every time.
+                self.stage6_loop_count += 1
+                self.boss_system_active = True
+                self.roll_stage_bosses(6)
+                escalation = self.config.stage6_dam_escalation[tier] ** self.stage6_loop_count
+                self.boss_dam = {b: v * escalation for b, v in self.boss_dam.items()}
+                self.boss_hp = {b: v * escalation for b, v in self.boss_hp.items()}
+                self.boss_hp_max = {b: v * escalation for b, v in self.boss_hp_max.items()}
+                # Same counter-attack grace as an ordinary clear_stage
+                # transition (see game_executables.clear_stage) - this
+                # re-roll doesn't go through clear_stage, so it needs its
+                # own grant. Per game designer: every endless-tail loop
+                # gets its own 1-static-state grace, same as a real stage
+                # transition.
+                self.boss_counterattack_grace = True
+                # See game_executables.reset_boss_battle's comment: targets
+                # the NEXT spin's opening board draw, not this one.
+                self.grace_deadspin_pending = True
+                boss_state_event(self)
+                continue
+
+            if self.boss_counterattack_grace:
+                # This trio's first static state since it was rolled - no
+                # counter-attack this spin, consumed once.
+                self.boss_counterattack_grace = False
+                total_damage = 0.0
+            elif self.config.use_flat_damage.get(tier, False):
+                total_damage = sum(
+                    self.config.flat_boss_counterattack_damage for b in self.config.boss_ids if self.boss_alive[b]
+                )
+                self.player_hp -= total_damage
+            else:
+                total_damage = sum(self.boss_dam[b] for b in self.config.boss_ids if self.boss_alive[b])
+                self.player_hp -= total_damage
+            bonus_counterattack_event(self, total_damage, self.player_hp)
+            player_hp_state_event(self)
+            if self.player_hp <= 0:
+                end_reason = "hp_depleted"
+                break
+
+        self.bonus_spin_count = spin_count
+        self.bonus_end_reason = end_reason
+
+        # --- Finishing blow (2026-09-02, per game designer: "0-10x ~ 0%") ---
+        # A session that defeats NO boss never calls roll_reward_drop at all,
+        # so the tier's reward table - the only thing tuning can reach - cannot
+        # touch it. Its payout is line pay alone, which always lands under 5x.
+        # Measured on production config (_tuning_scratch/zerokill_why.py,
+        # n=4000/tier): 21.6% of Normal, 28.2% of Super and 4.0% of Hidden
+        # sessions end this way. Since the lowest reward tier is 12x (Super) /
+        # 42x (Hidden), ANY session with >=1 kill automatically clears 10x, so
+        # the whole "0-10x ~ 0%" requirement reduces to: never end a session
+        # with 0 kills.
+        #
+        # WHY A GUARANTEE AND NOT A BUFF. The same measurement showed the
+        # zero-kill group already deals 172-187% of the easiest boss's HP -
+        # they out-damage a kill and still get none, because damage is split
+        # three ways by the column->boss routing (boss_primary_zone /
+        # boss_fallback_zone). So the finishing blow is not charity: it lets
+        # the last hit land on the boss the player had almost killed. Two
+        # buff-shaped alternatives were measured and rejected:
+        #   Both Ways for Super  -> zero-kill 28.2% to 0.40%, but mean 19.2x
+        #     target and line pay ALONE 3271x against a 240.77x budget. Both
+        #     Ways doubles session length AND quadruples per-spin damage, so
+        #     it compounds to x8.2 damage / x14 line pay. Line pay cannot be
+        #     lowered by the reward table (it is the floor of the mean, see
+        #     _tuning_scratch/decompose.py), so this is unreachable.
+        #   Hidden HP floor 414->724 -> zero-kill 4.0% to 0.93%, mean 1.21x
+        #     target; correctable by cutting C 21%, but that spends 21% of the
+        #     reward budget to buy 3.5 points, versus 0.38% for this.
+        # A buff only SHIFTS a probability; "~0%" requires a guarantee.
+        #
+        # Implemented as a plain on_boss_defeated call so it reuses every
+        # existing path: the tier's own table (in_bonus is still True here -
+        # rolling after run_bonus_session returns would silently fall through
+        # to the SHARED table, whose 1x/2x/3x tiers leave the session under 5x
+        # anyway; that exact bug was measured once already), the ordinary
+        # (non-stage-6-chest) pool, award_win's wincap headroom guard, record()
+        # and boss_defeated_event - so the frontend needs no new event type.
+        #
+        # `is_last_of_stage` evaluates False inside on_boss_defeated because
+        # stage_defeat_order is empty here, so this never triggers clear_stage
+        # and never reaches the stage-6 chest or Maxwin pools. pruned_tiers is
+        # likewise empty (reset_boss_battle clears it per session and only
+        # clear_stage populates it, which needs 3 kills).
+        #
+        # DO NOT rewrite the guard as `not self.stage_defeat_order`:
+        # clear_stage resets that list, so a session that killed exactly 3
+        # bosses and advanced a stage would read as zero-kill and get a free
+        # reward. The dedicated counter is the reason it exists.
+        #
+        # Validated: Super 4 seeds x 20,000 and Hidden 4 seeds x 20,000 on the
+        # live tables (_tuning_scratch/consolation_test.py, which patches this
+        # exact call site), plus 160,000 sessions per tier inside the two-
+        # cluster validation. 0-10x and =0x both land at 0.0000% on every seed.
+        # Cost to the mean: +3.1% of target for Super, +0.38% for Hidden, both
+        # already absorbed into the C values in game_config.py.
+        if self.bonus_kill_count == 0 and end_reason != "wincap":
+            alive = [b for b in self.config.boss_ids if self.boss_alive[b]]
+            if alive:
+                # This award happens AFTER the last run_one_bonus_spin has
+                # already closed its books, so it needs its own open/close
+                # bracket - the same pair that method uses. award_win only
+                # feeds win_manager.spin_win / running_bet_win; it is
+                # update_gametype_wins that files the amount under
+                # freegame_wins. Without this bracket the money reaches
+                # running_bet_win but no gametype column, and
+                # src.state.state.update_final_win's
+                # "Base + Free game payout mismatch!" assertion kills the
+                # worker thread mid-run (the pipeline then dies further
+                # downstream with a confusing missing-books FileNotFoundError).
+                # reset_spin_win MUST come first: the final spin's own
+                # spin_win is still sitting there and has already been filed,
+                # so closing without resetting would count it twice.
+                #
+                # Every scratch harness missed this because they all read
+                # running_bet_win, which was correct throughout - only the
+                # basegame/freegame SPLIT was broken, and that is only checked
+                # when a real book is written.
+                self.win_manager.reset_spin_win()
+                # The boss the player came closest to killing.
+                self.on_boss_defeated(min(alive, key=lambda b: self.boss_hp[b]))
+                # self.gametype is still freegame_type here - it is reset to
+                # basegame_type at the very end of this method.
+                self.win_manager.update_gametype_wins(self.gametype)
+
+        bonus_end_event(self, tier, spin_count, self.player_hp, end_reason)
+
+        self.in_bonus = False
+        self.gametype = self.config.basegame_type
