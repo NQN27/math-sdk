@@ -332,7 +332,12 @@ class GameBonus(GameExecutables):
 
         granted = random.choice(self.config.bonus_player_hp_choices[tier])
         if self.config.use_flat_damage.get(tier, False):
-            granted = granted * self.config.flat_damage_player_hp_initial_mult.get(tier, 1.0)
+            # Flat-damage system's damage values (flat_symbol_damage,
+            # flat_wild_damage, flat_boss_counterattack_damage) are all
+            # small whole integers - Player HP must stay an integer too,
+            # not a stray decimal from multiplying by a fractional rescale
+            # factor (e.g. 200*0.026=5.2).
+            granted = round(granted * self.config.flat_damage_player_hp_initial_mult.get(tier, 1.0))
         self.player_hp = float(granted)
         self.player_hp_max = float(granted)
         self.booster_pending_for_next_spin = False

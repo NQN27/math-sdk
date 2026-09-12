@@ -306,9 +306,9 @@ class GameConfig(Config):
         # ballooned to ~488 spins/session and 100% ended at stage 6 (never
         # actually clearing it) before this multiplier existed.
         # 0.113 = 1/8.86, i.e. shrink boss HP by the same ratio damage output
-        # shrank by, to preserve roughly the same spins-to-kill. NOT YET
-        # RE-VALIDATED at this value - still needs its own measurement pass
-        # before trusting the resulting stage-death%/mean.
+        # shrank by, to preserve roughly the same spins-to-kill. RE-VALIDATED
+        # 2026-09-13 as part of the player-HP rescale below - kept at 0.113
+        # unchanged (only the player-side multipliers needed fixing).
         self.flat_damage_boss_hp_mult = {"normal": 0.113, "super": 1.0, "hidden": 1.0}
         # Same idea, player-side: counterattack dropped from an old average
         # base Dam of ~38.65/boss (mean of boss_stage_table's Dam column
@@ -329,11 +329,44 @@ class GameConfig(Config):
         # cleared" compounds into that kind of cliff; splitting them lets
         # each be tuned independently and should smooth the response.
         # Applied as a multiplier on whichever choice bonus_player_hp_choices
-        # rolls / on the flat 50 stage-clear bonus, not a replacement value.
-        # NEITHER re-validated yet at these starting numbers - still needs
-        # its own measurement pass.
-        self.flat_damage_player_hp_initial_mult = {"normal": 0.08, "super": 1.0, "hidden": 1.0}
-        self.flat_damage_player_hp_bonus_mult = {"normal": 0.08, "super": 1.0, "hidden": 1.0}
+        # rolls / on the flat 50 stage-clear bonus, not a replacement value -
+        # the result is ROUNDED to a whole integer (game_bonus.py/
+        # game_executables.py) since every other flat-damage value
+        # (flat_symbol_damage, flat_wild_damage, flat_boss_counterattack_damage)
+        # is a small whole integer too; a fractional HP value would be an
+        # inconsistent unit.
+        #
+        # RESCALED AND MEASURED 2026-09-13 (was un-validated 0.08/0.08,
+        # which gave mean=1087x against the ~85-90x target - over 12x too
+        # high). Grid-searched the actual integer (initial HP, per-stage
+        # bonus HP) pairs directly with boss_hp_mult held at the validated
+        # 0.113 (n=5000-15000 per candidate, Normal Bonus,
+        # `_tuning_scratch/flat_damage_sweep3.py`) rather than guessing a
+        # multiplier and hoping it rounds well - confirmed the same
+        # near-discontinuous-threshold behavior noted above is really a
+        # staircase over the ROUNDED INTEGER HP values, most sensitive to
+        # the per-stage bonus (it compounds across every stage cleared in a
+        # session): (9,2)=34.71x, (10,2)=48.79x, (9,3)=54.66x, (11,2)=66.57x,
+        # (10,3)=88.92x, (12,2)=105.09x, (11,3)=130.33x - (10,3) landed
+        # closest to target. CONFIRMED at n=15000: mean=86.41x (inside the
+        # ~85-90 target band), stage-death% 55.6/32.0/8.4/2.0/0.4/1.6 (a
+        # smooth monotonic decay, no weird bimodality).
+        # Mult values below are exact (10/200 and 3/50) so the rounding is a
+        # no-op at these specific settings - not a coincidence, chosen this
+        # way on purpose so the config value IS the integer HP, not an
+        # approximation of it.
+        # STILL OPEN: this only matches the OLD system's overall MEAN, not
+        # its percentile SHAPE - measured median/mean ratio here is 30.8%
+        # (p50=26.6/p75=48.8/p90=93.4/p95=166.2/p99=2282.1), noticeably more
+        # tail-skewed than the random-damage system's own target shape
+        # (~37-42% ratio). reward_drop_weights_normal_bonus is completely
+        # unchanged by this pass - matching the OLD system's percentile
+        # shape under flat damage (if wanted) would need its own dedicated
+        # reward-table retune under this mechanic, the same conclusion
+        # in-place-tumble's TOWORK.md item already reached for a different
+        # mechanic change.
+        self.flat_damage_player_hp_initial_mult = {"normal": 10 / 200, "super": 1.0, "hidden": 1.0}
+        self.flat_damage_player_hp_bonus_mult = {"normal": 3 / 50, "super": 1.0, "hidden": 1.0}
 
         # --- 15 paylines across 5 rows (0=top .. 4=bottom) -------------------
         # Own design (not specified beyond "15 lines, continuous left-to-

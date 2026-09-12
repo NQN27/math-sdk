@@ -93,18 +93,37 @@ backend state produces byte-identical output to what's committed).
       counter-attack damage, initial Player HP grant, and the +50
       stage-clear HP bonus (all three in `game_bonus.py` ->
       `flat_boss_counterattack_damage`/`flat_damage_player_hp_initial_mult`/
-      `flat_damage_player_hp_bonus_mult`). Smoke-tested (200 Normal Bonus
-      sessions, `use_flat_damage["normal"]=True`, zero crashes) - but
-      **numerically NOT re-validated**: current multipliers
-      (`flat_damage_boss_hp_mult["normal"]=0.113`,
-      `flat_damage_player_hp_initial_mult`/`_bonus_mult["normal"]=0.08`)
-      were derived from a single n=30 sanity run and give mean=1087x
-      against Normal's ~85-90x target - **over 12x too high**, confirmed by
-      re-running it directly. Unlike in-place-tumble (measured, decided,
-      forked out), this one is mid-development, not at a decision point yet
-      - needs its own HP-rescale measurement pass (both multipliers) before
-      it's even ready to evaluate, let alone adopt or fork out. Scratch:
-      `_tuning_scratch/flat_damage_measure.py`, `flat_damage_trace.py`.
+      `flat_damage_player_hp_bonus_mult`).
+      **HP RESCALED AND MEASURED 2026-09-13** - was mean=1087x (over 12x too
+      high) at the original un-validated 0.08/0.08 multipliers. Also fixed a
+      real bug found along the way: the player-HP grant/bonus were never
+      rounded to an integer, inconsistent with every other flat-damage value
+      (`flat_symbol_damage`/`flat_wild_damage`/`flat_boss_counterattack_damage`
+      are all small whole integers) - both call sites now `round()` the
+      result. Grid-searched the actual integer (initial HP, per-stage bonus
+      HP) pairs directly (boss_hp_mult held at the already-derived 0.113):
+      (9,2)=34.71x, (10,2)=48.79x, (9,3)=54.66x, (11,2)=66.57x,
+      **(10,3)=88.92x**, (12,2)=105.09x, (11,3)=130.33x - confirms the
+      documented cliff is really a staircase over rounded integer HP,
+      dominated by the per-stage bonus (it compounds every stage cleared).
+      (10,3) applied to production, CONFIRMED at n=15000: mean=86.41x
+      (inside the ~85-90 target band), stage-death% 55.6/32.0/8.4/2.0/0.4/1.6
+      (smooth monotonic decay). `flat_damage_player_hp_initial_mult["normal"]`/
+      `_bonus_mult["normal"]` are now `10/200`/`3/50` exactly (not
+      approximations - chosen so rounding is a no-op).
+      **Still open**: this matches the OLD system's MEAN only, not its
+      percentile SHAPE - measured ratio here is median/mean=30.8%
+      (p50=26.6/p75=48.8/p90=93.4/p95=166.2/p99=2282.1), more tail-skewed
+      than the ~37-42% ratio the random-damage system targets.
+      `reward_drop_weights_normal_bonus` is untouched by this pass - getting
+      the OLD system's percentile shape under flat damage too would need
+      its own dedicated reward-table retune, same conclusion in-place-tumble
+      already reached for a different mechanic change. Once that's decided,
+      this is at the same kind of decision point in-place-tumble reached
+      (adopt via a dedicated retune, or leave shelved) - not there yet
+      before this measurement pass, is now. Scratch:
+      `_tuning_scratch/flat_damage_measure.py`, `flat_damage_trace.py`,
+      `flat_damage_sweep.py`/`flat_damage_sweep2.py`/`flat_damage_sweep3.py`.
 
 - [ ] **RTP optimizer doesn't hit target when 2+ non-identity fences coexist**
       (Phase 3, `math-sdk`). Base mode measures ~0.6071 RTP vs the 0.967

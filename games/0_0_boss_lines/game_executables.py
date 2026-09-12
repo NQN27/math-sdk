@@ -567,7 +567,9 @@ class GameExecutables(GameCalculations):
             tier = getattr(self, "bonus_tier", None)
             hp_bonus = 50.0
             if tier and self.config.use_flat_damage.get(tier, False):
-                hp_bonus *= self.config.flat_damage_player_hp_bonus_mult.get(tier, 1.0)
+                # Same integer-HP reasoning as the initial grant in
+                # game_bonus.run_bonus_session.
+                hp_bonus = round(hp_bonus * self.config.flat_damage_player_hp_bonus_mult.get(tier, 1.0))
             self.player_hp += hp_bonus
             self.player_hp_max += hp_bonus
             player_hp_state_event(self)
