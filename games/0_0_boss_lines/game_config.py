@@ -225,29 +225,32 @@ class GameConfig(Config):
         # to the nearest valid increment: 0.15 -> 0.2, 0.75 -> 0.8 (0.3 already
         # valid, unchanged). Every other symbol's spec values already land on a
         # $0.10 increment. See readme.txt.
-        # RESCALED 2026-09-13 (x1.3 of the original spec values below) as
-        # part of rebalancing Normal Bonus's line-pay vs reward-drop split
-        # under the flat-damage system - measured line-pay was only ~22-27%
-        # of total payout (vs reward-drop's ~73-78%), and per user request
-        # this ratio needed shifting toward line-pay rather than leaving
-        # reward-drop dominant. This is a GAME-WIDE table (shared by every
-        # bet mode and all 3 Bonus tiers, not Normal-specific) - per explicit
-        # go-ahead, since base/ante/Ultimate Power/God Mode/buy3/buy4/Super/
-        # Hidden haven't had their own post-rescale re-verification pass yet
-        # and are being treated as "not yet redone, will be redone later" for
-        # this build. Original spec values (pre-x1.3): L1=0.1/0.2/0.5,
-        # L2=0.2/0.3/0.8, L3=0.2/0.4/1.0, L4=0.3/0.6/1.5, L5=0.5/1.0/2.5,
-        # H1=1.0/2.0/5.0, H2=1.5/4.0/10.0, H3=2.0/6.0/15.0, H4=3.0/8.0/20.0.
+        # RESCALED 2026-09-13 (x1.3 of the original spec values below,
+        # rounded to the nearest 0.05 for clean numbers - the raw x1.3
+        # product had 2-decimal odd values like 0.13/0.26/0.39/1.04, per
+        # user request to avoid that) as part of rebalancing Normal Bonus's
+        # line-pay vs reward-drop split under the flat-damage system -
+        # measured line-pay was only ~22-27% of total payout (vs
+        # reward-drop's ~73-78%), and per user request this ratio needed
+        # shifting toward line-pay rather than leaving reward-drop dominant.
+        # This is a GAME-WIDE table (shared by every bet mode and all 3
+        # Bonus tiers, not Normal-specific) - per explicit go-ahead, since
+        # base/ante/Ultimate Power/God Mode/buy3/buy4/Super/Hidden haven't
+        # had their own post-rescale re-verification pass yet and are being
+        # treated as "not yet redone, will be redone later" for this build.
+        # Original spec values (pre-x1.3): L1=0.1/0.2/0.5, L2=0.2/0.3/0.8,
+        # L3=0.2/0.4/1.0, L4=0.3/0.6/1.5, L5=0.5/1.0/2.5, H1=1.0/2.0/5.0,
+        # H2=1.5/4.0/10.0, H3=2.0/6.0/15.0, H4=3.0/8.0/20.0.
         self.paytable = {
-            (3, "L1"): 0.13, (4, "L1"): 0.26, (5, "L1"): 0.65,
-            (3, "L2"): 0.26, (4, "L2"): 0.39, (5, "L2"): 1.04,
-            (3, "L3"): 0.26, (4, "L3"): 0.52, (5, "L3"): 1.3,
-            (3, "L4"): 0.39, (4, "L4"): 0.78, (5, "L4"): 1.95,
-            (3, "L5"): 0.65, (4, "L5"): 1.3, (5, "L5"): 3.25,
-            (3, "H1"): 1.3, (4, "H1"): 2.6, (5, "H1"): 6.5,
-            (3, "H2"): 1.95, (4, "H2"): 5.2, (5, "H2"): 13.0,
-            (3, "H3"): 2.6, (4, "H3"): 7.8, (5, "H3"): 19.5,
-            (3, "H4"): 3.9, (4, "H4"): 10.4, (5, "H4"): 26.0,
+            (3, "L1"): 0.15, (4, "L1"): 0.25, (5, "L1"): 0.65,
+            (3, "L2"): 0.25, (4, "L2"): 0.40, (5, "L2"): 1.05,
+            (3, "L3"): 0.25, (4, "L3"): 0.50, (5, "L3"): 1.30,
+            (3, "L4"): 0.40, (4, "L4"): 0.80, (5, "L4"): 1.95,
+            (3, "L5"): 0.65, (4, "L5"): 1.30, (5, "L5"): 3.25,
+            (3, "H1"): 1.30, (4, "H1"): 2.60, (5, "H1"): 6.50,
+            (3, "H2"): 1.95, (4, "H2"): 5.20, (5, "H2"): 13.00,
+            (3, "H3"): 2.60, (4, "H3"): 7.80, (5, "H3"): 19.50,
+            (3, "H4"): 3.90, (4, "H4"): 10.40, (5, "H4"): 26.00,
         }
         # No (kind, "W") entries: Wild never lands on reel/column 0 (see the
         # reel CSVs), so Lines.get_lines's wild-anchored-run branch (which only
