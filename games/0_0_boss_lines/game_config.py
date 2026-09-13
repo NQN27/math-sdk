@@ -306,10 +306,45 @@ class GameConfig(Config):
         # ballooned to ~488 spins/session and 100% ended at stage 6 (never
         # actually clearing it) before this multiplier existed.
         # 0.113 = 1/8.86, i.e. shrink boss HP by the same ratio damage output
-        # shrank by, to preserve roughly the same spins-to-kill. RE-VALIDATED
-        # 2026-09-13 as part of the player-HP rescale below - kept at 0.113
-        # unchanged (only the player-side multipliers needed fixing).
-        self.flat_damage_boss_hp_mult = {"normal": 0.113, "super": 1.0, "hidden": 1.0}
+        # shrank by, to preserve roughly the same spins-to-kill.
+        #
+        # PER-STAGE OVERRIDE (2026-09-13): this value can now be a plain
+        # float (applies to every stage, as originally) OR a dict keyed by
+        # stage (game_executables.roll_stage_bosses looks up `.get(stage,
+        # 1.0)` when it's a dict) - lets one tier's stage-by-stage survival
+        # funnel be reshaped without touching the shared boss_stage_table.
+        # Added because the flat 0.113-everywhere baseline's measured
+        # stage-death% (s1=54.9/s2=32.5/s3=9.1/s4=2.1/s5=0.2/s6=1.3, n=1500)
+        # was badly front-loaded against the game designer's target
+        # (s1=38.30/s2=32.70/s3=16.45/s4=7.40/s5=3.60/s6<=5, see the
+        # Controlled Deadspin Routing section above for where that target
+        # comes from) - too many sessions dying at stage 1 instead of
+        # spreading across s3-s5.
+        # Eased stages 1-2 only (0.113 -> 0.105, ~7% easier) to let more
+        # sessions survive past the earliest stages - CONFIRMED this moves
+        # in the right direction (n=800: err vs target 36.6->28.0; s2 lands
+        # almost exactly on target) but does NOT fully close the gap: s3-s5
+        # are still meaningfully under target (measured ~10-11/2.7-3.1/
+        # 0.2-0.4 vs target 16.45/7.4/3.6) even after this change, and mean
+        # is noisy/elevated at this setting (93.08x at n=800, 109.95x at
+        # n=5000 - both above the ~85-90x mean target the OLD random-damage
+        # system was tuned to, and NOT tightly converged between sample
+        # sizes). A "little" adjustment here measurably improves the shape
+        # but does not fully solve it - fully matching the designer's exact
+        # profile needs either further per-stage iteration on s3-s6 too (own
+        # cliff-sensitivity risk - some candidates tested took >100s per
+        # n=800 batch and had to be abandoned) or the previously-scoped but
+        # never-built bonus_stage_deadspin_chance/bonus_stage_connect_chance
+        # levers (still empty dicts, see the Controlled Deadspin Routing
+        # section), or a dedicated reward-table retune to also bring mean
+        # back down once the funnel shape is right. NOT further iterated
+        # past this point - see TOWORK.md for the open item.
+        # Scratch: _tuning_scratch/flat_damage_stage_sweep.py.
+        self.flat_damage_boss_hp_mult = {
+            "normal": {1: 0.105, 2: 0.105, 3: 0.113, 4: 0.113, 5: 0.113, 6: 0.113},
+            "super": 1.0,
+            "hidden": 1.0,
+        }
         # Same idea, player-side: counterattack dropped from an old average
         # base Dam of ~38.65/boss (mean of boss_stage_table's Dam column
         # across all 6 stages: 21.3,25.3,30.3,38.3,50,66.7) down to a flat 1,

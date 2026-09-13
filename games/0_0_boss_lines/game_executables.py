@@ -318,11 +318,15 @@ class GameExecutables(GameCalculations):
         base = self.config.boss_stage_table[stage]
         lo, hi = self.config.boss_variance_range
         tier = getattr(self, "bonus_tier", None)
-        hp_mult = (
-            self.config.flat_damage_boss_hp_mult.get(tier, 1.0)
-            if tier and self.config.use_flat_damage.get(tier, False)
-            else 1.0
-        )
+        if tier and self.config.use_flat_damage.get(tier, False):
+            tier_mult = self.config.flat_damage_boss_hp_mult.get(tier, 1.0)
+            # Per-stage override (dict keyed by stage) lets one tier's
+            # funnel be reshaped stage-by-stage without touching the shared
+            # boss_stage_table itself - falls back to the tier's flat scalar
+            # for any stage not explicitly listed.
+            hp_mult = tier_mult.get(stage, 1.0) if isinstance(tier_mult, dict) else tier_mult
+        else:
+            hp_mult = 1.0
         hp, dam = {}, {}
         for _ in range(self.config.boss_hp_reroll_attempts):
             for b in self.config.boss_ids:

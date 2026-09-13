@@ -125,6 +125,42 @@ backend state produces byte-identical output to what's committed).
       `_tuning_scratch/flat_damage_measure.py`, `flat_damage_trace.py`,
       `flat_damage_sweep.py`/`flat_damage_sweep2.py`/`flat_damage_sweep3.py`.
 
+      **DISCOVERED 2026-09-13 while auditing every Normal parameter**: this
+      whole (10,3) rescale only targeted MEAN. A separate, earlier, more
+      detailed effort (see the Controlled Deadspin Routing section's
+      `bonus_stage_deadspin_chance`/`bonus_stage_connect_chance` comments)
+      had already established a game-designer stage-death% TARGET for this
+      system - s1=38.30/s2=32.70/s3=16.45/s4=7.40/s5=3.60/s6<=5 - and a
+      prior candidate (initial_mult=0.060/bonus_mult=0.04, never actually
+      applied to production) that hit s1/s6 but overshot s2 and undershot
+      s3-s5. (10,3)'s own measured funnel (55.6/32.0/8.4/2.0/0.4/1.6) is
+      MORE front-loaded at s1 than even that prior candidate - the mean-only
+      grid search had no visibility into this target.
+      **Boss-side lever added and tried, per explicit go-ahead ("sua
+      distribution cua boss mot chut de hop config")**: `flat_damage_boss_hp_mult`
+      now accepts a per-stage dict (game_executables.roll_stage_bosses reads
+      `.get(stage, 1.0)`), not just a flat scalar - lets one tier's funnel
+      be reshaped stage-by-stage without touching the shared
+      `boss_stage_table`. Eased stages 1-2 only, 0.113->0.105 (~7% easier).
+      CONFIRMED this moves the right direction (n=800: shape-error vs
+      target 36.6->28.0, s2 lands almost exactly on target) but does NOT
+      fully close the gap - s3-s5 stay meaningfully under target
+      (~10-11/2.7-3.1/0.2-0.4 vs 16.45/7.4/3.6) and mean is noisy/elevated
+      at this setting (93.08x at n=800, 109.95x at n=5000 - both above the
+      ~85-90x band, not tightly converged between sample sizes either).
+      **Not iterated further past this point** - some more aggressive
+      per-stage candidates tried during this pass (e.g. easing stage 1 down
+      to 0.07-0.095) took over 90-100 seconds for even n=800/1500 and had to
+      be abandoned, confirming this system's documented cliff-sensitivity
+      extends to the boss side too, not just player HP.
+      **Needs a decision**: keep iterating stage-by-stage (own real time
+      cost per the abandoned candidates above), populate the still-empty
+      `bonus_stage_deadspin_chance`/`bonus_stage_connect_chance` levers
+      instead (the mechanism this was originally built for, per the
+      Controlled Deadspin Routing comments), or accept (10,3) + this modest
+      s1/s2 ease as "improved but not exact" and move on. Scratch:
+      `_tuning_scratch/flat_damage_stage_sweep.py`.
+
 - [ ] **RTP optimizer doesn't hit target when 2+ non-identity fences coexist**
       (Phase 3, `math-sdk`). Base mode measures ~0.6071 RTP vs the 0.967
       target whenever the `freegame` fence is present alongside `basegame`
