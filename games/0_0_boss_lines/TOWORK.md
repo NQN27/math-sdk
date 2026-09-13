@@ -159,7 +159,55 @@ backend state produces byte-identical output to what's committed).
       instead (the mechanism this was originally built for, per the
       Controlled Deadspin Routing comments), or accept (10,3) + this modest
       s1/s2 ease as "improved but not exact" and move on. Scratch:
-      `_tuning_scratch/flat_damage_stage_sweep.py`.
+      `_tuning_scratch/flat_damage_stage_sweep.py`. Stage-death funnel is
+      STILL front-loaded as of the line-pay/reward-drop rebalance below
+      (unchanged by that pass - it doesn't touch HP/boss config at all).
+
+      **LINE-PAY / REWARD-DROP REBALANCE 2026-09-13, per explicit request**
+      ("sua lai giua ti le payout cua line vs boss"). Measured split first
+      (`_tuning_scratch/payout_component_split_normal_flatdamage.py`,
+      n=3000-5000): flat-damage's line-pay was only 22.2% of total
+      (23.60x), reward-drop 77.8% (82.53x) - production/cascade's own split
+      is 27.4%/72.6% for comparison, so flat-damage was already MORE
+      reward-drop-skewed than the system it's supposed to reproduce.
+      Isolated-effect test first: doubling `self.paytable` alone barely
+      moved p99 (3094->2923x) - confirms line-pay isn't what drives the
+      tail, only mean/median scale with it.
+      **`self.paytable` rescaled x1.3 - this is GAME-WIDE (shared by every
+      bet mode and Super/Hidden Bonus too), done anyway per explicit
+      go-ahead since those haven't had their own post-rescale
+      re-verification pass yet and are being treated as "not yet redone,
+      will be redone later" for this build - do not assume base/ante/
+      Ultimate Power/God Mode/buy3/buy4/Super/Hidden's previously-recorded
+      RTP/volatility numbers in this file are still accurate until they get
+      their own fresh measurement pass.**
+      Reward-drop's high tiers cut alongside it: 300/350/600/1000 weights
+      -40% further (on top of iteration 9's cut), and the chest tiers'
+      VALUES reduced (400/500/800/1500/2500/4000 -> 275/425/675/950/1100/
+      1500, weights unchanged) - value cuts were needed, not just weight
+      cuts, since a weight-only test (same 6 weights x0.55, values
+      unchanged) left p99 at 3210, essentially unmoved - cutting weight
+      only relocates a large-VALUE tail to a higher percentile, it doesn't
+      shrink the tail's dollar size. Hit a real bug picking the first
+      replacement values (250/350/1000 collided with EXISTING regular-tier
+      keys, silently overwritten via dict `.update()` - caught before
+      applying, redone with values that don't collide with any of this
+      table's other 29 keys, asserted in the measurement harness so it
+      can't recur silently).
+      CONFIRMED at n=20000: mean=95.28x (close to the ~90 ceiling), p50-p95
+      track target closely (33.31/61.36/88.49/207.61 vs targets
+      37.5/80/140/350 - now sometimes under rather than over), p99
+      1967.43x (down from 3210x pre-rebalance, still ~2.5x over the
+      800-1000 target - improved, not fully closed), p99.5=2186.44 (close
+      to 2500 target), p99.9=2587.73 (under the 5000+ target). Stage-death
+      funnel unchanged by this pass (still front-loaded, see above - this
+      rebalance only touched paytable/reward-drop, not HP/boss config).
+      **Still open**: p99 not fully closed (own further iteration needed,
+      same cliff-sensitivity risk as every other lever here), and the
+      game-wide paytable change means base/ante/Ultimate Power/God Mode/
+      buy3/buy4/Super/Hidden all need their own fresh RTP/volatility
+      measurement before any of their previously-recorded numbers in this
+      file can be trusted again.
 
 - [ ] **RTP optimizer doesn't hit target when 2+ non-identity fences coexist**
       (Phase 3, `math-sdk`). Base mode measures ~0.6071 RTP vs the 0.967

@@ -225,16 +225,29 @@ class GameConfig(Config):
         # to the nearest valid increment: 0.15 -> 0.2, 0.75 -> 0.8 (0.3 already
         # valid, unchanged). Every other symbol's spec values already land on a
         # $0.10 increment. See readme.txt.
+        # RESCALED 2026-09-13 (x1.3 of the original spec values below) as
+        # part of rebalancing Normal Bonus's line-pay vs reward-drop split
+        # under the flat-damage system - measured line-pay was only ~22-27%
+        # of total payout (vs reward-drop's ~73-78%), and per user request
+        # this ratio needed shifting toward line-pay rather than leaving
+        # reward-drop dominant. This is a GAME-WIDE table (shared by every
+        # bet mode and all 3 Bonus tiers, not Normal-specific) - per explicit
+        # go-ahead, since base/ante/Ultimate Power/God Mode/buy3/buy4/Super/
+        # Hidden haven't had their own post-rescale re-verification pass yet
+        # and are being treated as "not yet redone, will be redone later" for
+        # this build. Original spec values (pre-x1.3): L1=0.1/0.2/0.5,
+        # L2=0.2/0.3/0.8, L3=0.2/0.4/1.0, L4=0.3/0.6/1.5, L5=0.5/1.0/2.5,
+        # H1=1.0/2.0/5.0, H2=1.5/4.0/10.0, H3=2.0/6.0/15.0, H4=3.0/8.0/20.0.
         self.paytable = {
-            (3, "L1"): 0.1, (4, "L1"): 0.2, (5, "L1"): 0.5,
-            (3, "L2"): 0.2, (4, "L2"): 0.3, (5, "L2"): 0.8,
-            (3, "L3"): 0.2, (4, "L3"): 0.4, (5, "L3"): 1.0,
-            (3, "L4"): 0.3, (4, "L4"): 0.6, (5, "L4"): 1.5,
-            (3, "L5"): 0.5, (4, "L5"): 1.0, (5, "L5"): 2.5,
-            (3, "H1"): 1.0, (4, "H1"): 2.0, (5, "H1"): 5.0,
-            (3, "H2"): 1.5, (4, "H2"): 4.0, (5, "H2"): 10.0,
-            (3, "H3"): 2.0, (4, "H3"): 6.0, (5, "H3"): 15.0,
-            (3, "H4"): 3.0, (4, "H4"): 8.0, (5, "H4"): 20.0,
+            (3, "L1"): 0.13, (4, "L1"): 0.26, (5, "L1"): 0.65,
+            (3, "L2"): 0.26, (4, "L2"): 0.39, (5, "L2"): 1.04,
+            (3, "L3"): 0.26, (4, "L3"): 0.52, (5, "L3"): 1.3,
+            (3, "L4"): 0.39, (4, "L4"): 0.78, (5, "L4"): 1.95,
+            (3, "L5"): 0.65, (4, "L5"): 1.3, (5, "L5"): 3.25,
+            (3, "H1"): 1.3, (4, "H1"): 2.6, (5, "H1"): 6.5,
+            (3, "H2"): 1.95, (4, "H2"): 5.2, (5, "H2"): 13.0,
+            (3, "H3"): 2.6, (4, "H3"): 7.8, (5, "H3"): 19.5,
+            (3, "H4"): 3.9, (4, "H4"): 10.4, (5, "H4"): 26.0,
         }
         # No (kind, "W") entries: Wild never lands on reel/column 0 (see the
         # reel CSVs), so Lines.get_lines's wild-anchored-run branch (which only
@@ -1294,12 +1307,35 @@ class GameConfig(Config):
             # cut - p85/p90 are now mostly carried by the 100-250 boost
             # and chest, not these, so trimming further should cost little
             # there. Cutting another ~50% on top of iter6b's already -45%.
-            300: 0.83, 350: 0.72, 600: 0.50, 1000: 0.33,
-            # Chest tiers (applied last, same as {**REGULAR_WEIGHTS, **SEG7_CHEST}):
-            400: 2, 500: 1.5, 800: 1.5, 1500: 9, 2500: 6, 4000: 3,
+            # ITERATION 12 (2026-09-13, flat-damage line-pay/reward-drop
+            # rebalance): -40% further cut on top of iteration 9's values
+            # (0.83/0.72/0.50/0.33 -> 0.498/0.432/0.30/0.198), paired with
+            # the paytable x1.3 rescale above and the chest-VALUE cut below -
+            # measured under flat-damage (n=20000, use_flat_damage["normal"]
+            # =True): mean=95.28x (close to the ~90 ceiling), p50-p95 track
+            # target closely (p50=33.31/p75=61.36/p85=88.49/p95=207.61 vs
+            # targets 37.5/80/140/350 - some now under rather than over).
+            300: 0.498, 350: 0.432, 600: 0.30, 1000: 0.198,
+            # Chest tiers (applied last, same as {**REGULAR_WEIGHTS, **SEG7_CHEST}).
+            # VALUES cut 2026-09-13 (not just weight - weight-only cuts were
+            # tried first and measured to only relocate the tail to a higher
+            # percentile without shrinking it: n=12000 with these same 6
+            # weights x0.55 and values UNCHANGED still gave p99=3210,
+            # essentially unmoved). New values chosen to avoid every
+            # existing tier key in this table (asserted in the measurement
+            # harness - a first attempt collided at 250/350/1000, silently
+            # overwriting those REGULAR tiers via dict update, and had to be
+            # redone). Weights themselves are unchanged from iteration 9.
+            # CONFIRMED at n=20000: p99 3210->1967 (still ~2.5x over the
+            # 800-1000 target - improved, not fully closed), p99.5=2186
+            # (close to the 2500 target), p99.9=2588 (under the 5000+
+            # target). Scratch: _tuning_scratch/
+            # payout_component_split_normal_flatdamage.py (line-pay/
+            # reward-drop split measurement that motivated this pass).
+            275: 2, 425: 1.5, 675: 1.5, 950: 9, 1100: 6, 1500: 3,
         }
-        self.reward_drop_top_tiers_normal_bonus = {400, 500, 800, 1500, 2500, 4000}
-        self.reward_drop_stage6_last_tiers_normal_bonus = {400, 500, 800, 1500, 2500, 4000}
+        self.reward_drop_top_tiers_normal_bonus = {275, 425, 675, 950, 1100, 1500}
+        self.reward_drop_stage6_last_tiers_normal_bonus = {275, 425, 675, 950, 1100, 1500}
 
         # Safety cap on resolve-loop passes per spin (should never be hit by a
         # legitimate board; guards against a logic bug causing a true infinite
