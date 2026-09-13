@@ -1289,7 +1289,20 @@ class GameConfig(Config):
             1: 288, 2: 230, 3: 720, 4: 568, 5: 605, 6: 492, 8: 400,
             10: 110, 12: 85, 15: 65, 18: 48, 20: 60, 25: 44,
             30: 36, 35: 29.3, 40: 24.1, 50: 19.6, 60: 16.1, 80: 13.2,
-            100: 17, 120: 13.5, 150: 11, 180: 7.5, 200: 8, 250: 4.3,
+            # ITERATION 13 (2026-09-14, flat-damage mean-under-85 pass): cut
+            # -60% on top of the values below (17/13.5/11/7.5/8/4.3 -> x0.40)
+            # per explicit request to bring flat-damage's mean under 85
+            # while keeping median unchanged (user confirmed median~33 is
+            # good - do not disturb it). Tried boosting 1-8 tiers +30% first
+            # (the historically reliable cascade-era lever) but it barely
+            # moved mean (95.28->98.78, WRONG direction) and dragged median
+            # down (33.31->32.20) - abandoned, since disturbing the
+            # already-good median was explicitly unwanted. 100-250 doesn't
+            # govern median (governed by the much-more-frequent 1-8/10-80
+            # tiers) but does meaningfully feed mean via the many sessions
+            # that reach a handful of kills without going deep - cutting it
+            # instead moved mean the right way without touching median.
+            100: 6.8, 120: 5.4, 150: 4.4, 180: 3.0, 200: 3.2, 250: 1.72,
             # ITERATION 5d: 5c's -60% cut on 300/350/600/1000 overcorrected
             # - mean improved (96.03->90.27) but p85/p90/p95/p99 all
             # dropped BELOW target too (p99 685.03, undershot the 800-1000
@@ -1335,10 +1348,20 @@ class GameConfig(Config):
             # target). Scratch: _tuning_scratch/
             # payout_component_split_normal_flatdamage.py (line-pay/
             # reward-drop split measurement that motivated this pass).
-            275: 2, 425: 1.5, 675: 1.5, 950: 9, 1100: 6, 1500: 3,
+            # ITERATION 13 (2026-09-14): values cut further (~25-30%,
+            # 275/425/675/950/1100/1500 -> 210/320/500/700/800/1050), paired
+            # with the 100-250 cut above, as part of the same mean-under-85
+            # pass. New values again chosen to avoid every other tier key in
+            # this table (asserted in the measurement harness). CONFIRMED at
+            # n=20000: mean=83.62x (target achieved, was 95.28x), median
+            # =33.45x (essentially unchanged from 33.31x, as required), p99
+            # 1967->1581 (continued improvement, still above the 800-1000
+            # target). Scratch: _tuning_scratch/
+            # flat_damage_mean_under_85.py.
+            210: 2, 320: 1.5, 500: 1.5, 700: 9, 800: 6, 1050: 3,
         }
-        self.reward_drop_top_tiers_normal_bonus = {275, 425, 675, 950, 1100, 1500}
-        self.reward_drop_stage6_last_tiers_normal_bonus = {275, 425, 675, 950, 1100, 1500}
+        self.reward_drop_top_tiers_normal_bonus = {210, 320, 500, 700, 800, 1050}
+        self.reward_drop_stage6_last_tiers_normal_bonus = {210, 320, 500, 700, 800, 1050}
 
         # Safety cap on resolve-loop passes per spin (should never be hit by a
         # legitimate board; guards against a logic bug causing a true infinite

@@ -209,6 +209,29 @@ backend state produces byte-identical output to what's committed).
       measurement before any of their previously-recorded numbers in this
       file can be trusted again.
 
+      **MEAN-UNDER-85 PASS 2026-09-14**, per explicit request, with an
+      explicit constraint: keep median (~33) unchanged - user confirmed
+      that value was already good, don't disturb it. Tried the historically
+      reliable cascade-era lever first (boost 1-8 tiers +30%) - it barely
+      moved mean (95.28->98.78, WRONG direction, likely noise-dominated at
+      that lever's actual effect size here) AND dragged median down
+      (33.31->32.20) - abandoned immediately since disturbing median was
+      explicitly unwanted.
+      Switched to 100-250 (doesn't govern median - median is dominated by
+      the much-more-frequent 1-8/10-80 tiers - but does meaningfully feed
+      mean via the many sessions that get a handful of kills without going
+      deep) cut -60% (17/13.5/11/7.5/8/4.3 -> x0.40), paired with a further
+      chest-VALUE cut (275/425/675/950/1100/1500 -> 210/320/500/700/800/1050,
+      ~25-30% further down from the previous pass). CONFIRMED at n=20000: mean
+      95.28->83.62x (target achieved), median 33.31->33.45x (essentially
+      unchanged, as required), p99 1967->1581x (continued improvement,
+      still above the 800-1000 target - same open item as before, not
+      solved by this pass either). Needed 3 rounds to land safely under 85
+      (mean=84.99 at one intermediate cut was right at the boundary and
+      risked flipping back over 85 on a different seed - pushed further for
+      real margin rather than accepting a razor-thin pass). Scratch:
+      `_tuning_scratch/flat_damage_mean_under_85.py`.
+
 - [ ] **RTP optimizer doesn't hit target when 2+ non-identity fences coexist**
       (Phase 3, `math-sdk`). Base mode measures ~0.6071 RTP vs the 0.967
       target whenever the `freegame` fence is present alongside `basegame`
