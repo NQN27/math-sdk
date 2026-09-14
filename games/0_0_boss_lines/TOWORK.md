@@ -232,6 +232,36 @@ backend state produces byte-identical output to what's committed).
       real margin rather than accepting a razor-thin pass). Scratch:
       `_tuning_scratch/flat_damage_mean_under_85.py`.
 
+      **STAGE 5/6 FUNNEL RESHAPE 2026-09-14**, per explicit request after
+      seeing the chest/regular-reward-drop split (measured via
+      `_tuning_scratch/payout_component_split_chest.py`): flat-damage
+      reached the chest in 2.27% of sessions vs production's 0.67% (3.4x
+      more often) - the actual reason chest was still 20.8% of total payout
+      here vs production's 9.8%, even after the value cuts above. User
+      wanted s5's share higher, s6's lower, without moving mean/median.
+      `flat_damage_boss_hp_mult["normal"][5]`: 0.113 -> 0.40 - needed a much
+      bigger jump than expected to matter (0.15 and 0.22 were tried first
+      and only nudged s5/s6 by <1pp each - this lever has its own
+      threshold/nonlinearity, same as everything else HP-related in this
+      system). Hardening stage 5 alone dropped mean to 71.54x (fewer
+      chest-reaching sessions), so restored the 100-250 tier weights and
+      chest tier values (both cut in the mean-under-85 pass above) most of
+      the way back toward their pre-that-pass levels to compensate, rather
+      than stacking two separate mean-reducing cuts that were now fighting
+      the same underlying effect from different angles.
+      CONFIRMED at n=20000 against the real committed file: s5 0.62->1.71%
+      (~2.8x higher), s6 2.30->1.26% (now under even production's own
+      1.37%), mean 83.62->83.13x (essentially unchanged), median
+      33.45->33.90x (essentially unchanged). p99 drifted back up a little
+      (1581->1868x) as an expected side effect of relaxing the chest-value
+      cut - still well below the original 3210x this whole arc started
+      from, but this specific number is now a byproduct of the funnel fix,
+      not something separately re-optimized this pass.
+      **Still open**: p99 (1868x vs the 800-1000 target) and the overall
+      stage funnel (s1 still ~50% vs the designer target's 38.30%) remain
+      the two threads left in this system - both flagged above, unchanged
+      by this specific pass.
+
 - [ ] **RTP optimizer doesn't hit target when 2+ non-identity fences coexist**
       (Phase 3, `math-sdk`). Base mode measures ~0.6071 RTP vs the 0.967
       target whenever the `freegame` fence is present alongside `basegame`

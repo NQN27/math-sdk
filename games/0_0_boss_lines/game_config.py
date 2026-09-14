@@ -356,8 +356,24 @@ class GameConfig(Config):
         # back down once the funnel shape is right. NOT further iterated
         # past this point - see TOWORK.md for the open item.
         # Scratch: _tuning_scratch/flat_damage_stage_sweep.py.
+        #
+        # STAGE 5 HARDENED FURTHER (2026-09-14), per explicit request:
+        # s5's share was too small (0.62%) and s6's too large (2.30%) -
+        # wanted s5 higher, s6 lower, without moving mean/median. 0.113 ->
+        # 0.40 (a much bigger jump than stage 1/2's own -7% ease above was
+        # needed to move the needle at all: 0.15 only nudged s5/s6 by
+        # <1pp each, 0.22 barely more - this lever needed a ~3.5x jump, not
+        # a small nudge, to matter). Paired with restoring the 100-250
+        # reward-drop weights and chest values back toward their prior,
+        # less-aggressive levels (see reward_drop_weights_normal_bonus's
+        # own comments) to compensate the mean this alone would have
+        # dropped (harder stage 5 = fewer chest-reaching sessions = lower
+        # mean on its own). CONFIRMED at n=20000: s5 0.62->1.71% (~2.8x),
+        # s6 2.30->1.26% (now under even production's own 1.37%), mean
+        # 83.62->83.13x (essentially unchanged, as required), median
+        # 33.45->33.90x (essentially unchanged).
         self.flat_damage_boss_hp_mult = {
-            "normal": {1: 0.105, 2: 0.105, 3: 0.113, 4: 0.113, 5: 0.113, 6: 0.113},
+            "normal": {1: 0.105, 2: 0.105, 3: 0.113, 4: 0.113, 5: 0.40, 6: 0.113},
             "super": 1.0,
             "hidden": 1.0,
         }
@@ -1302,7 +1318,13 @@ class GameConfig(Config):
             # tiers) but does meaningfully feed mean via the many sessions
             # that reach a handful of kills without going deep - cutting it
             # instead moved mean the right way without touching median.
-            100: 6.8, 120: 5.4, 150: 4.4, 180: 3.0, 200: 3.2, 250: 1.72,
+            # RESTORED 2026-09-14: once stage 5 was hardened (see
+            # flat_damage_boss_hp_mult above), chest-reaching sessions grew
+            # rarer on their own, which cost mean back down again - restored
+            # this tier all the way back to its pre-iteration-13 level
+            # (x1.0, no cut) to compensate, rather than stacking two
+            # mean-reducing cuts on top of each other.
+            100: 17, 120: 13.5, 150: 11, 180: 7.5, 200: 8, 250: 4.3,
             # ITERATION 5d: 5c's -60% cut on 300/350/600/1000 overcorrected
             # - mean improved (96.03->90.27) but p85/p90/p95/p99 all
             # dropped BELOW target too (p99 685.03, undershot the 800-1000
@@ -1358,10 +1380,18 @@ class GameConfig(Config):
             # 1967->1581 (continued improvement, still above the 800-1000
             # target). Scratch: _tuning_scratch/
             # flat_damage_mean_under_85.py.
-            210: 2, 320: 1.5, 500: 1.5, 700: 9, 800: 6, 1050: 3,
+            # RESTORED 2026-09-14: reverted to the pre-iteration-13 values
+            # (210/320/500/700/800/1050 -> 275/425/675/950/1100/1500) as
+            # part of the same stage-5-hardening pass above - hardening
+            # stage 5 already reduces how often the chest is reached
+            # structurally (measured chest-hit-rate: see
+            # _tuning_scratch/payout_component_split_chest.py), so this
+            # value cut was no longer needed to compensate mean and was
+            # trading away too much p99 headroom for no remaining benefit.
+            275: 2, 425: 1.5, 675: 1.5, 950: 9, 1100: 6, 1500: 3,
         }
-        self.reward_drop_top_tiers_normal_bonus = {210, 320, 500, 700, 800, 1050}
-        self.reward_drop_stage6_last_tiers_normal_bonus = {210, 320, 500, 700, 800, 1050}
+        self.reward_drop_top_tiers_normal_bonus = {275, 425, 675, 950, 1100, 1500}
+        self.reward_drop_stage6_last_tiers_normal_bonus = {275, 425, 675, 950, 1100, 1500}
 
         # Safety cap on resolve-loop passes per spin (should never be hit by a
         # legitimate board; guards against a logic bug causing a true infinite
