@@ -979,10 +979,12 @@ class GameConfig(Config):
         # idea, refined in discussion). Every Bonus spin, while the session's
         # running total is still under `floor`, roll `trigger_prob` chance to
         # top the session up directly into [floor, band_high]. Deliberately
-        # NOT a guarantee (that's the separate finishing-blow mechanic below,
-        # game_bonus.run_bonus_session) - some sessions still end genuinely
-        # low if the coin-flip never lands, by design ("van de ngo kha nang
-        # den cuoi van k duoc gi").
+        # NOT a guarantee (that used to be the separate finishing-blow
+        # mechanic - REMOVED 2026-09-16, see boss_low_hp_execute_chance
+        # below for its replacement, which is also explicitly NOT a
+        # guarantee) - some sessions still end genuinely low if the coin-
+        # flip never lands, by design ("van de ngo kha nang den cuoi van k
+        # duoc gi").
         #
         # "Roll until you get something" is resolved as ONE direct draw from
         # the already-successful [floor, band_high] range once the trigger
@@ -999,8 +1001,9 @@ class GameConfig(Config):
         #
         # Only calls award_win (never touches boss_hp/player_hp/stage), so it
         # is mechanically decoupled from the funnel re-tune (2117cfe) and the
-        # finishing-blow guarantee (756f968) by construction - confirmed by
-        # measurement, not just this reasoning: n=8000 stage-death% held at
+        # (since-removed) finishing-blow guarantee (756f968) by construction -
+        # confirmed by measurement, not just this reasoning: n=8000
+        # stage-death% held at
         # s2=10.03/s3=28.69/s4=34.07/s5=18.15/s6=9.07 (baseline) - see
         # TOWORK.md for the combined-effect numbers this was validated
         # against (_tuning_scratch/perspin_rescue_roll.py):
@@ -1020,6 +1023,44 @@ class GameConfig(Config):
         self.bonus_rescue_roll = {
             "super": {"trigger_prob": 1.0 / 8.0, "floor": 5.0, "band_high": 10.0},
         }
+
+        # --- Low-HP execute chance (2026-09-16) --------------------------
+        # REPLACES the old end-of-session "finishing blow" guarantee (see
+        # git history / _tuning_scratch/consolation_test.py for that
+        # mechanic's own validation record - it guaranteed a 0-kill session
+        # always landed at least 1 kill, specifically to hit the "0-10x ~
+        # 0%" designer requirement for Super/Hidden). Per explicit request:
+        # remove the guarantee entirely and replace it with an ONGOING,
+        # RARE per-spin chance for any ALIVE boss already at or below
+        # `boss_low_hp_execute_threshold_pct` of its own max HP to be
+        # instantly finished off - same on_boss_defeated path a real kill
+        # takes (reward-drop roll, stage-clear check, events), just
+        # triggered by a roll instead of damage reaching exactly 0. See
+        # game_bonus.run_bonus_session for the check site (runs once per
+        # ordinary internal spin, for every tier - NOT gated by
+        # use_spin_budget, unlike this session's other new levers, since
+        # this replaces a mechanic that applied to all 3 tiers).
+        #
+        # THIS IS NOT A GUARANTEE, unlike what it replaces - a session can
+        # still end with 0 kills (and therefore under 10x) if the chance
+        # never lands, by explicit design ("cơ chế này sẽ rare để kích
+        # hoạt"). Applied identically to Normal/Super/Hidden for now, per
+        # explicit request ("sẽ thay thế cho cả 3 trước mắt ko cần đo super
+        # hay hidden") - Super/Hidden's own "0-10x ~ 0%" requirement is
+        # THEREFORE NO LONGER GUARANTEED and has NOT been re-measured
+        # against this change (the old guarantee's validation record above
+        # is now stale for all 3 tiers). Needs its own re-measurement pass
+        # before being treated as still satisfying that requirement.
+        #
+        # PLACEHOLDER values, not yet tuned - threshold chosen so only a
+        # boss already nearly dead qualifies (15% of its own max HP, which
+        # itself varies +/-25% per boss_variance_range, so this is relative
+        # to each individual boss's own rolled max, not a fixed number);
+        # chance chosen deliberately low/rare per the explicit request
+        # above, not measured against any target yet.
+        self.boss_low_hp_execute_threshold_pct = 0.15
+        self.boss_low_hp_execute_chance = 0.05
+
         self.max_stage = max(self.boss_stage_table.keys())
         self.boss_variance_range = (0.75, 1.25)
         # Reroll cap for the "3 bosses' HP must be within 35% of each other"

@@ -12,6 +12,40 @@ backend state produces byte-identical output to what's committed).
 
 ## Blocking / high severity
 
+- [ ] **REMOVED the finishing-blow guarantee, replaced with a rare low-HP
+      execute chance (2026-09-16)**, per explicit request ("Bỏ cơ chế last
+      hit đó đi thay vào đó là đổi sang cơ chế khi máu boss thấp có tỉ lệ
+      last hit boss đó", "Cơ chế này sẽ rare để kích hoạt"). The old
+      mechanic (`game_bonus.run_bonus_session`'s end-of-session "Finishing
+      blow" block, added 2026-09-02) guaranteed a 0-kill session always got
+      1 kill, specifically validated to hit Super/Hidden's "0-10x ~ 0%"
+      designer requirement (4 seeds x 20,000 each, 0.0000% on every seed).
+      That block is now DELETED entirely. Replacement: every ordinary
+      internal Bonus spin, any ALIVE boss at or below `boss_low_hp_execute_
+      threshold_pct` (15%) of its own max HP gets an independent
+      `boss_low_hp_execute_chance` (5%, deliberately rare per explicit
+      request) roll to be instantly finished off via the same
+      `on_boss_defeated` path a real kill takes - see game_config.py's
+      docstring for the full design (including why it reads boss_alive/hp
+      fresh each loop iteration and breaks on `boss_system_active` going
+      False, to avoid misfiring against a freshly-rolled next-stage trio
+      under the same reused boss_ids).
+      Applied identically to all 3 tiers per explicit request ("sẽ thay
+      thế cho cả 3 trước mắt ko cần đo super hay hidden"), rather than
+      scoping it to `use_spin_budget`/Normal only as first proposed.
+      **THIS IS NOT A GUARANTEE** - sanity-checked n=2000/tier after the
+      change (no crash, all 3 tiers): zero-kill rates now normal=20.35%,
+      super=5.10%, hidden=28.35% (super/hidden are NOT comparable to the
+      old 28.2%/4.0% figures from 2026-09-02 - too many tier-specific
+      rebalances happened between then and now for a direct before/after
+      read). **Needs a decision/re-measurement pass before shipping**:
+      Super/Hidden's "0-10x ~ 0%" requirement is no longer met at all
+      (28.2%/4.0%-era guarantee is gone) - either accept the requirement is
+      no longer satisfied, or re-tune `boss_low_hp_execute_chance`/
+      `_threshold_pct` per-tier if it still needs to be approximately met.
+      Explicitly deferred by the user this pass ("ko cần đo super hay
+      hidden chỉ cần note").
+
 - [ ] **NEW, UNTUNED (2026-09-16): fixed-spin-budget mechanic**, per
       explicit game-designer request ("sửa lại cơ chế bỏ máu người chơi
       thay vào đó là số lượt spin cố định, lên stage sau thì + lượt spin" -
