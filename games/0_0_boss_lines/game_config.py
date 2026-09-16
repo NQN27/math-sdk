@@ -238,19 +238,26 @@ class GameConfig(Config):
         # base/ante/Ultimate Power/God Mode/buy3/buy4/Super/Hidden haven't
         # had their own post-rescale re-verification pass yet and are being
         # treated as "not yet redone, will be redone later" for this build.
-        # Original spec values (pre-x1.3): L1=0.1/0.2/0.5, L2=0.2/0.3/0.8,
-        # L3=0.2/0.4/1.0, L4=0.3/0.6/1.5, L5=0.5/1.0/2.5, H1=1.0/2.0/5.0,
-        # H2=1.5/4.0/10.0, H3=2.0/6.0/15.0, H4=3.0/8.0/20.0.
+        # REVERTED 2026-09-16, per explicit user request ("trả lại bảng
+        # multi cũ cho tôi"): back to the original spec values (pre-x1.3),
+        # rounded only for the $0.10 RGS increment per the note above. The
+        # x1.3 rescale's own rationale (line-pay's ~22-27%-of-total share
+        # under flat-damage) still stands as a real finding - see TOWORK.md -
+        # but the paytable lever is undone; Normal Bonus's line-pay/reward-
+        # drop split and the flat-damage mean/median numbers measured
+        # against the x1.3 table (83.13x/33.90x etc.) are now STALE and need
+        # re-measuring against this reverted table before being relied on
+        # again.
         self.paytable = {
-            (3, "L1"): 0.15, (4, "L1"): 0.25, (5, "L1"): 0.65,
-            (3, "L2"): 0.25, (4, "L2"): 0.40, (5, "L2"): 1.05,
-            (3, "L3"): 0.25, (4, "L3"): 0.50, (5, "L3"): 1.30,
-            (3, "L4"): 0.40, (4, "L4"): 0.80, (5, "L4"): 1.95,
-            (3, "L5"): 0.65, (4, "L5"): 1.30, (5, "L5"): 3.25,
-            (3, "H1"): 1.30, (4, "H1"): 2.60, (5, "H1"): 6.50,
-            (3, "H2"): 1.95, (4, "H2"): 5.20, (5, "H2"): 13.00,
-            (3, "H3"): 2.60, (4, "H3"): 7.80, (5, "H3"): 19.50,
-            (3, "H4"): 3.90, (4, "H4"): 10.40, (5, "H4"): 26.00,
+            (3, "L1"): 0.10, (4, "L1"): 0.20, (5, "L1"): 0.50,
+            (3, "L2"): 0.20, (4, "L2"): 0.30, (5, "L2"): 0.80,
+            (3, "L3"): 0.20, (4, "L3"): 0.40, (5, "L3"): 1.00,
+            (3, "L4"): 0.30, (4, "L4"): 0.60, (5, "L4"): 1.50,
+            (3, "L5"): 0.50, (4, "L5"): 1.00, (5, "L5"): 2.50,
+            (3, "H1"): 1.00, (4, "H1"): 2.00, (5, "H1"): 5.00,
+            (3, "H2"): 1.50, (4, "H2"): 4.00, (5, "H2"): 10.00,
+            (3, "H3"): 2.00, (4, "H3"): 6.00, (5, "H3"): 15.00,
+            (3, "H4"): 3.00, (4, "H4"): 8.00, (5, "H4"): 20.00,
         }
         # No (kind, "W") entries: Wild never lands on reel/column 0 (see the
         # reel CSVs), so Lines.get_lines's wild-anchored-run branch (which only
@@ -733,6 +740,73 @@ class GameConfig(Config):
             # [500,550,600,650,700,750,800].
             "hidden": [200, 250, 300, 350, 400, 450, 500],
         }
+        # EXPERIMENTAL (2026-09-16, per explicit user request: "sửa lại cơ
+        # chế bỏ máu người chơi thay vào đó là số lượt spin cố định, lên
+        # stage sau thì + lượt spin"): replaces the Player-HP/boss-
+        # counterattack session-ending mechanic with a fixed spin budget,
+        # per tier - default OFF everywhere, same convention as
+        # use_flat_damage/use_inplace_tumble (an unmeasured behavior change
+        # to a carefully-tuned economy should not silently become live).
+        # See game_bonus.run_bonus_session/reset_bonus_state and
+        # game_executables.clear_stage for the mechanic itself.
+        #
+        # Session starts with `spin_budget_initial[tier]` spins and ends
+        # the instant that count reaches 0 - every internal Bonus spin
+        # ALWAYS consumes exactly 1, UNCONDITIONALLY (including a
+        # boss_counterattack_grace spin and an endless-stage6-reroll
+        # `continue` spin). This must be unconditional, not mirrored off
+        # the old counterattack block's position in the loop: HP-vs-
+        # boss_dam has a natural escalating counter-pressure
+        # (stage6_dam_escalation eventually outraces any HP top-up) that
+        # bounds the endless tail; a spin count has none, so any branch
+        # that let a spin run "free" (skipped because it hit an early
+        # `continue`/grace-consumption path) would let super/hidden farm
+        # the endless tail up to bonus_safety_cap_spins with no offsetting
+        # cost. Decrementing unconditionally right after every
+        # run_one_bonus_spin call, before any of that downstream branching,
+        # avoids the loophole entirely rather than patching each path.
+        #
+        # Stage-clear grants a fresh `random.randint(*spin_budget_per_stage_
+        # clear[tier])` MORE spins - the direct analogue of the old +50
+        # Player HP stage-clear bonus, except a random 1-3 range (per spec)
+        # rather than a fixed amount.
+        # Deliberately placed inside the SAME stage-6-endless-repeat
+        # suppression guard clear_stage already uses for the HP bonus
+        # (`not (stage == max_stage and stage6_loop_count > 0)`) and for
+        # the identical reason: without it, every endless-tail loop would
+        # extend the budget with no offsetting cost and the tail would
+        # never self-bound (same problem as the unconditional-decrement
+        # note above, from the other direction - grants must be capped
+        # even though costs can't be skipped).
+        #
+        # DEAD LEVERS for any tier with this flag on: use_flat_damage and
+        # flat_damage_player_hp_initial_mult/_bonus_mult (Player HP is
+        # never granted/read/spent - self.player_hp/max stay 0.0 all
+        # session; bonus_player_hp_choices is never drawn from either),
+        # and elixir_heal_pct_range/elixir_heal_round_to (Elixir is
+        # repurposed below to grant spins instead of a % HP heal, rather
+        # than silently becoming a no-op collectible - see
+        # game_bonus._activate_elixir_booster). bonus_trigger_event/
+        # player_hp_state_event/bonus_end_event still fire unchanged for
+        # event-schema compatibility, just always reporting 0.0 for
+        # playerHp/playerHpMax/playerHpFinal on a spin-budget tier -
+        # bonus_end_event's end_reason gets a new value, "spins_depleted",
+        # alongside the existing "hp_depleted"/"wincap"/"safety_cap"/
+        # "stage_cleared".
+        #
+        # VALUES per explicit game-designer spec (2026-09-16): Normal Bonus
+        # starts with 6 spins; clearing a stage grants a random 1-3 MORE
+        # (uniform-random int, rolled fresh at each clear - see
+        # game_executables.clear_stage - not a fixed amount, unlike the old
+        # +50 Player HP grant it replaces). Super/Hidden are NOT part of
+        # this spec (only Normal was requested) - left at the same shape
+        # for type-consistency, but unverified/unused while their own flag
+        # stays False.
+        self.use_spin_budget = {"normal": False, "super": False, "hidden": False}
+        self.spin_budget_initial = {"normal": 6, "super": 8, "hidden": 8}
+        self.spin_budget_per_stage_clear = {"normal": (1, 3), "super": (1, 3), "hidden": (1, 3)}
+        self.elixir_spin_budget_grant = {"normal": 1, "super": 1, "hidden": 1}
+
         self.bonus_start_stage = {"normal": 1, "super": 2, "hidden": 3}
         # Dedicated Scatter-free Bonus/freegame reel per tier - see
         # reels/FR0.csv (baseline Power density, matches base-game rate) /

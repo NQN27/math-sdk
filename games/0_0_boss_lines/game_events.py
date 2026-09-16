@@ -18,6 +18,7 @@ BONUS_SPIN_START = "bonusSpinStart"
 BONUS_COUNTERATTACK = "bonusCounterattack"
 BONUS_END = "bonusEnd"
 PLAYER_HP_STATE = "playerHpState"
+SPIN_BUDGET_STATE = "spinBudgetState"
 ELIXIR_ACTIVATED = "elixirActivated"
 BOOSTER_ACTIVATED = "boosterActivated"
 
@@ -190,12 +191,16 @@ def bonus_counterattack_event(gamestate, total_damage, player_hp_after):
 
 def bonus_end_event(gamestate, tier, spins_taken, player_hp_final, end_reason):
     """Bonus session over - `end_reason` in {"hp_depleted", "wincap",
-    "safety_cap", "stage_cleared"} (see game_bonus.run_bonus_session -
-    stage 6 is an endless tail for tiers in config.stage6_endless_tiers;
-    currently all 3 tiers are enabled, but "stage_cleared" remains a
-    possible end_reason for any tier a future config change excludes from
-    the endless tail - it ends the session the first time stage 6 clears,
-    same as the original pre-endless behavior)."""
+    "safety_cap", "stage_cleared", "spins_depleted"} (see
+    game_bonus.run_bonus_session - stage 6 is an endless tail for tiers in
+    config.stage6_endless_tiers; currently all 3 tiers are enabled, but
+    "stage_cleared" remains a possible end_reason for any tier a future
+    config change excludes from the endless tail - it ends the session the
+    first time stage 6 clears, same as the original pre-endless behavior).
+    "spins_depleted" is EXPERIMENTAL (use_spin_budget, see game_config.py) -
+    the fixed-spin-budget analogue of "hp_depleted"; on a tier with that
+    flag on, `player_hp_final` is always 0.0 (Player HP is never granted in
+    that mode)."""
     event = {
         "index": len(gamestate.book.events),
         "type": BONUS_END,
@@ -215,6 +220,20 @@ def player_hp_state_event(gamestate):
         "type": PLAYER_HP_STATE,
         "playerHp": round(gamestate.player_hp, 2),
         "playerHpMax": gamestate.player_hp_max,
+    }
+    gamestate.book.add_event(event)
+
+
+def spin_budget_state_event(gamestate):
+    """EXPERIMENTAL (use_spin_budget): current spins-remaining snapshot -
+    emitted whenever it changes (grant/stage-clear bonus/Elixir grant/
+    per-spin decrement). The Player-HP-based equivalent, player_hp_state_
+    event, still fires too (playerHp/playerHpMax just stay 0.0 for a tier
+    with this flag on - see game_config.py's use_spin_budget docstring)."""
+    event = {
+        "index": len(gamestate.book.events),
+        "type": SPIN_BUDGET_STATE,
+        "spinsRemaining": gamestate.spins_remaining,
     }
     gamestate.book.add_event(event)
 

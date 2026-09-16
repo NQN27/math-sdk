@@ -28,6 +28,7 @@ from game_events import (
     power_activated_event,
     power_state_event,
     player_hp_state_event,
+    spin_budget_state_event,
 )
 
 
@@ -569,14 +570,28 @@ class GameExecutables(GameCalculations):
             stage == self.config.max_stage and getattr(self, "stage6_loop_count", 0) > 0
         ):
             tier = getattr(self, "bonus_tier", None)
-            hp_bonus = 50.0
-            if tier and self.config.use_flat_damage.get(tier, False):
-                # Same integer-HP reasoning as the initial grant in
-                # game_bonus.run_bonus_session.
-                hp_bonus = round(hp_bonus * self.config.flat_damage_player_hp_bonus_mult.get(tier, 1.0))
-            self.player_hp += hp_bonus
-            self.player_hp_max += hp_bonus
-            player_hp_state_event(self)
+            if tier and self.config.use_spin_budget.get(tier, False):
+                # EXPERIMENTAL (use_spin_budget) - see game_config.py's
+                # docstring. Direct analogue of the +50 Player HP grant
+                # below, but Player HP is never granted/spent in this mode -
+                # deliberately sharing this method's outer guard (suppressed
+                # on endless-stage6-tail REPEAT clears) for the same reason
+                # the HP grant is: an unbounded per-loop grant would let the
+                # endless tail extend the spin budget forever with nothing
+                # to offset it, since a spin count (unlike HP-vs-boss_dam)
+                # has no escalating counter-pressure of its own.
+                lo, hi = self.config.spin_budget_per_stage_clear.get(tier, (0, 0))
+                self.spins_remaining += random.randint(lo, hi)
+                spin_budget_state_event(self)
+            else:
+                hp_bonus = 50.0
+                if tier and self.config.use_flat_damage.get(tier, False):
+                    # Same integer-HP reasoning as the initial grant in
+                    # game_bonus.run_bonus_session.
+                    hp_bonus = round(hp_bonus * self.config.flat_damage_player_hp_bonus_mult.get(tier, 1.0))
+                self.player_hp += hp_bonus
+                self.player_hp_max += hp_bonus
+                player_hp_state_event(self)
 
         stage_clear_event(self, stage, removed_symbol, pruned, next_stage)
 

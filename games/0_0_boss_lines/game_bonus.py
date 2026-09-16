@@ -31,6 +31,7 @@ from game_events import (
     bonus_counterattack_event,
     bonus_end_event,
     player_hp_state_event,
+    spin_budget_state_event,
     elixir_activated_event,
     booster_activated_event,
     boss_state_event,
@@ -50,6 +51,10 @@ class GameBonus(GameExecutables):
         self.in_bonus = False
         self.player_hp = 0.0
         self.player_hp_max = 0.0
+        # EXPERIMENTAL (use_spin_budget) - see game_config.py's docstring.
+        # Stays 0 for the whole book outside an active spin-budget session,
+        # same "at rest" convention as player_hp above.
+        self.spins_remaining = 0
         self.scatter_columns = set()
         self.booster_pending_for_next_spin = False
         self.booster_multiplier_current_spin = 1.0
@@ -176,17 +181,27 @@ class GameBonus(GameExecutables):
         el_positions = sorted((p["reel"], p["row"]) for p in self.get_symbol_positions("EL")["EL"])
         bo_positions = sorted((p["reel"], p["row"]) for p in self.get_symbol_positions("BO")["BO"])
 
+        spin_budget_mode = self.config.use_spin_budget.get(self.bonus_tier, False)
         for r, ro in el_positions:
             self.board[r][ro].explode = True
-            lo, hi = self.config.elixir_heal_pct_range
-            pct = random.uniform(lo, hi)
-            round_to = self.config.elixir_heal_round_to
-            raw_heal = self.player_hp * pct
-            heal = round(raw_heal / round_to) * round_to
-            new_hp = min(self.player_hp_max, self.player_hp + heal)
-            actual_healed = new_hp - self.player_hp
-            self.player_hp = new_hp
-            elixir_activated_event(self, (r, ro), actual_healed, self.player_hp)
+            if spin_budget_mode:
+                # Repurposed (see game_config.py's use_spin_budget
+                # docstring): Player HP is never granted/spent in this
+                # mode, so a %-of-current-HP heal has nothing to act on -
+                # grant spins instead of letting Elixir become a silent
+                # no-op collectible.
+                self.spins_remaining += self.config.elixir_spin_budget_grant.get(self.bonus_tier, 0)
+                elixir_activated_event(self, (r, ro), 0.0, self.player_hp)
+            else:
+                lo, hi = self.config.elixir_heal_pct_range
+                pct = random.uniform(lo, hi)
+                round_to = self.config.elixir_heal_round_to
+                raw_heal = self.player_hp * pct
+                heal = round(raw_heal / round_to) * round_to
+                new_hp = min(self.player_hp_max, self.player_hp + heal)
+                actual_healed = new_hp - self.player_hp
+                self.player_hp = new_hp
+                elixir_activated_event(self, (r, ro), actual_healed, self.player_hp)
 
         if bo_positions:
             for r, ro in bo_positions:
@@ -195,7 +210,10 @@ class GameBonus(GameExecutables):
             booster_activated_event(self, bo_positions)
 
         if el_positions or bo_positions:
-            player_hp_state_event(self)
+            if spin_budget_mode:
+                spin_budget_state_event(self)
+            else:
+                player_hp_state_event(self)
 
     # --- One internal Bonus spin ----------------------------------------------
     def run_one_bonus_spin(self, both_ways: bool) -> None:
@@ -330,16 +348,27 @@ class GameBonus(GameExecutables):
         self.gametype = self.config.freegame_type
         both_ways = self.config.bonus_both_ways[tier]
 
-        granted = random.choice(self.config.bonus_player_hp_choices[tier])
-        if self.config.use_flat_damage.get(tier, False):
-            # Flat-damage system's damage values (flat_symbol_damage,
-            # flat_wild_damage, flat_boss_counterattack_damage) are all
-            # small whole integers - Player HP must stay an integer too,
-            # not a stray decimal from multiplying by a fractional rescale
-            # factor (e.g. 200*0.026=5.2).
-            granted = round(granted * self.config.flat_damage_player_hp_initial_mult.get(tier, 1.0))
-        self.player_hp = float(granted)
-        self.player_hp_max = float(granted)
+        spin_budget_mode = self.config.use_spin_budget.get(tier, False)
+        if spin_budget_mode:
+            # EXPERIMENTAL (use_spin_budget) - see game_config.py's
+            # docstring. Player HP is never granted/read/spent in this
+            # mode; it stays at 0.0 for event-schema compatibility only
+            # (bonus_trigger_event/player_hp_state_event/bonus_end_event
+            # still fire unchanged - see below).
+            self.spins_remaining = self.config.spin_budget_initial.get(tier, 8)
+            self.player_hp = 0.0
+            self.player_hp_max = 0.0
+        else:
+            granted = random.choice(self.config.bonus_player_hp_choices[tier])
+            if self.config.use_flat_damage.get(tier, False):
+                # Flat-damage system's damage values (flat_symbol_damage,
+                # flat_wild_damage, flat_boss_counterattack_damage) are all
+                # small whole integers - Player HP must stay an integer too,
+                # not a stray decimal from multiplying by a fractional rescale
+                # factor (e.g. 200*0.026=5.2).
+                granted = round(granted * self.config.flat_damage_player_hp_initial_mult.get(tier, 1.0))
+            self.player_hp = float(granted)
+            self.player_hp_max = float(granted)
         self.booster_pending_for_next_spin = False
         self.booster_multiplier_current_spin = 1.0
         self.stage6_loop_count = 0
@@ -355,11 +384,16 @@ class GameBonus(GameExecutables):
 
         bonus_trigger_event(self, tier, self.player_hp, self.player_hp_max, start_stage)
         player_hp_state_event(self)
+        if spin_budget_mode:
+            spin_budget_state_event(self)
         boss_state_event(self)
 
         spin_count = 0
         end_reason = "safety_cap"
-        while self.player_hp > 0 and spin_count < self.config.bonus_safety_cap_spins:
+        while (
+            (self.spins_remaining > 0 if spin_budget_mode else self.player_hp > 0)
+            and spin_count < self.config.bonus_safety_cap_spins
+        ):
             spin_count += 1
             # Booster's x2/x3-boss-damage flag (set at the END of the
             # PREVIOUS spin, if a Booster was collected there) applies for
@@ -406,6 +440,22 @@ class GameBonus(GameExecutables):
             if self.wincap_triggered:
                 end_reason = "wincap"
                 break
+
+            if spin_budget_mode:
+                # EXPERIMENTAL (use_spin_budget) - see game_config.py's
+                # docstring. UNCONDITIONAL: every internal spin taken
+                # always costs exactly 1, regardless of what the
+                # boss_system_active branch below does with it this same
+                # iteration (a stage-clear, an endless-stage6-reroll
+                # `continue`, or a boss_counterattack_grace spin - none of
+                # those get to skip this, unlike the old HP-counterattack
+                # block they'd have skipped). A spin budget has no
+                # escalating counter-pressure the way HP-vs-boss_dam does,
+                # so any conditional skip here would let super/hidden farm
+                # the endless tail for free up to bonus_safety_cap_spins.
+                self.spins_remaining -= 1
+                spin_budget_state_event(self)
+
             if not self.boss_system_active:
                 if not self.config.stage6_endless_tiers.get(tier, False):
                     # This tier is excluded from the endless tail (see
@@ -457,6 +507,22 @@ class GameBonus(GameExecutables):
                 boss_state_event(self)
                 continue
 
+            if spin_budget_mode:
+                # EXPERIMENTAL (use_spin_budget) - Player HP is never
+                # spent in this mode (see game_config.py's docstring for
+                # why Elixir/HP become dead levers here); the loop's own
+                # while-condition (spins_remaining > 0) is what actually
+                # ends the session. This explicit break only matters for a
+                # correct end_reason LABEL on the one iteration that empties
+                # the budget - the safety-net check after the loop (below)
+                # covers the case where an earlier `continue` in the
+                # boss_system_active branch above skipped straight past
+                # this line on that same iteration.
+                if self.spins_remaining <= 0:
+                    end_reason = "spins_depleted"
+                    break
+                continue
+
             if self.boss_counterattack_grace:
                 # This trio's first static state since it was rolled - no
                 # counter-attack this spin, consumed once.
@@ -475,6 +541,16 @@ class GameBonus(GameExecutables):
             if self.player_hp <= 0:
                 end_reason = "hp_depleted"
                 break
+
+        # Safety net: if the loop exited via its own while-condition
+        # (spins_remaining already hit 0 on an iteration whose body took an
+        # early `continue` above - e.g. an endless-stage6 reroll on the
+        # exact same spin the budget emptied - rather than the explicit
+        # `break` a few lines up), end_reason is still stuck at the
+        # "safety_cap" default from initialization. Correct it here rather
+        # than trying to cover every such interleaving inline above.
+        if spin_budget_mode and end_reason == "safety_cap" and self.spins_remaining <= 0:
+            end_reason = "spins_depleted"
 
         self.bonus_spin_count = spin_count
         self.bonus_end_reason = end_reason

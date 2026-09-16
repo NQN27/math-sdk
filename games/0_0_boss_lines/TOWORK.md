@@ -12,6 +12,42 @@ backend state produces byte-identical output to what's committed).
 
 ## Blocking / high severity
 
+- [ ] **NEW, UNTUNED (2026-09-16): fixed-spin-budget mechanic**, per
+      explicit game-designer request ("sửa lại cơ chế bỏ máu người chơi
+      thay vào đó là số lượt spin cố định, lên stage sau thì + lượt spin" -
+      replace the Player-HP/counterattack session-ending mechanic with a
+      fixed spin budget, top up on stage clear). Implemented as
+      `use_spin_budget` (per-tier, default OFF everywhere - same
+      experimental-flag convention as `use_flat_damage`/
+      `use_inplace_tumble`, see game_config.py's docstring for the full
+      design, including why the per-spin decrement must be UNCONDITIONAL
+      to keep the endless stage-6 tail bounded). Values per spec: Normal
+      starts at 6 spins, +random(1,3) per stage clear (`spin_budget_
+      initial`/`spin_budget_per_stage_clear` in game_config.py). Elixir
+      repurposed to grant spins instead of a %-HP heal in this mode (was a
+      dead-code risk otherwise - see the config docstring).
+      Syntax/sanity-verified (`_tuning_scratch/spin_budget_test.py`, n=500,
+      `use_spin_budget["normal"]=True`, everything else at its current
+      committed state) - runs clean, no crash, no runaway (safety_cap never
+      hit; end_reason splits 51.4% spins_depleted / 48.6% stage_cleared).
+      **But the resulting economy is wildly off any prior target**: mean=
+      882.71x, median=339.25x, avg spins/session=27.04 (vs production's own
+      ~11), and 48.6% of sessions reach stage 6 (vs the tuned system's
+      single-digit-percent reach rate) - because removing HP-based death
+      removes the main way sessions used to end early; a session now only
+      ends by running out of budget or by completing all 6 stages, and
+      since clearing a stage is pure upside (never costs budget, only adds
+      to it), sessions snowball forward far more than the old system ever
+      allowed. `boss_stage_table`/`reward_drop_weights_normal_bonus` are
+      still the OLD values tuned for the HP-vs-damage risk model - none of
+      that carries over to a spin-budget model with no retuning. **Needs a
+      decision before this is usable**: retune the initial/per-stage-clear
+      spin numbers and/or the reward table for this mechanic specifically
+      (same measure-iterate discipline as every other lever in this file),
+      or treat these numbers as informational only until asked to tune
+      further. Flag stays OFF in the committed config either way - this is
+      a capability, not a live change.
+
 - [ ] **PENDING DECISION (handoff, 2026-09-04): in-place tumble mechanic,
       implemented + tested but NOT adopted.** Game designer's idea: replace
       exploded symbols in their own cell (nothing else moves) instead of the
