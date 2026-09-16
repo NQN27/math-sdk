@@ -103,7 +103,16 @@ class GameExecutables(GameCalculations):
             # game_config.bonus_stage_deadspin_chance's docstring for
             # measured effect.
             tier = getattr(self, "bonus_tier", None)
-            chance = self.config.bonus_stage_deadspin_chance.get(tier, {}).get(self.stage, 0.0)
+            # GATED TO use_spin_budget (2026-09-16, see
+            # bonus_stage_deadspin_chance's docstring in game_config.py) -
+            # stays 0.0 for the live HP-based/flat-damage systems even if
+            # this dict has nonzero entries, so populating it for the
+            # spin-budget economy can't silently regress those already-
+            # validated systems.
+            if self.config.use_spin_budget.get(tier, False):
+                chance = self.config.bonus_stage_deadspin_chance.get(tier, {}).get(self.stage, 0.0)
+            else:
+                chance = 0.0
         else:
             return
         routed_any = False
@@ -713,10 +722,21 @@ class GameExecutables(GameCalculations):
         """
         triggered = getattr(self, "chain_block_pending", False)
         if not triggered:
-            extra = getattr(self, "chain_pass_count", 0) - self.config.chain_block_threshold
+            tier = getattr(self, "bonus_tier", None)
+            if tier and self.config.use_spin_budget.get(tier, False):
+                # EXPERIMENTAL (2026-09-16) - see game_config.py's
+                # spin_budget_chain_block_threshold/_step docstring for why
+                # this is a separate override rather than editing the
+                # shared chain_block_threshold/chain_block_step directly.
+                threshold = self.config.spin_budget_chain_block_threshold.get(tier, self.config.chain_block_threshold)
+                step = self.config.spin_budget_chain_block_step.get(tier, self.config.chain_block_step)
+            else:
+                threshold = self.config.chain_block_threshold
+                step = self.config.chain_block_step
+            extra = getattr(self, "chain_pass_count", 0) - threshold
             if extra < 0:
                 return
-            chance = min(1.0, self.config.chain_block_step * (extra + 1))
+            chance = min(1.0, step * (extra + 1))
             if random.random() >= chance:
                 return
             triggered = True

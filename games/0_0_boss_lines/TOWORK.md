@@ -48,6 +48,37 @@ backend state produces byte-identical output to what's committed).
       further. Flag stays OFF in the committed config either way - this is
       a capability, not a live change.
 
+      **STABILIZED 2026-09-16**, per explicit request ("tinh chỉnh deadspin
+      và chain-block để back về ổn định", "ưu tiên giảm chain quá dài
+      trước", "để tỉ lệ deadspin là 30% rồi tinh chỉnh block chain hợp
+      lý"). Rather than editing the shared `chain_block_threshold`/
+      `chain_block_step` (already validated for the live HP-based/flat-
+      damage systems at 2/0.26 - iteration 9b, n=40000), added a
+      `use_spin_budget`-ONLY override pair (`spin_budget_chain_block_
+      threshold`/`_step`) so tightening chain-block for this economy can't
+      silently regress those already-locked systems - see game_config.py's
+      docstring. Same gating applied to `bonus_stage_deadspin_chance`
+      (previously ungated, would have affected every tier/system the
+      instant it went non-zero) - now reads 0.0 unless `use_spin_budget` is
+      on for that tier.
+      Deadspin fixed at 30% flat across all 6 stages (per spec) with
+      chain-block as the tuned lever (per spec, chain-block prioritized
+      first): swept `spin_budget_chain_block_step` at threshold=1 from
+      0.35 to 0.80 (n=1500 each) - 0.35->219.47x mean, 0.45->163.66x,
+      0.55->131.17x, 0.65->115.37x, 0.80->81.04x (threshold=0/step=0.60 was
+      tried first and overshot the other way, 54.47x). **LOCKED: threshold=
+      1, step=0.80** - CONFIRMED at n=4000: mean=87.09x, median=25.10x,
+      ratio=28.8%, avg spins/session=12.27 (close to production's own
+      ~11), stage-end% {1:60.1, 2:29.5, 3:5.88, 4:1.07, 5:0.53, 6:2.92}
+      (stage6 reach now close to production's own low-single-digit rate,
+      down from the untuned pass's 49.67%), safety_cap never hit.
+      Scratch: `_tuning_scratch/spin_budget_test.py`.
+      **Still open**: median (25.10x) sits below the live system's own
+      ~30-40x target band - not separately chased this pass since no
+      explicit median constraint was given this time (unlike the earlier
+      flat-damage mean-under-85 pass, where "giữ median" was explicit).
+      Flag stays OFF in the committed config regardless.
+
 - [ ] **PENDING DECISION (handoff, 2026-09-04): in-place tumble mechanic,
       implemented + tested but NOT adopted.** Game designer's idea: replace
       exploded symbols in their own cell (nothing else moves) instead of the

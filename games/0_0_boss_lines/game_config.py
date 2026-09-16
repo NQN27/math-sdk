@@ -170,6 +170,29 @@ class GameConfig(Config):
         self.chain_block_threshold = 2
         self.chain_block_step = 0.26
 
+        # EXPERIMENTAL (2026-09-16) - use_spin_budget-ONLY chain-block
+        # override (see game_executables._maybe_apply_chain_block). The
+        # shared chain_block_threshold/chain_block_step above stay the
+        # single source of truth for every OTHER system (live HP-based
+        # cascade, flat-damage) - both already validated against those
+        # exact values (iteration 9b, n=40000: 79.84x+/-2.04); tightening
+        # chain-block GLOBALLY to fix the spin-budget economy would
+        # silently regress that already-locked calibration, the same class
+        # of bug this file has hit twice before (the Wild-col0 fix and the
+        # power_multi_factor_weights global-vs-scoped bug - see their own
+        # comments). A tier absent from these dicts falls back to the
+        # shared values above unchanged - only "normal" (the only tier
+        # with use_spin_budget on) is populated.
+        #
+        # Per explicit request: cut chains much shorter than the live
+        # system's own 2/0.26 (removing HP-based death removed the main
+        # brake on how far a session progresses per spin under a FIXED
+        # spin budget, so cascades need to do less work per spin here).
+        # PLACEHOLDER pending measurement - see
+        # _tuning_scratch/spin_budget_test.py.
+        self.spin_budget_chain_block_threshold = {"normal": 1}
+        self.spin_budget_chain_block_step = {"normal": 0.80}
+
         # EXPERIMENTAL (2026-09-06, game designer's idea): per-tier, per-
         # stage deadspin chance, reusing the same Controlled Deadspin
         # Routing primitive as deadspin_force_chance/bonus_grace_deadspin_
@@ -186,7 +209,16 @@ class GameConfig(Config):
         # from this dict gets no extra deadspin at all (0.0 default via
         # .get()). NOT YET VALIDATED - starting point for the same
         # measure-and-iterate pass as every other lever here.
-        self.bonus_stage_deadspin_chance = {"normal": {}}
+        #
+        # GATED TO use_spin_budget ONLY (2026-09-16, see
+        # game_executables.create_board_reelstrips): this was still
+        # unused/all-zero for every tier when the spin-budget mechanic was
+        # built, so populating it now to help control THAT economy is safe
+        # only if it stays inert for the live HP-based/flat-damage systems
+        # (both already validated with this at 0.0/dormant) - reads as 0.0
+        # for any tier without use_spin_budget on, regardless of what's in
+        # this dict. Flat 30% per explicit request, every stage 1-6.
+        self.bonus_stage_deadspin_chance = {"normal": {s: 0.30 for s in range(1, 7)}}
         # "Reverse deadspin" counterpart - see game_executables.
         # _route_column_force_connect's docstring for the mechanism (biases
         # a column toward CONNECTING to its neighbor instead of breaking).
