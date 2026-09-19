@@ -12,6 +12,78 @@ backend state produces byte-identical output to what's committed).
 
 ## Blocking / high severity
 
+- [ ] **Normal Bonus SWITCHED LIVE to spin-budget (2026-09-17/20)** - per
+      explicit request ("đổi sang từ HP sang spin trước"),
+      `use_spin_budget["normal"]` flipped `False -> True`: Normal Bonus now
+      ends via the fixed-spin-budget mechanic (see the earlier "fixed-
+      spin-budget mechanic" item below for the mechanic itself), NOT the
+      old Player-HP/counterattack system, as the real shipped default -
+      not just an experiment anymore.
+      Last-hit mechanic REDESIGNED twice this pass (see game_config.py's
+      `boss_last_hit_base_chance`/`_scale` docstring for full detail): v1
+      rolled per exploding CELL (measured 2-3x mean inflation across every
+      tier - too frequent), v2 rolls ONCE per boss per PASS instead
+      (aggregated - `game_executables.resolve_pass_last_hit`), which
+      brought the inflation back down to near-zero. Formula unchanged:
+      `chance = (1 - current_hp/max_hp) * scale + base_chance`, currently
+      `scale=0.02`/`base=0.005`.
+      `reward_drop_weights_normal_bonus` went through a 6-round combined
+      pass this session (percentile-shape "shoulder" build via 100-1000
+      tier weight/value boosts, then a K_low=0.884/K_high=1.39 SPLIT
+      rescale relative to an intermediate K=0.78 uniform rescale - see the
+      dict's own inline comments for the full round-by-round numbers) to
+      land mean/median near explicit targets (mean=88.9x priority, median
+      ~24x secondary). **CONFIRMED at n=20000 (twice, consistent): mean=
+      88.20x (-0.45% vs 88.9 target), median=25.93x (+8.0% vs 24 target)**.
+      Percentile shape vs. a separately-given target table still
+      undershoots in the p60-p95 "shoulder" band (-13% to -48% depending
+      on percentile - see the config's own round-by-round table) and at
+      p99.5 (-39%) - accepted as a known gap once mean hit its priority
+      target, not further chased this pass.
+      **IMPORTANT COUPLING FOUND**: `reward_drop_weights_normal_bonus` is
+      selected purely by `bonus_tier == "normal"` in
+      `game_executables.py` - it is NOT gated by `use_spin_budget`. Since
+      Normal is now live on spin_budget, this is currently moot (both
+      paths agree), but if `use_spin_budget["normal"]` is ever flipped
+      back to `False` for any reason, the live HP-based Normal Bonus would
+      silently inherit this same heavily-rescaled table (last validated
+      for the OLD HP-based system at 79.84x, iteration 9b) - re-verify
+      that table's own fit before ever reverting the flag.
+      Deadspin (`bonus_stage_deadspin_chance["normal"]`, per-stage) and
+      the `spin_budget_chain_block_threshold`/`_step["normal"]` override
+      both went through several measured rounds too (see their own
+      config comments) - current values on disk (`{1:0.27, 2-6:0.38}`
+      deadspin, chain-block `threshold=1`/`step=1.0`) reflect the actual
+      committed state; trust `game_config.py` directly over this summary
+      if they ever drift, per this file's own top-of-file convention.
+
+- [ ] **Super Bonus PORTED to spin-budget, config wired but UNMEASURED
+      (2026-09-20)** - per explicit request ("add các config mới này cho
+      super... mục tiêu như cũ với super"), same mechanic Normal just
+      switched to, this time targeting SUPER'S OWN pre-existing designer
+      mean target (240.77x - NOT Normal's 88.9x). `use_spin_budget["super"]`
+      flipped `False -> True`. New per-tier entries added, ALL still raw
+      placeholders with zero measurement behind them:
+      `bonus_stage_deadspin_chance["super"]` (flat 30% across stages 2-6,
+      Super's own stage range per `bonus_start_stage["super"]=2`),
+      `spin_budget_chain_block_threshold["super"]=1`/`_step["super"]=0.80`
+      (arbitrary first guess, not fit to Super). `spin_budget_initial
+      ["super"]=8` was already sitting here from the original Normal-only
+      pass - kept because it happens to match Super's own natural ~8-spin
+      average session length under the OLD system (see
+      `bonus_rescue_roll`'s "trung binh game 8 spin" note), a better-
+      grounded starting guess than an arbitrary number would be.
+      `reward_drop_weights_super_bonus` has NOT been touched at all -
+      Super's economy is line-pay-DOMINATED (75.4% of total, the OPPOSITE
+      of Normal's reward-drop-dominated split), so it almost certainly
+      needs its own K-rescale/shoulder pass once real numbers come in, not
+      a copy of Normal's approach.
+      Sanity-checked only: 20 sessions run via `run_bonus_session("super")`
+      with the flag on - no crash. **No economy measurement has been run
+      yet** - needs the same measure-iterate pass (chain-block/deadspin
+      first, reward table if that's insufficient) Normal went through,
+      from scratch, targeting 240.77x.
+
 - [ ] **REMOVED the finishing-blow guarantee, replaced with a rare low-HP
       execute chance (2026-09-16)**, per explicit request ("Bỏ cơ chế last
       hit đó đi thay vào đó là đổi sang cơ chế khi máu boss thấp có tỉ lệ

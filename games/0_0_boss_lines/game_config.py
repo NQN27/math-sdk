@@ -190,8 +190,13 @@ class GameConfig(Config):
         # spin budget, so cascades need to do less work per spin here).
         # PLACEHOLDER pending measurement - see
         # _tuning_scratch/spin_budget_test.py.
-        self.spin_budget_chain_block_threshold = {"normal": 1}
-        self.spin_budget_chain_block_step = {"normal": 0.80}
+        # SUPER PORTED 2026-09-20 (see use_spin_budget's own docstring
+        # above) - starting placeholder threshold=1/step=0.80, an
+        # arbitrary but reasonable first guess (matches an earlier value
+        # Normal's own tuning passed through, not a measured fit for
+        # Super). NOT YET MEASURED against Super's 240.77x target.
+        self.spin_budget_chain_block_threshold = {"normal": 1, "super": 1}
+        self.spin_budget_chain_block_step = {"normal": 1.0, "super": 0.80}
 
         # EXPERIMENTAL (2026-09-06, game designer's idea): per-tier, per-
         # stage deadspin chance, reusing the same Controlled Deadspin
@@ -217,8 +222,23 @@ class GameConfig(Config):
         # only if it stays inert for the live HP-based/flat-damage systems
         # (both already validated with this at 0.0/dormant) - reads as 0.0
         # for any tier without use_spin_budget on, regardless of what's in
-        # this dict. Flat 30% per explicit request, every stage 1-6.
-        self.bonus_stage_deadspin_chance = {"normal": {s: 0.30 for s in range(1, 7)}}
+        # this dict. Flat 30% -> 35% -> 33% (2026-09-17, per explicit
+        # request - 35% pulled median down more than wanted), every stage
+        # 1-6.
+        # SUPER PORTED 2026-09-20 (see use_spin_budget's own docstring
+        # above) - flat 30% starting placeholder across Super's own stage
+        # range (2-6, per bonus_start_stage["super"]=2 - stage 1 never
+        # happens for Super), same starting point Normal's own tuning pass
+        # began from before iterating to 27%/38%. NOT YET MEASURED against
+        # Super's 240.77x target - Super's own combat dynamics (wider
+        # power_multi_factor_weights, booster_damage_multiplier=3.0,
+        # stage6 endless tail) differ enough from Normal's that this value
+        # should NOT be assumed to land anywhere near Normal's own final
+        # 27%/38% split without its own measure-iterate pass.
+        self.bonus_stage_deadspin_chance = {
+            "normal": {1: 0.27, 2: 0.38, 3: 0.38, 4: 0.38, 5: 0.38, 6: 0.38},
+            "super": {2: 0.30, 3: 0.30, 4: 0.30, 5: 0.30, 6: 0.30},
+        }
         # "Reverse deadspin" counterpart - see game_executables.
         # _route_column_force_connect's docstring for the mechanism (biases
         # a column toward CONNECTING to its neighbor instead of breaking).
@@ -834,8 +854,42 @@ class GameConfig(Config):
         # this spec (only Normal was requested) - left at the same shape
         # for type-consistency, but unverified/unused while their own flag
         # stays False.
-        self.use_spin_budget = {"normal": False, "super": False, "hidden": False}
-        self.spin_budget_initial = {"normal": 6, "super": 8, "hidden": 8}
+        # FLIPPED TO LIVE 2026-09-17 for "normal" (per explicit request:
+        # "đổi sang từ HP sang spin trước" - switch Normal Bonus over to
+        # the spin-budget mechanic as the real live default, not just an
+        # experiment). This is the first tier to switch off the old HP-
+        # based/counterattack ending mechanic entirely - Super/Hidden stay
+        # on it (their own spin-budget placeholders above are still
+        # unmeasured, per the Super-vs-Normal comparison this session did).
+        # Normal's spin-budget economy was tuned across this whole session
+        # to mean~88.2x/median~25.9x against an explicit target of
+        # mean=88.9x (see TOWORK.md for the full round-by-round history:
+        # deadspin=33%, spin_budget_chain_block threshold=1/step=0.80,
+        # boss_last_hit base=0.005/scale=0.02 per-pass-aggregated, and the
+        # reward_drop_weights_normal_bonus K_low/K_high split-rescale).
+        # SUPER PORTED 2026-09-20 (per explicit request: "add các config
+        # mới này cho super... mục tiêu như cũ với super"), same
+        # mechanic/flag Normal already uses, targeting SUPER'S OWN
+        # pre-existing designer mean target (240.77x - see "CORRECTED
+        # TARGETS" comment near boss_stage_table below), NOT Normal's
+        # 88.9x. spin_budget_initial["super"]=8 was already sitting here
+        # as an untouched placeholder before this - kept as the starting
+        # point since it happens to match Super's own natural ~8-spin
+        # average session length under the OLD HP-based system (see
+        # bonus_rescue_roll's docstring: "trung binh game 8 spin"), a much
+        # better-grounded starting guess than Normal's own initial=7 was.
+        # spin_budget_per_stage_clear["super"]=(1,3)/elixir_spin_budget_
+        # grant["super"]=1 are still raw, unmeasured placeholders, same
+        # shape as Normal's before its own tuning pass. NOT YET MEASURED
+        # against the 240.77x target - needs the same measure-iterate pass
+        # Normal went through (deadspin/chain-block first, then
+        # reward_drop_weights_super_bonus if that alone isn't enough -
+        # Super's own reward table has NOT been touched by any of this
+        # session's work and almost certainly needs its own K-rescale/
+        # shoulder pass, since Super's economy is line-pay-dominated
+        # (75.4%) rather than reward-drop-dominated like Normal).
+        self.use_spin_budget = {"normal": True, "super": True, "hidden": False}
+        self.spin_budget_initial = {"normal": 7, "super": 8, "hidden": 8}
         self.spin_budget_per_stage_clear = {"normal": (1, 3), "super": (1, 3), "hidden": (1, 3)}
         self.elixir_spin_budget_grant = {"normal": 1, "super": 1, "hidden": 1}
 
@@ -1024,42 +1078,67 @@ class GameConfig(Config):
             "super": {"trigger_prob": 1.0 / 8.0, "floor": 5.0, "band_high": 10.0},
         }
 
-        # --- Low-HP execute chance (2026-09-16) --------------------------
+        # --- Last-hit ("execute") chance (2026-09-17) --------------------
         # REPLACES the old end-of-session "finishing blow" guarantee (see
         # git history / _tuning_scratch/consolation_test.py for that
         # mechanic's own validation record - it guaranteed a 0-kill session
         # always landed at least 1 kill, specifically to hit the "0-10x ~
-        # 0%" designer requirement for Super/Hidden). Per explicit request:
-        # remove the guarantee entirely and replace it with an ONGOING,
-        # RARE per-spin chance for any ALIVE boss already at or below
-        # `boss_low_hp_execute_threshold_pct` of its own max HP to be
-        # instantly finished off - same on_boss_defeated path a real kill
-        # takes (reward-drop roll, stage-clear check, events), just
-        # triggered by a roll instead of damage reaching exactly 0. See
-        # game_bonus.run_bonus_session for the check site (runs once per
-        # ordinary internal spin, for every tier - NOT gated by
-        # use_spin_budget, unlike this session's other new levers, since
-        # this replaces a mechanic that applied to all 3 tiers).
+        # 0%" designer requirement for Super/Hidden) AND supersedes the
+        # 2026-09-16 flat per-spin placeholder (threshold_pct/flat 5%
+        # chance) that briefly stood in for it - per explicit spec:
         #
-        # THIS IS NOT A GUARANTEE, unlike what it replaces - a session can
-        # still end with 0 kills (and therefore under 10x) if the chance
-        # never lands, by explicit design ("cơ chế này sẽ rare để kích
-        # hoạt"). Applied identically to Normal/Super/Hidden for now, per
-        # explicit request ("sẽ thay thế cho cả 3 trước mắt ko cần đo super
-        # hay hidden") - Super/Hidden's own "0-10x ~ 0%" requirement is
-        # THEREFORE NO LONGER GUARANTEED and has NOT been re-measured
-        # against this change (the old guarantee's validation record above
-        # is now stale for all 3 tiers). Needs its own re-measurement pass
-        # before being treated as still satisfying that requirement.
+        #   chance = (1 - current_hp / max_hp) * boss_last_hit_scale
+        #            + boss_last_hit_base_chance
         #
-        # PLACEHOLDER values, not yet tuned - threshold chosen so only a
-        # boss already nearly dead qualifies (15% of its own max HP, which
-        # itself varies +/-25% per boss_variance_range, so this is relative
-        # to each individual boss's own rolled max, not a fixed number);
-        # chance chosen deliberately low/rare per the explicit request
-        # above, not measured against any target yet.
-        self.boss_low_hp_execute_threshold_pct = 0.15
-        self.boss_low_hp_execute_chance = 0.05
+        # `current_hp` is the boss's HP BEFORE damage. Only rolled when that
+        # damage would NOT already reduce the boss to <=0 (a hit that
+        # already kills the boss doesn't need a "last hit" - it already is
+        # one).
+        #
+        # GRANULARITY (2026-09-17 v2, per explicit follow-up correction):
+        # first built as a roll per INDIVIDUAL exploding cell/instance (see
+        # game_executables.deal_damage_to_boss's old version in git
+        # history) - measured to fire far too often, since a single
+        # whole-board-explode pass can have dozens of exploding cells, each
+        # an independent roll (Normal HP-based mean 80.82x -> 193.78x,
+        # Super 240-260x target -> 779.72x, n=2000 each - roughly 2-3x
+        # inflation across every tier). Per explicit correction ("Ko nên
+        # tính theo ô... nên chỉ nên tính khi có connection gây damage vào
+        # boss đấy"), re-scoped to roll ONCE per boss per PASS instead:
+        # every exploding instance in a pass still deals its own raw
+        # damage (unchanged, still correctly re-routed live if a boss dies
+        # mid-pass), but `current_hp`/the last-hit roll itself only happens
+        # once per boss, using the boss's HP at the START of the pass (not
+        # per individual instance) and firing only if the boss is still
+        # alive after the WHOLE pass's combined damage - see
+        # game_executables.resolve_pass_last_hit, called once per pass from
+        # game_calculations.evaluate_and_explode, right after the exploding
+        # loop. A single pass therefore rolls at most 3 times (once per
+        # boss), not once per exploding cell.
+        #
+        # The chance scales linearly with how LOW the boss's HP already is:
+        # a full-HP boss (current_hp/max_hp = 1) only gets the base 0.5%;
+        # a boss already chipped down near 0 HP approaches 0.5% + scale.
+        #
+        # THIS IS NOT A GUARANTEE, same as the mechanic it replaces - a
+        # session can still end with 0 kills (and therefore under 10x) if
+        # the chance never lands. Applied identically to Normal/Super/
+        # Hidden (per explicit request, not scoped to use_spin_budget) and
+        # to both the random-range AND flat-damage damage systems
+        # (deal_damage_to_boss/resolve_pass_last_hit are shared code, gated
+        # by neither use_flat_damage nor use_spin_budget) - Super/Hidden's
+        # own "0-10x ~ 0%" requirement is THEREFORE NO LONGER GUARANTEED and
+        # has NOT been re-measured against this change (same open item as
+        # the 2026-09-16 removal, carried over unchanged).
+        #
+        # scale lowered 0.045 -> 0.02 per explicit request, ON TOP OF the
+        # per-cell -> per-pass re-scoping above (both moves reduce roll
+        # frequency/impact - not yet re-measured together at this exact
+        # combination for Normal HP-based/Super/Hidden per explicit
+        # instruction to only track the spin-budget economy going forward -
+        # see TOWORK.md). base_chance unchanged.
+        self.boss_last_hit_base_chance = 0.005
+        self.boss_last_hit_scale = 0.02
 
         self.max_stage = max(self.boss_stage_table.keys())
         self.boss_variance_range = (0.75, 1.25)
@@ -1448,10 +1527,37 @@ class GameConfig(Config):
         # level (was dialed back to 1.5x in 8b to save mean - now going
         # to ~2.2x) to grow p85/p90/p95. Watching mean carefully to stay
         # near/under 90.
+        # SPIN-BUDGET MEAN/MEDIAN RESCALE (2026-09-17): after 4 rounds of
+        # shoulder-building (see the 100-1000 tiers below), mean/median had
+        # drifted up to 113.56x/30.60x - per explicit request (target mean
+        # 88.6x, median 24x, ratio 88.6/113.56=0.780 and 24/30.60=0.784,
+        # close enough to treat as one factor), rescaled EVERY tier VALUE
+        # in this whole table (both the regular pool below and the chest
+        # tiers further down) by a single K=0.78, weights UNCHANGED - same
+        # "uniform K-rescale preserves shape, weights untouched" technique
+        # as the 2026-08-18 K=4.28 rescale elsewhere in this file's
+        # history.
+        #
+        # MEASURED (n=15000) after that single-K pass: mean=75.04x (target
+        # 88.6, UNDERSHOT by -15%), median=27.15x (target 24, OVERSHOT by
+        # +13%) - a single scalar can't fix both at once when they need to
+        # move in OPPOSITE directions. Split into two factors per explicit
+        # follow-up ("Tiếp tục đi"): the highest-weight/lowest-value tiers
+        # (this block, originally 1-80) dominate the SESSION MEDIAN by
+        # sheer draw frequency (a typical 1-3-kill session draws almost
+        # entirely from here) but barely move the mean (their absolute
+        # values are tiny); the 100+/chest tiers below dominate the MEAN
+        # (rare but huge) while barely touching the median. Applied a
+        # further K_low=0.884 (24/27.15) ON TOP of the K=0.78 above to
+        # this block specifically, and K_high=1.22 to the 100+/chest
+        # blocks below (net effect vs the ORIGINAL pre-K=0.78 values:
+        # this block x0.78x0.884=0.690, the 100+/chest blocks
+        # x0.78x1.22=0.952) - NOT yet re-measured at this exact split,
+        # first attempt.
         self.reward_drop_weights_normal_bonus = {
-            1: 288, 2: 230, 3: 720, 4: 568, 5: 605, 6: 492, 8: 400,
-            10: 110, 12: 85, 15: 65, 18: 48, 20: 60, 25: 44,
-            30: 36, 35: 29.3, 40: 24.1, 50: 19.6, 60: 16.1, 80: 13.2,
+            0.69: 288, 1.38: 230, 2.07: 720, 2.76: 568, 3.45: 605, 4.14: 492, 5.52: 400,
+            6.9: 110, 8.28: 85, 10.34: 65, 12.41: 48, 13.79: 60, 17.24: 44,
+            20.69: 36, 24.13: 29.3, 27.58: 24.1, 34.48: 19.6, 41.38: 16.1, 55.16: 13.2,
             # ITERATION 13 (2026-09-14, flat-damage mean-under-85 pass): cut
             # -60% on top of the values below (17/13.5/11/7.5/8/4.3 -> x0.40)
             # per explicit request to bring flat-damage's mean under 85
@@ -1471,7 +1577,32 @@ class GameConfig(Config):
             # this tier all the way back to its pre-iteration-13 level
             # (x1.0, no cut) to compensate, rather than stacking two
             # mean-reducing cuts on top of each other.
-            100: 17, 120: 13.5, 150: 11, 180: 7.5, 200: 8, 250: 4.3,
+            # SPIN-BUDGET SHOULDER PASS (2026-09-17): per explicit request
+            # to try adjusting multiple tiers together in one combined
+            # pass, rather than one lever at a time - a percentile check
+            # against a new target table (_tuning_scratch/
+            # spin_budget_percentile_check.py) found p50/p99/p99.5 already
+            # close, but p60-p95 badly UNDER target (p90 measured 102.4 vs
+            # target 250, p95 measured 205.8 vs target 500 - up to -59%) -
+            # a missing "shoulder" between the median and the chest-driven
+            # tail. Boosted ONLY the 100-1000 regular-pool tiers (weight,
+            # several also value) to build that shoulder, deliberately
+            # leaving the 1-80 tiers (which set the median/mode - already
+            # correct) and the chest-exclusive 275-1500 tiers (which set
+            # p99+ - already roughly correct) untouched, so this pass
+            # targets exactly the gap and nothing already working. NOT YET
+            # measured against the target table - first combined attempt.
+            # ROUND 2 (2026-09-17): p75-p85 still -35% to -46% under target
+            # after round 1 - pushed 100-250 further (roughly x1.5).
+            # ROUND 4 (2026-09-17): p75-p95 still -27% to -38% under target
+            # after round 3 - pushed 250 further to keep feeding that zone.
+            # Values below rescaled x0.78 along with the rest of the table
+            # (see the mean/median rescale note above) - weights unchanged.
+            # K_high pushed 1.34 -> ~1.39 (extra x1.04, per explicit
+            # priority on hitting mean=88.6 exactly - was 86.50, -2.4%) -
+            # 104.68/125.61/157.01/188.42/209.35/261.69 ->
+            # 108.87/130.63/163.29/195.96/217.72/272.16.
+            108.87: 45, 130.63: 36, 163.29: 30, 195.96: 22, 217.72: 24, 272.16: 26,
             # ITERATION 5d: 5c's -60% cut on 300/350/600/1000 overcorrected
             # - mean improved (96.03->90.27) but p85/p90/p95/p99 all
             # dropped BELOW target too (p99 685.03, undershot the 800-1000
@@ -1500,7 +1631,23 @@ class GameConfig(Config):
             # =True): mean=95.28x (close to the ~90 ceiling), p50-p95 track
             # target closely (p50=33.31/p75=61.36/p85=88.49/p95=207.61 vs
             # targets 37.5/80/140/350 - some now under rather than over).
-            300: 0.498, 350: 0.432, 600: 0.30, 1000: 0.198,
+            # Same SPIN-BUDGET SHOULDER PASS as 100-250 above - boosted
+            # (300/350 by ~10x, 600/1000 by ~10-12x) to keep building the
+            # shoulder up through the 300-1000 range too, right below the
+            # chest-exclusive tiers.
+            # ROUND 2: p99 overshot (+41.8% vs target) after round 1's
+            # 600/1000 boost - pulled those back down (300/350 left alone,
+            # they sit closer to the p85-p95 zone that's still under).
+            # ROUND 4: pushed 300/350 (p85-p90 zone) and nudged 600/1000
+            # (p90-p95 zone) up slightly - cautious on the latter two since
+            # round 2's version of this same push overshot p99.
+            # K_high=1.22 applied here too - 234/273/468/780 ->
+            # 285.48/333.06/570.96/951.6.
+            # Same extra x1.10 bump - 285.48/333.06/570.96/951.6 ->
+            # 314.03/366.37/628.06/1046.76.
+            # Same extra x1.04 - 314.03/366.37/628.06/1046.76 ->
+            # 326.59/381.03/653.18/1088.63.
+            326.59: 10, 381.03: 8, 653.18: 3, 1088.63: 1.3,
             # Chest tiers (applied last, same as {**REGULAR_WEIGHTS, **SEG7_CHEST}).
             # VALUES cut 2026-09-13 (not just weight - weight-only cuts were
             # tried first and measured to only relocate the tail to a higher
@@ -1535,10 +1682,33 @@ class GameConfig(Config):
             # _tuning_scratch/payout_component_split_chest.py), so this
             # value cut was no longer needed to compensate mean and was
             # trading away too much p99 headroom for no remaining benefit.
-            275: 2, 425: 1.5, 675: 1.5, 950: 9, 1100: 6, 1500: 3,
+            # ROUND 3 (2026-09-17, spin-budget shoulder pass continued):
+            # p99 overshot target even MORE after round 2's 100-250 boost
+            # (+41.8% -> +45.6%) despite pulling 600/1000 back down -
+            # chest-reaching sessions' NON-chest kills got richer too
+            # (round 1/2 boosted the whole regular pool), so their overall
+            # total rose even with chest itself untouched. Cut chest VALUES
+            # ~25-30% (not just weight - a weight-only cut was already
+            # measured elsewhere in this file to just relocate the tail
+            # without shrinking it) to compensate: 275/425/675/950/1100/
+            # 1500 -> 190/310/480/650/780/1050 (picked to avoid colliding
+            # with every other tier key in this table, same convention as
+            # every earlier chest-value change here). Weights unchanged.
+            # ROUND 4: p99.5 undershot (-18%) after round 3's cut - nudged
+            # the top 2 chest tiers back up a bit (780/1050 -> 850/1150,
+            # picked to keep avoiding every other tier key), leaving the
+            # bottom 4 alone (those set p99, already +23% over - no need
+            # to push that further).
+            # Values rescaled x0.78 along with the rest of the table (see
+            # the mean/median rescale note at the top of this dict), then
+            # K_high pushed 1.34 -> ~1.39 (same extra x1.04 as the other
+            # 100+ tiers above, per explicit priority on mean=88.6):
+            # 198.88/324.5/502.48/680.35/889.79/1203.73 ->
+            # 206.84/337.48/522.58/707.56/925.38/1251.88. Weights unchanged.
+            206.84: 2, 337.48: 1.5, 522.58: 1.5, 707.56: 9, 925.38: 6, 1251.88: 3,
         }
-        self.reward_drop_top_tiers_normal_bonus = {275, 425, 675, 950, 1100, 1500}
-        self.reward_drop_stage6_last_tiers_normal_bonus = {275, 425, 675, 950, 1100, 1500}
+        self.reward_drop_top_tiers_normal_bonus = {206.84, 337.48, 522.58, 707.56, 925.38, 1251.88}
+        self.reward_drop_stage6_last_tiers_normal_bonus = {206.84, 337.48, 522.58, 707.56, 925.38, 1251.88}
 
         # Safety cap on resolve-loop passes per spin (should never be hit by a
         # legitimate board; guards against a logic bug causing a true infinite

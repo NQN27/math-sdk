@@ -437,37 +437,15 @@ class GameBonus(GameExecutables):
                 self.award_win(topup)
                 self.win_manager.update_gametype_wins(self.gametype)
 
-            # --- Low-HP execute chance (2026-09-16) - see game_config.py's
-            # boss_low_hp_execute_threshold_pct/_chance docstring for why
-            # this REPLACES the old end-of-session finishing-blow guarantee
-            # (removed) rather than sitting alongside it. Applies to every
-            # tier identically (not gated by use_spin_budget, unlike this
-            # session's other new levers - this one stands in for a
-            # mechanic that used to cover all 3 tiers). Deliberately RARE
-            # and NOT a guarantee - a session can still end with 0 kills.
-            #
-            # Fresh reads of boss_alive/boss_hp/boss_hp_max every iteration
-            # (never a precomputed snapshot) and an immediate break the
-            # instant boss_system_active goes False: an execute earlier in
-            # this same loop can clear the stage and roll_stage_bosses a
-            # brand-new trio under the SAME boss_ids ("boss1"/"boss2"/
-            # "boss3" are stage-agnostic slot labels, reused every stage) -
-            # without this guard, a later iteration of this same for-loop
-            # could misfire against the NEW trio using a chance rolled for
-            # the OLD stage's low-HP condition.
-            if self.boss_system_active:
-                for b in self.config.boss_ids:
-                    if not self.boss_system_active:
-                        break
-                    if not self.boss_alive[b]:
-                        continue
-                    if self.boss_hp[b] <= self.config.boss_low_hp_execute_threshold_pct * self.boss_hp_max[b]:
-                        if random.random() < self.config.boss_low_hp_execute_chance:
-                            # Same reset/award/file bracket as the rescue
-                            # roll above - see its comment for why.
-                            self.win_manager.reset_spin_win()
-                            self.on_boss_defeated(b)
-                            self.win_manager.update_gametype_wins(self.gametype)
+            # NOTE: the last-hit/execute chance is no longer a per-spin
+            # check here - as of 2026-09-17 it's rolled PER HIT, inside
+            # game_executables.deal_damage_to_boss (see game_config.py's
+            # boss_last_hit_base_chance/_scale docstring for the exact
+            # formula). No open/close win_manager bracket is needed for it
+            # here since on_boss_defeated only ever fires there from
+            # within evaluate_and_explode's own normal per-instance damage
+            # loop (already inside run_one_bonus_spin's own bracket), never
+            # after run_one_bonus_spin has already closed its books.
 
             if self.wincap_triggered:
                 end_reason = "wincap"

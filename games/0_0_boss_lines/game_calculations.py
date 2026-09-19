@@ -271,6 +271,16 @@ class GameCalculations(Executables):
         # same resolve loop ... use the redirected target").
         exploding.sort(key=lambda t: (t[0], t[1]))
 
+        # Last-hit ("execute") chance (2026-09-17 v2 - see
+        # game_config.py's boss_last_hit_base_chance/_scale and
+        # game_executables.resolve_pass_last_hit): snapshot every boss's HP
+        # BEFORE this pass's damage, and reset the per-pass accumulator
+        # deal_damage_to_boss fills in below - resolved ONCE, after the
+        # whole exploding loop, not per instance (measured far too frequent
+        # otherwise - see TOWORK.md).
+        pass_start_hp = dict(self.boss_hp) if getattr(self, "boss_system_active", False) else {}
+        self._pass_boss_damage_totals = {}
+
         flat_damage_tier = getattr(self, "bonus_tier", None)
         use_flat_damage = flat_damage_tier and self.config.use_flat_damage.get(flat_damage_tier, False)
         for r, ro, kind, ref_name in exploding:
@@ -283,6 +293,9 @@ class GameCalculations(Executables):
                 if kind == "wild":
                     damage *= self.config.wild_damage_multiplier
             self.deal_damage_to_boss(r, damage)
+
+        if self._pass_boss_damage_totals:
+            self.resolve_pass_last_hit(pass_start_hp)
 
         self.pass_exploded_positions = [{"reel": r, "row": ro} for (r, ro, _, _) in exploding]
 

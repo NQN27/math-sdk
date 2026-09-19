@@ -373,16 +373,68 @@ class GameExecutables(GameCalculations):
         see game_bonus.run_one_bonus_spin) doubles every damage roll for the
         WHOLE of that one spin's resolve loop, exactly like
         wild_damage_multiplier already does for Wild-substituted damage -
-        the two stack multiplicatively if both apply to the same instance."""
+        the two stack multiplicatively if both apply to the same instance.
+
+        2026-09-17 v2: no longer rolls the last-hit chance itself - only
+        applies raw damage and accumulates this pass's running total per
+        boss into `self._pass_boss_damage_totals` for
+        `resolve_pass_last_hit` (called once, after the WHOLE pass's
+        exploding-instance loop finishes - see game_calculations.
+        evaluate_and_explode) to roll against. Per-instance rolling was
+        tried first and measured to fire far too often (a whole-board-
+        explode pass can have dozens of exploding cells, each an
+        independent roll) - see TOWORK.md."""
         if not self.boss_system_active:
             return
         boss_id = self.route_boss_for_column(col)
         if not self.boss_alive.get(boss_id, False):
             return
         damage *= getattr(self, "booster_multiplier_current_spin", 1.0)
+        totals = getattr(self, "_pass_boss_damage_totals", None)
+        if totals is not None:
+            totals[boss_id] = totals.get(boss_id, 0.0) + damage
         self.boss_hp[boss_id] = max(0.0, self.boss_hp[boss_id] - damage)
         if self.boss_hp[boss_id] <= 0:
             self.on_boss_defeated(boss_id)
+
+    def resolve_pass_last_hit(self, pass_start_hp: dict) -> None:
+        """Last-hit ("execute") chance (2026-09-17 v2 - see
+        game_config.py's boss_last_hit_base_chance/_scale docstring for the
+        full design/history, including what this replaces). Rolled ONCE per
+        boss that took any damage THIS PASS (aggregated - see
+        deal_damage_to_boss), not once per exploding cell, against:
+
+          chance = (1 - pass_start_hp[boss] / max_hp) * boss_last_hit_scale
+                   + boss_last_hit_base_chance
+
+        `pass_start_hp` is a snapshot of every boss's HP taken BEFORE this
+        pass's exploding-instance loop ran (per spec: "HP hiện tại sẽ là HP
+        trước khi bị gây damage"), passed in by the caller rather than read
+        fresh here. A boss no longer alive (`boss_alive` False) is skipped -
+        either this pass's own raw damage already killed it normally (spec:
+        "last hit chỉ xảy ra khi damage đó hiện tại không làm chết boss" -
+        it isn't eligible, it's already dead) or an earlier boss_id's
+        execute in THIS SAME loop cleared the stage and rolled a fresh trio
+        under the same reused boss_ids ("boss1"/"boss2"/"boss3" are
+        stage-agnostic slot labels) - the `self.stage != original_stage`
+        guard below stops the loop the instant that happens, so a later
+        entry can never misfire against the new stage's trio using a
+        chance/HP snapshot that belonged to the old one."""
+        original_stage = self.stage
+        for boss_id, damage_this_pass in self._pass_boss_damage_totals.items():
+            if damage_this_pass <= 0:
+                continue
+            if self.stage != original_stage or not self.boss_system_active:
+                break
+            if not self.boss_alive.get(boss_id, False):
+                continue
+            start_hp = pass_start_hp.get(boss_id, 0.0)
+            max_hp = self.boss_hp_max[boss_id]
+            hp_frac = start_hp / max_hp if max_hp > 0 else 0.0
+            chance = (1 - hp_frac) * self.config.boss_last_hit_scale + self.config.boss_last_hit_base_chance
+            if random.random() < chance:
+                self.boss_hp[boss_id] = 0.0
+                self.on_boss_defeated(boss_id)
 
     # --- Boss defeat / reward-drop / stage clear ----------------------------
     def on_boss_defeated(self, boss_id: str) -> None:
