@@ -190,7 +190,26 @@ class GameBonus(GameExecutables):
                 # mode, so a %-of-current-HP heal has nothing to act on -
                 # grant spins instead of letting Elixir become a silent
                 # no-op collectible.
-                self.spins_remaining += self.config.elixir_spin_budget_grant.get(self.bonus_tier, 0)
+                #
+                # BUG FOUND (2026-09-20, via Super's own baseline
+                # measurement - mean 372.10x vs 240.77x target, safety_cap
+                # hit in 0.5% of sessions, max spins observed=500): this
+                # grant had NO suppression for repeat endless-stage6 loops,
+                # unlike the identical stage-clear grant in
+                # game_executables.clear_stage - Elixir can land on ANY
+                # spin including every loop of an endless tail (Super/
+                # Hidden only; Normal's own stage6_endless_tiers=False made
+                # this dormant/harmless there), so a session unlucky enough
+                # to keep drawing Elixir during a long tail could extend
+                # its own budget indefinitely, all the way to
+                # bonus_safety_cap_spins - exactly the unbounded-farming
+                # class of bug game_config.py's use_spin_budget docstring
+                # already warned the stage-clear grant needed guarding
+                # against, just missed here. Same guard applied now.
+                if not (
+                    self.stage == self.config.max_stage and getattr(self, "stage6_loop_count", 0) > 0
+                ):
+                    self.spins_remaining += self.config.elixir_spin_budget_grant.get(self.bonus_tier, 0)
                 elixir_activated_event(self, (r, ro), 0.0, self.player_hp)
             else:
                 lo, hi = self.config.elixir_heal_pct_range

@@ -14,9 +14,18 @@ from src.wins.win_manager import WinManager
 # not an accidental never-taken path).
 
 
-def measure(n, tier, seed_offset):
+def measure(n, tier, seed_offset, deadspin_pct=None, chain_step=None):
     config = game_config_mod.GameConfig()
     config.use_spin_budget[tier] = True
+    # NOTE: GameConfig.__init__ re-runs (resetting every attribute to its
+    # file default) on EVERY GameConfig() call, even though __new__ returns
+    # the same cached singleton instance - any override must be applied
+    # AFTER this specific construction, not before it in the caller, or it
+    # gets silently wiped out right here.
+    if deadspin_pct is not None:
+        config.bonus_stage_deadspin_chance[tier] = {s: deadspin_pct for s in range(1, 7)}
+    if chain_step is not None:
+        config.spin_budget_chain_block_step[tier] = chain_step
     gs = gamestate_mod.GameState(config)
     mode_max_win = config.bet_modes[0].get_wincap()
     gs.win_manager = WinManager(config.basegame_type, config.freegame_type, mode_max_win)
@@ -43,6 +52,8 @@ def measure(n, tier, seed_offset):
     mean_spins = sum(spin_counts) / n
 
     print(f"\n=== SPIN-BUDGET {tier} (n={n}) ===")
+    print(f"deadspin={config.bonus_stage_deadspin_chance.get(tier, {})} "
+          f"chain_step={config.spin_budget_chain_block_step[tier]}")
     print(f"initial={config.spin_budget_initial[tier]} per_stage_clear={config.spin_budget_per_stage_clear[tier]}")
     print(f"session total: mean={mean_total:.2f}x median={median_total:.2f}x ratio={100*median_total/mean_total:.1f}%")
     print(f"avg spins/session={mean_spins:.2f} (min={min(spin_counts)} max={max(spin_counts)})")
@@ -53,4 +64,6 @@ def measure(n, tier, seed_offset):
 if __name__ == "__main__":
     n = int(sys.argv[1]) if len(sys.argv) > 1 else 5000
     tier = sys.argv[2] if len(sys.argv) > 2 else "normal"
-    measure(n, tier, 771000)
+    deadspin_pct = float(sys.argv[3]) if len(sys.argv) > 3 else None
+    chain_step = float(sys.argv[4]) if len(sys.argv) > 4 else None
+    measure(n, tier, 771000, deadspin_pct=deadspin_pct, chain_step=chain_step)
