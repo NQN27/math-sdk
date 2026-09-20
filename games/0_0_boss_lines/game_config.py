@@ -196,7 +196,57 @@ class GameConfig(Config):
         # Normal's own tuning passed through, not a measured fit for
         # Super). NOT YET MEASURED against Super's 240.77x target.
         self.spin_budget_chain_block_threshold = {"normal": 1, "super": 1}
-        self.spin_budget_chain_block_step = {"normal": 1.0, "super": 0.80}
+        # Super: 0.80 -> 0.40 (2026-09-20) - baseline (deadspin=30%/
+        # step=0.80) measured mean=128.33x vs the 240.77x target (-46.7%,
+        # UNDER this time, opposite direction from Normal's own first
+        # pass) - loosening chain-block first, per the same "chain-block
+        # prioritized first" approach Normal's own tuning used.
+        #
+        # RE-TUNED (2026-09-21) after switching Super to flat_damage_boss_
+        # hp_mult's newly-rederived table (see that config's own comment -
+        # replaces an earlier 0.0255/... guess that blew out to mean=
+        # 1482.66x/stage6=75.27%). The new boss-HP table alone (chain_step
+        # still at 0.288) measured mean=278.88x at n=8000 (stage-end%=
+        # {2:12.64,3:38.59,4:29.73,5:8.39,6:10.66}) - close but ~16% over
+        # target. Direction check: 0.24->304.31x, 0.288->278.88x, 0.40->
+        # 211.05x (higher step = LOWER mean for this config, interpolated
+        # to 0.35 -> 237.12x at n=3000). CONFIRMED at n=15000: mean=
+        # 226.36x, median=80.30x, stage-end%={2:13.79,3:41.6,4:28.36,
+        # 5:7.91,6:8.34} - within this game's established ~1-6% sampling
+        # noise band of the 240.77x target at this n, and stage6 lands
+        # almost exactly on the best random-range config's own 8.28%.
+        # 0.288 -> 0.35.
+        self.spin_budget_chain_block_step = {"normal": 1.0, "super": 0.35}
+
+        # EXPERIMENTAL (2026-09-20) - use_spin_budget-ONLY boss-HP
+        # multiplier, per tier/per stage. Same shape/precedent as flat-
+        # damage's own flat_damage_boss_hp_mult, but for the RANDOM-RANGE
+        # damage system spin-budget currently uses (use_flat_damage is
+        # still False for every tier - see game_executables.
+        # roll_stage_bosses, which never had a per-tier override for this
+        # path before now). Built specifically to reduce Super's stage-6
+        # reach rate WITHOUT the funnel-volume side effects deadspin kept
+        # producing: raising deadspin at stage 5 alone worked (stage6
+        # 9.43% -> 7.71%) but any lever tried to compensate the resulting
+        # mean drop backfired - loosening chain-block re-inflated stage6
+        # itself (7.71% -> 10.72%), and lowering stages 2-4's deadspin
+        # flooded the funnel's entrance so much (stage2 death 30.3% ->
+        # 14.16%) that stage6 ended up WORSE than the original baseline
+        # (12.99% vs 9.43%) despite stage5's own gate being unchanged - see
+        # TOWORK.md for the full trade-off history. A boss-HP toll gate at
+        # stage5 should not have that failure mode: it makes stage5
+        # harder in absolute terms regardless of how many sessions arrive
+        # there, rather than probabilistically breaking connections (whose
+        # effect scales with how many attempts hit the gate).
+        # A tier/stage absent from this dict gets hp_mult=1.0 (shared
+        # boss_stage_table value, unchanged) - only "super" stage 5 is
+        # populated. NOT YET MEASURED.
+        # 1.4 -> 1.8 (2026-09-20, per explicit request to lower stage6 a
+        # bit further after the stage2-deadspin funnel reshape re-inflated
+        # it to 10.11% - this lever is the "clean" one (no funnel-volume
+        # side effect), and mean was already +12% over target anyway, so
+        # pushing it further should help both goals at once.
+        self.spin_budget_boss_hp_mult = {"super": {5: 1.8}}
 
         # EXPERIMENTAL (2026-09-06, game designer's idea): per-tier, per-
         # stage deadspin chance, reusing the same Controlled Deadspin
@@ -237,7 +287,41 @@ class GameConfig(Config):
         # 27%/38% split without its own measure-iterate pass.
         self.bonus_stage_deadspin_chance = {
             "normal": {1: 0.27, 2: 0.38, 3: 0.38, 4: 0.38, 5: 0.38, 6: 0.38},
-            "super": {2: 0.30, 3: 0.30, 4: 0.30, 5: 0.30, 6: 0.30},
+            # Super: 30% -> 38% (2026-09-20, per explicit request for
+            # "higher risk... một chút" - a bit more volatility). Higher
+            # deadspin cuts more low/mid sessions short (more early deaths,
+            # pulling median down) while chain_block_step stays the
+            # tail-shaping lever - raises variance for roughly the same
+            # mean, rather than moving mean itself. NOT YET measured.
+            # Stage 5 raised further (2026-09-20, per explicit request to
+            # lower stage-6 reach specifically) - breakdown showed 9.43%
+            # of ALL sessions end at stage 6, and 88.7% of THOSE already
+            # clear it at least once (only 1.07% get stuck fighting the
+            # initial trio, loop>=2 is a mere 2.58% of all sessions) - the
+            # mass is almost entirely from the stage 5->6 TRANSITION
+            # itself, not the endless tail compounding. Targeting that
+            # transition specifically via stage 5's own deadspin rather
+            # than touching the shared escalation/HP levers.
+            # 0.55 barely moved stage6 (9.43% -> 9.2%, ~same cliff/
+            # nonlinearity this project has repeatedly hit with deadspin -
+            # needs a much bigger jump, not a modest one, to matter).
+            # REVERTED stage5 back to flat 38% (2026-09-20) - deadspin
+            # couldn't reduce stage6 without a mean-compensation side
+            # effect (chain-block re-inflated stage6 itself; lowering
+            # stages 2-4 backfired WORSE by flooding the funnel's entrance
+            # - see TOWORK.md for the full trade-off history). Switching
+            # to a boss-HP-based lever instead (spin_budget_boss_hp_mult
+            # below) to isolate stage5's difficulty from session-volume
+            # effects entirely.
+            # Stage 2 lowered specifically (2026-09-20, per explicit
+            # request: "giảm tỉ lệ stage 2 dead xuống dồn vào 3456") -
+            # stage-end% showed stage2 as the single largest death share
+            # (~30%) - only stage2 touched here (not the same "cut every
+            # early stage" move that flooded the funnel and backfired for
+            # stage6 earlier - see the deadspin history above) so the
+            # redistribution targets specifically the 2->3+ transition.
+            # NOT YET measured.
+            "super": {2: 0.22, 3: 0.38, 4: 0.38, 5: 0.38, 6: 0.38},
         }
         # "Reverse deadspin" counterpart - see game_executables.
         # _route_column_force_connect's docstring for the mechanism (biases
@@ -363,7 +447,10 @@ class GameConfig(Config):
         # 0-3), so both HP pools need their own empirically-derived rescale
         # pass once real average-damage-per-spin is measured under this
         # system - not yet done, tracked as the immediate next step.
-        self.use_flat_damage = {"normal": False, "super": False, "hidden": False}
+        # "super": False -> True (2026-09-20, per explicit request to try
+        # flat/small-integer damage for Super too - see flat_damage_boss_
+        # hp_mult["super"]'s own docstring below for the target HP scale).
+        self.use_flat_damage = {"normal": False, "super": True, "hidden": False}
         self.flat_symbol_damage = {
             "L1": 1, "L2": 1, "L3": 1, "L4": 1, "L5": 1,
             "H1": 2, "H2": 2, "H3": 2, "H4": 2,
@@ -433,9 +520,89 @@ class GameConfig(Config):
         # 33.45->33.90x (essentially unchanged).
         self.flat_damage_boss_hp_mult = {
             "normal": {1: 0.105, 2: 0.105, 3: 0.113, 4: 0.113, 5: 0.40, 6: 0.113},
-            "super": 1.0,
+            # SUPER EXPERIMENTAL (2026-09-20, per explicit request: "thử
+            # bộ Dam lên boss về 1-2 và HP boss 10-20-30...") - tries
+            # flat-damage for Super (previously only Normal used it under
+            # spin-budget; Super was still on the random-range system).
+            # flat_symbol_damage/flat_wild_damage below are already ~1-3
+            # (shared across tiers, unchanged) - this multiplier targets
+            # each stage's AVERAGE boss HP (across its 3 bosses) down to
+            # roughly 10/20/30/40/50 for stages 2/3/4/5/6 (Super's own
+            # stage range - it never sees stage 1), derived directly from
+            # boss_stage_table's own per-stage averages: stage2 avg=391.67
+            # -> mult=0.0255, stage3 avg=549 -> 0.0364, stage4 avg=858 ->
+            # 0.0350, stage5 avg=1567.5 -> 0.0255, stage6 avg=3383.3 ->
+            # 0.0148 (not perfectly monotonic because boss_stage_table's
+            # own HP growth per stage isn't linear either - this is a
+            # ratio to a linear 10/20/30/40/50 target, not a smoothed
+            # curve). NOT YET MEASURED - replaces the spin_budget_boss_hp_
+            # mult=1.8 experiment (dormant once use_flat_damage is True,
+            # see roll_stage_bosses' if/elif chain).
+            # REDERIVED (2026-09-21), per explicit request: the 0.0255/
+            # 0.0364/... set above (targeting a naive linear 10/20/30/40/50
+            # avg-HP-per-stage ladder) was measured to blow out massively -
+            # mean=1482.66x, stage-end%={2:1.73,3:8.77,4:10.23,5:4.0,
+            # 6:75.27} at n=3000 (75% of sessions reaching the endless
+            # stage-6 tail, vs the best random-range config's 8.28%) - see
+            # TOWORK.md for the full failure writeup. Root cause: that guess
+            # wasn't grounded in this tier's OWN measured damage output, it
+            # just scaled boss_stage_table's raw HP averages down to hit an
+            # arbitrary round-number target.
+            #
+            # Correct derivation (mirrors EXACTLY how flat_damage_boss_hp_
+            # mult["normal"] above was originally derived - "measured
+            # avg-damage/spin under flat ON vs OLD system, ratio, mult =
+            # 1/ratio"), this time done PER-STAGE since Super's ratio varies
+            # by stage (unlike Normal's single flat 8.86x):
+            # _tuning_scratch/measure_super_old_damage_rate.py (use_flat_
+            # damage=False, boss HP inflated to ~infinite, isolates OLD
+            # random-range avg dmg/spin) vs measure_super_flat_damage_rate.py
+            # (same, use_flat_damage=True) - both per-stage, per-boss,
+            # n=300 sessions/stage:
+            #   stage2: old=351.93 new=32.13 ratio=10.955 -> mult=0.0913
+            #   stage3: old=177.40 new=18.22 ratio=9.737  -> mult=0.1027
+            #   stage4: old=88.63  new=9.346 ratio=9.483  -> mult=0.1055
+            #   stage5: old=60.90  new=6.583 ratio=9.251  -> mult=0.1081
+            #   stage6: old=38.71  new=4.177 ratio=9.267  -> mult=0.1079
+            # (ratios cluster 9.25-11.0x, consistent with Normal's own
+            # 8.86x - confirms flat_symbol_damage/flat_wild_damage's 1-3
+            # scale is a sane choice independent of tier). Applying these
+            # mults to boss_stage_table's per-boss values and rounding each
+            # to the nearest 5 (per explicit request - see
+            # flat_damage_boss_hp_round below) gives:
+            #   stage2: boss1=35 boss2=45 boss3=25
+            #   stage3: boss1=55 boss2=70 boss3=45
+            #   stage4: boss1=85 boss2=110 boss3=75
+            #   stage5: boss1=165 boss2=205 boss3=140
+            #   stage6: boss1=340 boss2=455 boss3=300
+            # (boss2 > boss1 > boss3 at every stage, preserved automatically
+            # since a per-stage scalar mult keeps boss_stage_table's own
+            # existing per-boss ratio - matches the explicit "boss vi tri so
+            # 2 cao nhat, roi den 1, roi den 3" requirement without needing
+            # any separate per-boss override.) NOT YET MEASURED end-to-end
+            # via spin_budget_test.py - expected to land close to the old
+            # random-range system's own already-tuned behavior (this
+            # derivation reproduces that system's per-stage damage/HP ratio
+            # by construction), but needs confirmation before treating as
+            # final.
+            "super": {2: 0.0913, 3: 0.1027, 4: 0.1055, 5: 0.1081, 6: 0.1079},
             "hidden": 1.0,
         }
+        # Rounding granularity for roll_stage_bosses' flat-damage HP roll -
+        # per-tier so Super's new small-integer scale (tens, not hundreds)
+        # can round to the nearest 5 (per explicit request) without
+        # changing Normal's already-tuned nearest-10 rounding (Normal's
+        # mean/median was calibrated at that granularity - switching it
+        # would need re-verification for no real benefit at its HP scale).
+        self.flat_damage_boss_hp_round = {"super": 5}
+        # Flat additive HP jitter ("+-5 tren moi boss", per explicit
+        # request), applied AFTER rounding instead of the shared
+        # boss_variance_range multiplicative +-25% swing (which was
+        # designed for the old hundreds-scale HP and produces awkward
+        # non-multiple-of-5 spreads at this new tens-scale) - only active
+        # for a tier listed here; every other tier keeps the original
+        # multiplicative variance untouched.
+        self.flat_damage_boss_hp_jitter = {"super": 5}
         # Same idea, player-side: counterattack dropped from an old average
         # base Dam of ~38.65/boss (mean of boss_stage_table's Dam column
         # across all 6 stages: 21.3,25.3,30.3,38.3,50,66.7) down to a flat 1,

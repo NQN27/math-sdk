@@ -335,14 +335,33 @@ class GameExecutables(GameCalculations):
             # boss_stage_table itself - falls back to the tier's flat scalar
             # for any stage not explicitly listed.
             hp_mult = tier_mult.get(stage, 1.0) if isinstance(tier_mult, dict) else tier_mult
+        elif tier and self.config.use_spin_budget.get(tier, False):
+            # EXPERIMENTAL (2026-09-20) - same per-tier/per-stage override
+            # shape as flat_damage_boss_hp_mult above, but for the
+            # random-range damage system spin-budget currently uses (see
+            # game_config.py's spin_budget_boss_hp_mult docstring for why
+            # this exists - a boss-HP toll gate at stage5 to reduce
+            # stage-6 reach without deadspin's funnel-volume side effects).
+            tier_mult = self.config.spin_budget_boss_hp_mult.get(tier, {})
+            hp_mult = tier_mult.get(stage, 1.0) if isinstance(tier_mult, dict) else (tier_mult or 1.0)
         else:
             hp_mult = 1.0
+        round_gran = self.config.flat_damage_boss_hp_round.get(tier, 10) if tier else 10
+        jitter = self.config.flat_damage_boss_hp_jitter.get(tier, 0) if tier else 0
         hp, dam = {}, {}
         for _ in range(self.config.boss_hp_reroll_attempts):
             for b in self.config.boss_ids:
                 base_dam, base_hp = base[b]
                 dam[b] = int(round(base_dam * random.uniform(lo, hi)))
-                hp[b] = int(round(base_hp * hp_mult * random.uniform(lo, hi) / 10.0) * 10)
+                if jitter:
+                    # Flat +-jitter variance (per-tier override) instead of
+                    # the multiplicative uniform(lo, hi) swing below - see
+                    # flat_damage_boss_hp_jitter's docstring in game_config.
+                    rolled = int(round(base_hp * hp_mult / round_gran) * round_gran)
+                    rolled += random.choice([-jitter, jitter])
+                    hp[b] = max(round_gran, rolled)
+                else:
+                    hp[b] = int(round(base_hp * hp_mult * random.uniform(lo, hi) / round_gran) * round_gran)
             max_hp, min_hp = max(hp.values()), min(hp.values())
             if max_hp <= 0 or (max_hp - min_hp) / max_hp <= self.config.boss_hp_spread_max:
                 break

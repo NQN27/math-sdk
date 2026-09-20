@@ -57,32 +57,46 @@ backend state produces byte-identical output to what's committed).
       committed state; trust `game_config.py` directly over this summary
       if they ever drift, per this file's own top-of-file convention.
 
-- [ ] **Super Bonus PORTED to spin-budget, config wired but UNMEASURED
-      (2026-09-20)** - per explicit request ("add các config mới này cho
-      super... mục tiêu như cũ với super"), same mechanic Normal just
-      switched to, this time targeting SUPER'S OWN pre-existing designer
-      mean target (240.77x - NOT Normal's 88.9x). `use_spin_budget["super"]`
-      flipped `False -> True`. New per-tier entries added, ALL still raw
-      placeholders with zero measurement behind them:
-      `bonus_stage_deadspin_chance["super"]` (flat 30% across stages 2-6,
-      Super's own stage range per `bonus_start_stage["super"]=2`),
-      `spin_budget_chain_block_threshold["super"]=1`/`_step["super"]=0.80`
-      (arbitrary first guess, not fit to Super). `spin_budget_initial
-      ["super"]=8` was already sitting here from the original Normal-only
-      pass - kept because it happens to match Super's own natural ~8-spin
-      average session length under the OLD system (see
-      `bonus_rescue_roll`'s "trung binh game 8 spin" note), a better-
-      grounded starting guess than an arbitrary number would be.
+- [x] **Super Bonus PORTED to spin-budget AND TUNED (2026-09-20/21)** - per
+      explicit request ("add các config mới này cho super... mục tiêu như
+      cũ với super"), same mechanic Normal switched to, targeting SUPER'S
+      OWN pre-existing designer mean target (240.77x - NOT Normal's 88.9x).
+      `use_spin_budget["super"]` flipped `False -> True`.
+      Tuning history: `deadspin={2:0.22,3-6:0.38}`, `chain_step=0.80 ->
+      0.288` first stabilized Super's RANDOM-RANGE-damage baseline to
+      mean≈257-268x/stage6≈8-10% (best pre-flat-damage result). Then, per
+      explicit request ("thử bộ Dam lên boss về 1-2 và HP boss 10-20-30..."),
+      `use_flat_damage["super"]` flipped `False -> True` with a naive linear
+      10/20/30/40/50 avg-boss-HP guess - **blew out to mean=1482.66x,
+      stage6=75.27%** (bosses far too easy to kill relative to how much
+      cumulative damage one whole-board-explode pass deals). Re-derived
+      `flat_damage_boss_hp_mult["super"]` properly this time, mirroring
+      Normal's own original flat-damage calibration method exactly
+      (measure OLD-system vs NEW-flat-system avg damage/spin per stage,
+      mult = 1/ratio - see that config's own comment for the full
+      measured numbers and `_tuning_scratch/measure_super_old_damage_rate.py`
+      / `measure_super_flat_damage_rate.py`). Also added, per explicit
+      request ("cần phải tròn số chia hết cho 5", "boss ở vị trí số 2 cao
+      nhất... 3 boss nên có số máu có thể random +5 hoặc -5"):
+      `flat_damage_boss_hp_round["super"]=5` (round-to-5 instead of the
+      shared round-to-10) and `flat_damage_boss_hp_jitter["super"]=5` (flat
+      +-5 additive variance per boss, replacing the shared +-25%
+      multiplicative `boss_variance_range` swing for this tier only - see
+      `game_executables.roll_stage_bosses`). boss2>boss1>boss3 ordering is
+      preserved automatically (a single per-stage scalar mult keeps
+      `boss_stage_table`'s own existing per-boss ratio) - verified by
+      direct sampling, all rolled values land on multiples of 5.
+      Re-tuned `spin_budget_chain_block_step["super"]` (0.288 -> 0.35) to
+      compensate the new boss-HP table's mean. **CONFIRMED at n=15000**:
+      mean=226.36x, median=80.30x, stage-end%={2:13.79,3:41.6,4:28.36,
+      5:7.91,6:8.34} - within this game's established sampling-noise band
+      of the 240.77x target, stage6 lands almost exactly on the best
+      random-range config's own 8.28%.
       `reward_drop_weights_super_bonus` has NOT been touched at all -
       Super's economy is line-pay-DOMINATED (75.4% of total, the OPPOSITE
       of Normal's reward-drop-dominated split), so it almost certainly
-      needs its own K-rescale/shoulder pass once real numbers come in, not
+      needs its own K-rescale/shoulder pass once priorities call for it, not
       a copy of Normal's approach.
-      Sanity-checked only: 20 sessions run via `run_bonus_session("super")`
-      with the flag on - no crash. **No economy measurement has been run
-      yet** - needs the same measure-iterate pass (chain-block/deadspin
-      first, reward table if that's insufficient) Normal went through,
-      from scratch, targeting 240.77x.
 
 - [ ] **REMOVED the finishing-blow guarantee, replaced with a rare low-HP
       execute chance (2026-09-16)**, per explicit request ("Bỏ cơ chế last
