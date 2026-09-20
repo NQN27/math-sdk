@@ -92,6 +92,18 @@ backend state produces byte-identical output to what's committed).
       5:7.91,6:8.34} - within this game's established sampling-noise band
       of the 240.77x target, stage6 lands almost exactly on the best
       random-range config's own 8.28%.
+      **STAGE 6 EASED (2026-09-21)**, per explicit request ("so 6 dang nhay
+      len cao qua"): stage6's raw-ratio HP (340/455/300) jumped ~2.06-2.22x
+      over stage5 (165/205/140), much steeper than every earlier
+      stage-to-stage step (~1.5-1.9x) - inherited from `boss_stage_table`'s
+      own disproportionate stage6 jump (2.16x). Eased
+      `flat_damage_boss_hp_mult["super"][6]` 0.1079 -> 0.0854, giving
+      boss1=270/boss2=360/boss3=240 (~1.6-1.76x step from stage5 instead).
+      CONFIRMED this does NOT reopen the stage6-reach blowout: n=8000,
+      mean=230.43x (vs 230.96x before - unchanged) and stage-end%
+      unchanged at 8.43% for stage6 - easing stage6's own HP only speeds up
+      the endless tail once a session is already there, doesn't change how
+      many sessions reach it (that's stage5 + cumulative spin budget).
       `reward_drop_weights_super_bonus` has NOT been touched at all -
       Super's economy is line-pay-DOMINATED (75.4% of total, the OPPOSITE
       of Normal's reward-drop-dominated split), so it almost certainly

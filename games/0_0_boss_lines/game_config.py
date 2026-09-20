@@ -563,7 +563,7 @@ class GameConfig(Config):
             #   stage3: old=177.40 new=18.22 ratio=9.737  -> mult=0.1027
             #   stage4: old=88.63  new=9.346 ratio=9.483  -> mult=0.1055
             #   stage5: old=60.90  new=6.583 ratio=9.251  -> mult=0.1081
-            #   stage6: old=38.71  new=4.177 ratio=9.267  -> mult=0.1079
+            #   stage6: old=38.71  new=4.177 ratio=9.267  -> mult=0.1079 (raw)
             # (ratios cluster 9.25-11.0x, consistent with Normal's own
             # 8.86x - confirms flat_symbol_damage/flat_wild_damage's 1-3
             # scale is a sane choice independent of tier). Applying these
@@ -574,18 +574,38 @@ class GameConfig(Config):
             #   stage3: boss1=55 boss2=70 boss3=45
             #   stage4: boss1=85 boss2=110 boss3=75
             #   stage5: boss1=165 boss2=205 boss3=140
-            #   stage6: boss1=340 boss2=455 boss3=300
+            #   stage6: boss1=340 boss2=455 boss3=300 (at raw mult=0.1079)
             # (boss2 > boss1 > boss3 at every stage, preserved automatically
             # since a per-stage scalar mult keeps boss_stage_table's own
             # existing per-boss ratio - matches the explicit "boss vi tri so
             # 2 cao nhat, roi den 1, roi den 3" requirement without needing
-            # any separate per-boss override.) NOT YET MEASURED end-to-end
-            # via spin_budget_test.py - expected to land close to the old
+            # any separate per-boss override.)
+            #
+            # STAGE 6 EASED (2026-09-21), per explicit request ("so 6 dang
+            # nhay len cao qua"): the raw-ratio stage6 numbers above jump
+            # ~2.06-2.22x over stage5 (165/205/140 -> 340/455/300) - much
+            # steeper than every earlier stage-to-stage step (~1.5-1.9x),
+            # because boss_stage_table's OWN raw stage6 HP already has this
+            # same disproportionate jump (avg 1567.5 -> 3383.3, 2.16x) and
+            # the per-stage-scalar-mult approach faithfully reproduces it.
+            # At this small integer scale that jump reads as an awkward
+            # discontinuity rather than a smooth ramp, so stage6's mult was
+            # eased 0.1079 -> 0.0854 (targeting a gentler ~1.6-1.76x step
+            # from stage5 instead) - gives boss1=270 boss2=360 boss3=240
+            # (jitter +-5, all still multiples of 5, ordering unchanged).
+            # CONFIRMED this does NOT reopen the stage6-reach blowout this
+            # tier already fixed once: n=8000, mean=230.43x (vs 230.96x
+            # before the ease - essentially unchanged) and stage-end%
+            # unchanged at 8.43% for stage 6. Makes sense - easing stage6's
+            # OWN HP only speeds up the endless tail's per-loop clear once a
+            # session already reached stage6, it doesn't change how many
+            # sessions get there in the first place (that's governed by
+            # stage5's difficulty + cumulative spin budget, both untouched).
             # random-range system's own already-tuned behavior (this
             # derivation reproduces that system's per-stage damage/HP ratio
             # by construction), but needs confirmation before treating as
             # final.
-            "super": {2: 0.0913, 3: 0.1027, 4: 0.1055, 5: 0.1081, 6: 0.1079},
+            "super": {2: 0.0913, 3: 0.1027, 4: 0.1055, 5: 0.1081, 6: 0.0854},
             "hidden": 1.0,
         }
         # Rounding granularity for roll_stage_bosses' flat-damage HP roll -
