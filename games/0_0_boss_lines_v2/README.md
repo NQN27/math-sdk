@@ -33,16 +33,19 @@ Super ~2400x, Hidden ~2250x mean).
       stage-5 boss, never advances, no scatter; last-hit +3% on the final
       Bonus spin without scatter. Check: `_tuning_scratch/modes_check_v2.py`,
       `base_check_v2.py`.
+- [x] Reels redesigned 2026-09-30 (`gen_reels.py`, reproducible, run from this folder): 6 independent
+      columns, Wild in all columns, Power only cols 2-5, specials placed with
+      spacing (SC >= 8 rows apart, others >= 4), H5 present, per-stage wild
+      taper kept, Normal now has Power (15%) since coin/upgrade/wild-multi are
+      core to v2. Removed unused S6/PWR1 files. All numbers still placeholders.
 - [ ] E - TUNING (nothing tuned yet): RTP per mode, Bonus/Super/Mega means,
-      chest/coin weights, HP tables, reels, stage-0 clear rate (~0.7%/spin
-      natural), Maxwin frequency (`stage6_chest_natural_maxwin_weight` is a
+      chest/coin weights, HP tables, reels, stage-0 clear rate (~5.5%/spin natural with the new reels; was 0.7%), Maxwin frequency (`stage6_chest_natural_maxwin_weight` is a
       placeholder), optimizer fences (freegame fence now needs "boss cleared"
       + forced scatter count 0/3/4).
 
 ## Known Phase A gaps
 - Paytable values like 0.15/0.25/1.25 are not multiples of 0.10 (RGS rule).
-- Reel strips are mechanical conversions, not designed; Wild still absent
-  from col 1 in the original strips.
+- (fixed) reel strips now come from gen_reels.py.
 - Damage: base/ante and Super use spec's flat 1/2/3; Normal/Hidden bonus still
   random-range (`use_flat_damage`).
 - Smoke: `_tuning_scratch/smoke_v2.py N`, payout checks:
