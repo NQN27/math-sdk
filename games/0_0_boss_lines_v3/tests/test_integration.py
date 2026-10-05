@@ -68,3 +68,100 @@ def test_bonus_stage_progression_and_endless_hp(gs, cfg):
         assert stages == sorted(stages)
         assert endless_hp == sorted(endless_hp)
         assert stages[0] >= cfg.bonus_tiers["super"]["start_stage"]
+
+
+def _segments(events):
+    """Split a book's events into (context, spin_events) per spin."""
+    ctx, cur, out = {"tier": None, "feature": None}, None, []
+    for e in events:
+        t = e["type"]
+        if t == "bonusStart":
+            ctx = {"tier": e["tier"], "feature": None}
+        elif t == "featureSpin":
+            ctx = {"tier": None, "feature": e["feature"]}
+        if t == "reveal":
+            cur = {"ctx": dict(ctx), "events": []}
+            out.append(cur)
+        if cur is not None:
+            cur["events"].append(e)
+    return out
+
+
+def _wild_weapon_count(reveal, cfg):
+    names = [s["name"] for col in reveal["board"] for s in col[1:-1]]  # strip padding rows
+    return sum(n == "W" or n in cfg.weapon_symbols for n in names)
+
+
+@pytest.fixture
+def tame(cfg):
+    """Same rules, much smaller payouts, so Bonus rounds finish without
+    hitting the 25,000x cap and the bookkeeping checks actually run."""
+    patches = {
+        "coin_value_weights": {0.2: 30, 0.5: 26, 1: 22, 2: 16, 3: 12, 4: 10, 5: 1, 20: 0.5, 100: 0.2},
+        "treasure_kind_weights": {"coin": 90, "magnet": 2, "clover": 3, "scatter": 2},
+        "global_factor_weights": {2: 1},
+        "clover_factor_weights": {2: 1},
+        "enhance_factor_weights": {2: 1},
+        "wild_mult_weights": {2: 1},
+        "stage_min_coin": {s: 0.2 for s in cfg.stage_min_coin},
+        "coin_tiers": {k: [0.2] for k in cfg.coin_tiers},
+    }
+    saved = {k: dict(getattr(cfg, k)) for k in patches}
+    for k, v in patches.items():
+        getattr(cfg, k).clear()
+        getattr(cfg, k).update(v)
+    yield cfg
+    for k, v in saved.items():
+        getattr(cfg, k).clear()
+        getattr(cfg, k).update(v)
+
+
+@pytest.mark.parametrize("mode", ["buy3", "buy4", "feature"])
+def test_mode_guarantees_and_bookkeeping(gs, tame, mode):
+    cfg = tame
+    checked = 0
+    crit = "basegame" if mode == "feature" else "freegame"
+    epic_spins = 0
+    for g in rounds(gs, cfg, mode, crit, 40):
+        ev = g.book.events
+        capped = any(e["type"] == "wincap" for e in ev)
+        for seg in _segments(ev):
+            reveal = seg["events"][0]
+            tier, feat = seg["ctx"]["tier"], seg["ctx"]["feature"]
+            if tier in ("super", "epic"):
+                assert _wild_weapon_count(reveal, cfg) >= cfg.super_min_wild_or_weapon
+            if feat == "heroic" and tier is None:
+                assert _wild_weapon_count(reveal, cfg) >= cfg.heroic_min_wild_or_weapon
+            if tier == "epic":
+                epic_spins += 1
+                assert any(e["type"] == "holdSpinStart" for e in seg["events"])
+            end = [e for e in seg["events"] if e["type"] == "spinEnd"]
+            treasure = any(e["type"] == "treasureStart" for e in seg["events"])
+            if end and not capped and feat != "treasureHunt":
+                assert treasure == end[0]["stageCleared"]
+        # every killed boss opens its chest exactly once (unless the cap ended the round)
+        if not capped:
+            kills = sum(e["type"] == "bossDefeated" for e in ev)
+            chests = sum(e["type"] == "chestOpened" for e in ev)
+            assert kills == chests
+        # spins played = initial + Scatters collected + Treasure Scatters + chest extra spins
+        starts = [e for e in ev if e["type"] == "bonusStart"]
+        if starts and not capped:
+            checked += 1
+            played = sum(e["type"] == "freeSpinStart" for e in ev)
+            added = (sum(e["added"] for e in ev if e["type"] == "scatterCollected")
+                     + sum(e.get("addedSpins", 0) for e in ev if e["type"] == "treasureSymbols")
+                     + sum(e.get("extraSpin", 0) for e in ev if e["type"] == "chestOpened"))
+            assert played == starts[0]["freeSpins"] + added
+    if mode == "buy4":
+        assert epic_spins > 0
+    if mode in ("buy3", "buy4"):
+        assert checked >= 20, f"only {checked} uncapped Bonus rounds were checked"
+
+
+def test_treasure_cells_skip_scatter(gs):
+    from conftest import set_board
+    set_board(gs, ["SC L1 L2 L3 L4 L1"] + ["L1 L2 L3 L4 L1 L2"] * 4)
+    gs.lit = {(0, 0), (1, 0)}
+    gs.bonus_tier = None
+    assert gs.treasure_cells() == {(1, 0)}

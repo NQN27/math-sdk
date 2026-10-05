@@ -29,6 +29,8 @@ class OptimizationSetup:
         self.game_config = game_config
         caps = {bm.get_name(): bm.get_wincap() for bm in game_config.bet_modes}
         opt = {}
+        # Proposal: Ante spin = 5x the rate of 3+ Scatter -> 1/5 of base's hit rate.
+        bonus_hr = {"base": 200, "ante": 40}
         for mode in ("base", "ante"):
             bonus_rtp = 0.30
             opt[mode] = {
@@ -36,7 +38,7 @@ class OptimizationSetup:
                     "wincap": ConstructConditions(rtp=WINCAP_RTP, av_win=caps[mode],
                                                   search_conditions=caps[mode]).return_dict(),
                     "0": ConstructConditions(rtp=0, av_win=0, search_conditions=0).return_dict(),
-                    "freegame": ConstructConditions(rtp=bonus_rtp, hr=200,
+                    "freegame": ConstructConditions(rtp=bonus_rtp, hr=bonus_hr[mode],
                                                     search_conditions={"symbol": "scatter"}).return_dict(),
                     "basegame": ConstructConditions(hr=3.5, rtp=TARGET - bonus_rtp - WINCAP_RTP).return_dict(),
                 },
@@ -49,6 +51,7 @@ class OptimizationSetup:
             "conditions": {
                 "wincap": ConstructConditions(rtp=WINCAP_RTP, av_win=caps["feature"],
                                               search_conditions=caps["feature"]).return_dict(),
+                "0": ConstructConditions(rtp=0, av_win=0, search_conditions=0).return_dict(),
                 "basegame": ConstructConditions(rtp=TARGET - WINCAP_RTP, hr="x").return_dict(),
             },
             "scaling": ConstructScaling([]).return_dict(),

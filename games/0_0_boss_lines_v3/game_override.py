@@ -27,6 +27,7 @@ class GameStateOverride(GameExecutables):
         self.spin_had_scatter = False
         self.actions = 0
         self.accidental_bonus = False
+        self.cap_hits = {}
 
     def assign_special_sym_function(self) -> None:
         self.special_symbol_functions = {}
@@ -37,6 +38,9 @@ class GameStateOverride(GameExecutables):
             return
         win_criteria = self.get_current_betmode_distributions().get_win_criteria()
         if self.accidental_bonus:
+            self.repeat = True
+        elif (self.config.reject_wincap_outside_wincap_fence and self.criteria != "wincap"
+              and self.final_win >= self.config.wincap):
             self.repeat = True
         elif win_criteria is None and self.final_win == 0 and self.criteria == "basegame":
             self.repeat = True

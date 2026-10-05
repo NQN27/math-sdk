@@ -112,6 +112,26 @@ spin budget, deadspin, chain-block...) không được mang sang.
 27. **Tỷ lệ chia Feature spin** (Heroic / Treasure hunt) và mức "Ante tăng 5 lần tỷ lệ 3+ Scatter" sẽ được tune
     sau. Mặc định tạm: 50/50.
 
+28. **Ô sáng nền đang chứa Scatter khi Treasure kích hoạt:** Treasure làm trống mọi ô sáng. Nếu một ô sáng đã được
+    lấp lại bằng Scatter thì ở base, Treasure sẽ xoá mất Scatter đó và có thể làm mất lượt vào Bonus.
+    Mặc định: **bỏ qua ô đang chứa Scatter**, cùng tinh thần với điều spec loại trừ Scatter khỏi Treasure
+    (`treasure_skips_scatter_cells = True`).
+
+## Cảnh báo cấu trúc (mục 7: báo những chỗ gây biến động lớn)
+Đo trên số liệu tạm, nhưng các điểm dưới đây đến từ **luật**, không chỉ từ weight:
+
+- **Treasure gần như phủ kín bảng.** Mỗi kết nối phá mọi bản sao của biểu tượng, nên khi Treasure kích hoạt thì
+  trung bình đã có **25–29/30 ô sáng**. Kết hợp với xu tối thiểu theo chặng (5x ở chặng 4, **20x ở chặng 5/Endless**),
+  một lần Treasure ở chặng 5 có mức sàn khoảng 25 × 20x = 500x, **chưa nhân Global**.
+- **Global multiplier chỉ tăng, không giảm trong suốt Bonus**, và nhân cả trả thưởng dòng, rương lẫn Treasure. Với
+  weight tạm, Global trung vị đạt 19–31 ngay trong một lần Treasure. Đây là nguồn khuếch đại lớn nhất, cần thống
+  nhất mức trần hoặc tần suất mong muốn trước khi tune.
+- **Rương Kim cương:** xu trong rương tối thiểu 100x (cấp rương), có 3 quà và nhân Global. Ở chặng 5/Endless mỗi boss
+  chết là ≥ 100x × Global.
+- **Scatter trong Bonus:** mỗi spin lấp lại khoảng 32 ô, ô nào cũng có thể ra Scatter (+1 spin). Ở mật độ 1%, mỗi spin
+  tự cộng trung bình 1.38 spin, nên Bonus **không bao giờ tự kết thúc**. Tôi đã hạ xuống 1 Scatter/cột trên reel Bonus
+  (còn 0.44 spin cộng thêm mỗi spin). Mật độ Scatter trong Bonus phải giữ thấp như vậy.
+
 ## Đề xuất gộp để giảm thời gian chạy (mục 7)
 - **Sấm chớp** gần như một "kết nối giả": phá mọi ô của một biểu tượng. Có thể gộp với Bom/Dao thành một vũ khí
   nổ theo hình ngẫu nhiên (3x3 / hàng / cả biểu tượng).

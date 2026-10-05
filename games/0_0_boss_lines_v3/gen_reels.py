@@ -28,16 +28,19 @@ SHAPE = {"L1": 60, "L2": 52, "L3": 46, "L4": 40, "H1": 22, "H2": 17, "H3": 12, "
 WEAPON_MIX = {"AR": 35, "BM": 25, "SW": 25, "LT": 15}
 
 # (wild %, scatter %, weapon %) per reel. Placeholders.
+# Bonus reels: 1 Scatter per column (0.34%). At 1% (3 per column) a Bonus
+# spin collected ~1.38 extra spins on average (every refilled cell can draw a
+# Scatter), so the Bonus never ran out of spins - see README.
 REEL_SPECS = {
     "BR0": dict(removed=0, wild=5.0, sc=1.4, weapon=1.5),
     "ANTE": dict(removed=0, wild=5.0, sc=3.0, weapon=1.5),
     "HERO": dict(removed=4, wild=8.0, sc=0.0, weapon=3.0),  # Heroic fights stage 5 -> no L
-    "BON_S1": dict(removed=0, wild=6.0, sc=1.0, weapon=2.0),
-    "BON_S2": dict(removed=1, wild=5.5, sc=1.0, weapon=2.0),
-    "BON_S3": dict(removed=2, wild=5.0, sc=1.0, weapon=2.0),
-    "BON_S4": dict(removed=3, wild=4.5, sc=1.0, weapon=2.0),
-    "BON_S5": dict(removed=4, wild=4.0, sc=1.0, weapon=2.0),
-    "BON_E": dict(removed=4, wild=4.0, sc=1.0, weapon=2.5),
+    "BON_S1": dict(removed=0, wild=6.0, sc=0.34, weapon=2.0),
+    "BON_S2": dict(removed=1, wild=5.5, sc=0.34, weapon=2.0),
+    "BON_S3": dict(removed=2, wild=5.0, sc=0.34, weapon=2.0),
+    "BON_S4": dict(removed=3, wild=4.5, sc=0.34, weapon=2.0),
+    "BON_S5": dict(removed=4, wild=4.0, sc=0.34, weapon=2.0),
+    "BON_E": dict(removed=4, wild=4.0, sc=0.34, weapon=2.5),
 }
 
 

@@ -27,8 +27,25 @@ Mỗi câu ứng với một cờ `Q<n>` trong `game_config.py`, nên trả lờ
 | **Tune số liệu** | ⛔ Chưa làm | Mọi weight là số tạm. Hiện Treasure chiếm gần hết payout và nhiều vòng chạm 25.000x |
 | Optimizer / kiểm tra định dạng RGS | ⛔ Chưa làm | Cần tune trước; payout lẻ 0.05 sẽ không qua kiểm tra RGS (Q3) |
 
+## Số đo hiện tại (weight tạm, 300 vòng mỗi mode, `_scratch/cap_rates.py`)
+
+| Mode | Mean | Vòng chạm 25.000x | Số lần Treasure |
+|---|---|---|---|
+| base | 1.312x | 9/300 | 23 |
+| ante | 538x | 4/300 | 14 |
+| feature | 16.479x | 180/300 | 216 |
+| buy3 | 22.730x | 267/300 | 373 |
+| buy4 | 24.947x | 299/300 | 386 |
+
+- Ngưỡng an toàn (số vòng Treasure, số lượt hành động, số lần Hold and Spin quay lại, số lần vẽ lại Epic): **0 lần chạm**
+  trong 1.500 vòng, nên không có ngưỡng nào đang định payout.
+- Treasure chiếm gần hết payout: trung bình 25–29 ô sáng, Global trung vị 19–31 trong một lần Treasure. Xem phần
+  "Cảnh báo cấu trúc" trong `QUESTIONS.md`.
+- `reject_wincap_outside_wincap_fence` đang **tắt**. Bật thì book 25.000x chỉ đến từ fence wincap (quy tắc của
+  project), nhưng với weight hiện tại các fence khác sẽ lặp gần như vô hạn. Bật lại sau lần tune đầu tiên.
+
 ## Lệnh
 
-- Test luật: `python -m pytest tests -q` (44 test).
+- Test luật: `python -m pytest tests -q` (48 test).
 - Sinh reel: `python gen_reels.py`.
 - Sinh sách: `python run.py` (optimizer đang tắt).

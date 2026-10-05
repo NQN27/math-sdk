@@ -54,13 +54,18 @@ class GameState(GameStateOverride):
         """Opening board -> Hold and Spin -> steps (1)-(9) -> Treasure."""
         self.begin_spin()
         self.draw_board(reel, force_scatters)
-        if epic:
-            for _ in range(200):  # Epic: the opening board must connect
+        if min_wild_weapon:
+            self._guarantee_wild_or_weapon(min_wild_weapon)
+        if epic:  # the opening board must connect (checked AFTER the guarantee)
+            for _ in range(200):
                 if self.evaluate_lines():
                     break
                 self.draw_board(reel)
-        if min_wild_weapon:
-            self._guarantee_wild_or_weapon(min_wild_weapon)
+                if min_wild_weapon:
+                    self._guarantee_wild_or_weapon(min_wild_weapon)
+            else:
+                self.note_cap("epic_redraw")
+                self._force_connection()
         reveal_event(self)
         if epic:
             self.hold_and_spin(force=True)
@@ -70,12 +75,26 @@ class GameState(GameStateOverride):
         if not self.wincap_triggered:
             self.open_chests()
         if not self.wincap_triggered and self.stage_cleared:
-            cells = set(self.all_cells()) if self.bonus_tier == "epic" else set(self.lit)
-            self.run_treasure(cells, self.current_min_coin())
+            self.run_treasure(self.treasure_cells(), self.current_min_coin())
             if self.in_bonus and self.bonus_tier != "epic" and self.config.lit_reset_after_treasure:
                 self.lit = set()
         emit(self, "spinEnd", spinWin=round(self.win_manager.spin_win, 2),
-             totalWin=round(self.win_manager.running_bet_win, 2))
+             totalWin=round(self.win_manager.running_bet_win, 2), stageCleared=self.stage_cleared)
+
+    def treasure_cells(self) -> set:
+        """Lit cells (all cells in Epic), minus cells now holding a Scatter (Q28)."""
+        cells = set(self.all_cells()) if self.bonus_tier == "epic" else set(self.lit)
+        if self.config.treasure_skips_scatter_cells:
+            cells = {x for x in cells if not self.is_scatter(self.board[x[0]][x[1]])}
+        return cells
+
+    def _force_connection(self) -> None:
+        """Fallback: make line 1 open with three of one allowed symbol."""
+        name = random.choice(self.allowed_basic_symbols())
+        for c in range(3):
+            r = self.config.paylines[1][c]
+            if not (self.is_wild(self.board[c][r]) or self.is_weapon(self.board[c][r])):
+                self.board[c][r] = self.make_symbol(name)
 
     def scatter_tier(self):
         n = min(self.scatter_count(), self.config.max_scatters_on_board)

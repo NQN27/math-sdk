@@ -46,6 +46,11 @@ class GameExecutables(GameCalculations):
             b["killed_this_spin"] = False
             b["chest_opened"] = False
 
+    def note_cap(self, name: str) -> None:
+        """A safety cap was hit (should be rare; counted for tuning reports)."""
+        self.cap_hits[name] = self.cap_hits.get(name, 0) + 1
+        emit(self, "safetyCap", cap=name)
+
     def stage_label(self):
         if self.stage is None:
             return None
@@ -380,6 +385,8 @@ class GameExecutables(GameCalculations):
             if not (a1 or a2 or a3):
                 break
             any_act = True
+            if self.actions >= self.config.max_actions_per_spin:
+                self.note_cap("actions")
             if self.darkened and not a3:
                 # Bonus Scatters darkened without a connection this pass are
                 # still destroyed in step (6).
@@ -507,11 +514,13 @@ class GameExecutables(GameCalculations):
             gifts.append({"kind": "coin", "value": v, "globalMult": g, "paid": paid})
             if self.wincap_triggered:
                 break
+        extra = 0
         if got_power and self.in_bonus and self.free_spins_left <= 0:
             self.free_spins_left += 1
+            extra = 1
         b["chest_opened"] = True
         emit(self, "chestOpened", boss=b["id"], chest=b["chest"], upgradedTo=upgraded, gifts=gifts,
-             freeSpinsLeft=self.free_spins_left if self.in_bonus else None)
+             extraSpin=extra, freeSpinsLeft=self.free_spins_left if self.in_bonus else None)
 
     def open_chests(self) -> None:
         for b in self.bosses:  # boss1 -> boss3 = left to right
@@ -556,7 +565,12 @@ class GameExecutables(GameCalculations):
             self.board[cell[0]][cell[1]] = None
         first = True
         used_clovers, used_magnets = set(), set()
-        for _ in range(cfg.treasure_max_rounds):
+        rounds = 0
+        while True:
+            rounds += 1
+            if rounds > cfg.treasure_max_rounds:
+                self.note_cap("treasure_rounds")
+                break
             # (1) appear on empty lit cells
             empty = [x for x in cells if self.board[x[0]][x[1]] is None]
             new = []
@@ -584,7 +598,7 @@ class GameExecutables(GameCalculations):
                 self.spin_had_scatter = True
             emit(self, "treasureSymbols", cells=[
                 {**pos(self, c, r), "kind": kinds[(c, r)], "value": self.board[c][r].prize} for c, r in new],
-                globalMult=self.global_factor())
+                globalMult=self.global_factor(), addedSpins=n_sc if self.in_bonus else 0)
             # (2) clovers in cell order
             for c, r in cells:
                 if kinds.get((c, r)) != "clover" or (c, r) in used_clovers:
@@ -642,7 +656,10 @@ class GameExecutables(GameCalculations):
 
         held = {x for x in self.all_cells() if is_held(self.board[x[0]][x[1]])}
         emit(self, "holdSpinStart", symbols=sorted(names), held=[pos(self, c, r) for c, r in sorted(held)])
-        for _ in range(self.config.hold_spin_max_respins):
+        for i in range(self.config.hold_spin_max_respins + 1):
+            if i == self.config.hold_spin_max_respins:
+                self.note_cap("hold_spin_respins")
+                break
             if len(held) == 30:
                 break
             spun = [x for x in self.all_cells() if x not in held]

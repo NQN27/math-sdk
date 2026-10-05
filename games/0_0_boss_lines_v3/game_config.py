@@ -199,7 +199,7 @@ class GameConfig(Config):
         self.hold_spin_max_respins = 60
 
         # ---- Treasure --------------------------------------------------------------
-        self.treasure_kind_weights = {"coin": 62, "magnet": 7, "clover": 10, "global": 6, "scatter": 4}
+        self.treasure_kind_weights = {"coin": 65, "magnet": 7, "clover": 10, "global": 6, "scatter": 1}
         self.clover_factor_weights = {2: 40, 3: 25, 4: 15, 5: 10, 10: 7, 20: 3}
         self.global_factor_weights = {2: 30, 3: 22, 4: 15, 5: 11, 6: 8, 7: 6, 8: 4, 9: 2, 10: 2}
         self.clover_only_new = True  # Q19
@@ -208,6 +208,7 @@ class GameConfig(Config):
         self.lit_reset_after_treasure = True  # Q23
         self.treasure_max_rounds = 60
         self.treasure_hunt_min_coin = 1
+        self.treasure_skips_scatter_cells = True  # Q28: a lit cell now holding a Scatter keeps it
 
         # ---- Bonus ------------------------------------------------------------------
         self.bonus_tiers = {
@@ -221,6 +222,10 @@ class GameConfig(Config):
         self.base_global_into_bonus = False  # Q25
         self.feature_heroic_chance = 0.5  # Q27
         self.max_actions_per_spin = 400  # safety cap on cycles of steps (1)-(8)
+        # A 25,000x win should only come from the "wincap" fence. OFF until the
+        # first tuning pass: with placeholder weights most Bonus rounds hit the
+        # cap, so the other fences would repeat almost forever.
+        self.reject_wincap_outside_wincap_fence = False
 
         # ---- Reels ------------------------------------------------------------------
         reel_files = ["BR0", "ANTE", "HERO", "BON_S1", "BON_S2", "BON_S3", "BON_S4", "BON_S5", "BON_E"]
@@ -259,7 +264,8 @@ class GameConfig(Config):
             distributions=[
                 Distribution(criteria="wincap", quota=0.001, win_criteria=maxwin,
                              conditions=cond("HERO", force_wincap=True)),
-                Distribution(criteria="basegame", quota=0.999, conditions=cond("HERO")),
+                Distribution(criteria="0", quota=0.1, win_criteria=0.0, conditions=cond("HERO")),
+                Distribution(criteria="basegame", quota=0.899, conditions=cond("HERO")),
             ],
         ))
         for name, cost, triggers in (("buy3", 100.0, {3: 90, 4: 9, 5: 1}), ("buy4", 300.0, {4: 95, 5: 5})):
