@@ -1,0 +1,658 @@
+"""Boss Lines v3 game actions, in the order of the proposal's section 6.
+
+One spin = opening board -> (Hold and Spin) -> loop of steps (1)-(8) ->
+step (9) chests -> Treasure if the stage was cleared.
+
+  (1) Bonus only: Scatters add free spins and are darkened.
+  (2) Replace (reserved) fires while it can.
+  (3) Enhance, Upgrade, Transform (reserved) fire in that order.
+  (4) Connected Wilds roll their event, in cell-priority order.
+  (5) Lines pay: base x sum(Enhance) x Wild multiplier x Global.
+  (6) Connected basic symbols (every copy on the board), connected Wilds and
+      darkened Scatters are destroyed and deal damage; refill; back to (1).
+      If (1)-(6) did nothing -> (7).
+  (7) Every weapon fires in cell order; refill; back to (1). Nothing -> (8).
+  (8) One reserved Destroy fires; refill; back to (1). Nothing -> (9).
+  (9) Chests of bosses killed this spin open left to right; then Treasure if
+      every boss of the stage is dead.
+"""
+
+import math
+import random
+
+from game_calculations import GameCalculations
+from game_config import ENDLESS
+from game_events import emit, pos, boss_state_event, board_cells_event
+from src.calculations.statistics import get_random_outcome
+
+
+def round_half_up(x: float) -> int:
+    """Nearest integer, .5 rounds up (Python's round() is banker's rounding)."""
+    return int(math.floor(x + 0.5))
+
+
+class GameExecutables(GameCalculations):
+    """Boss, power, weapon, chest and Treasure logic."""
+
+    # =========================================================================
+    # Per-spin state
+    # =========================================================================
+    def begin_spin(self) -> None:
+        self.enhance = [[0] * 5 for _ in range(6)]
+        self.wild_mult = {}
+        self.darkened = set()
+        self.spin_had_scatter = False
+        for b in self.bosses:
+            b["killed_this_spin"] = False
+            b["chest_opened"] = False
+
+    def stage_label(self):
+        if self.stage is None:
+            return None
+        return "endless" if self.stage == ENDLESS else self.stage
+
+    def is_final_bonus_spin(self) -> bool:
+        return self.in_bonus and self.free_spins_left <= 0 and not self.spin_had_scatter
+
+    # =========================================================================
+    # Bosses
+    # =========================================================================
+    def _roll_hp(self, lo: int, hi: int) -> int:
+        step = self.config.hp_round
+        return random.choice(list(range(lo, hi + 1, step)))
+
+    def _roll_chest(self, stage) -> str:
+        order = self.config.chest_order
+        base = order.index(self.config.stage_min_chest[stage])
+        k = get_random_outcome({i: w for i, w in enumerate(self.config.chest_tier_step_weights)})
+        return order[min(base + k, len(order) - 1)]
+
+    def spawn_stage(self, stage) -> None:
+        """Fresh bosses for `stage` (0-5 or ENDLESS); None = no bosses."""
+        self.stage = stage
+        self.stage_cleared = False
+        self.bosses = []
+        if stage is None:
+            return
+        if stage == ENDLESS:
+            if self.last_endless_hp is None:
+                hp = self._roll_hp(*self.config.stage_hp_range[ENDLESS])
+            else:
+                hp = self.last_endless_hp + random.choice(self.config.endless_hp_step_choices)
+            self.last_endless_hp = hp
+            zones = self.config.endless_zone
+        else:
+            zones = self.config.boss_zones
+        for bid, zone in zones.items():
+            if stage != ENDLESS:
+                hp = self._roll_hp(*self.config.stage_hp_range[stage])
+            self.bosses.append({"id": bid, "zone": zone, "hp": hp, "hp_max": hp, "alive": True,
+                                "chest": self._roll_chest(stage), "killed_this_spin": False,
+                                "chest_opened": False})
+        boss_state_event(self)
+
+    def boss_for_col(self, c: int):
+        for b in self.bosses:
+            if c in b["zone"]:
+                return b
+        return None
+
+    def _kill(self, b, reason: str) -> None:
+        b["alive"] = False
+        b["hp"] = 0
+        b["killed_this_spin"] = True
+        emit(self, "bossDefeated", boss=b["id"], reason=reason, chest=b["chest"])
+        if self.bosses and all(not x["alive"] for x in self.bosses):
+            self.stage_cleared = True
+
+    def deal_damage(self, hits, step: str, last_hit: bool = True) -> None:
+        """One damage step. `hits` = [(col, row, damage)]. Damage is summed per
+        boss; each damaged boss then rolls Last hit (if allowed) and the boss
+        drop ONCE for this step (QUESTIONS.md Q11)."""
+        per_boss = {}
+        for c, r, dmg in hits:
+            b = self.boss_for_col(c)
+            if b is None or not b["alive"] or dmg <= 0:
+                continue
+            per_boss.setdefault(b["id"], [b, 0])[1] += dmg
+        if not per_boss:
+            return
+        cfg = self.config
+        for b, dmg in per_boss.values():
+            dmg = round_half_up(dmg)
+            b["hp"] = max(0, b["hp"] - dmg)
+            emit(self, "bossDamage", boss=b["id"], damage=dmg, hp=b["hp"], step=step)
+            if b["hp"] <= 0:
+                self._kill(b, "damage")
+            elif last_hit:
+                chance = cfg.last_hit_base + cfg.last_hit_scale * (1 - b["hp"] / b["hp_max"])
+                if self.is_final_bonus_spin():
+                    chance *= cfg.last_hit_final_spin_mult
+                if random.random() < chance:
+                    self._kill(b, "lastHit")
+            self._boss_drop(b)
+        boss_state_event(self)
+
+    def _boss_drop(self, b) -> None:
+        if random.random() >= self.config.boss_drop_chance:
+            return
+        kind = get_random_outcome(self.config.boss_drop_weights)
+        if kind == "power":
+            p = self.pick_power()
+            if p is not None:
+                self.reserve[p] += 1
+                emit(self, "bossDrop", boss=b["id"], kind="power", power=p)
+            return
+        cells = [(c, r) for c in b["zone"] for r in range(5) if self.is_basic(self.board[c][r])]
+        if cells:
+            c, r = random.choice(cells)
+            self.board[c][r] = self.make_symbol("W")
+            emit(self, "bossDrop", boss=b["id"], kind="wild", position=pos(self, c, r))
+
+    # =========================================================================
+    # Destroy / refill
+    # =========================================================================
+    def destroy_cells(self, cells, lit_cells=()) -> None:
+        """Empty `cells` (None) and drop their Enhance factor; mark lit_cells."""
+        for c, r in cells:
+            self.board[c][r] = None
+            self.enhance[c][r] = 0
+        for cell in lit_cells:
+            self.lit.add(cell)
+
+    def refill(self) -> list:
+        """Fill every empty cell in place, in cell-priority order."""
+        filled = []
+        for c, r in self.all_cells():
+            if self.board[c][r] is None:
+                self.board[c][r] = self.draw_symbol_for(c, r)
+                filled.append((c, r))
+        if filled:
+            board_cells_event(self, "refill", filled)
+        return filled
+
+    # =========================================================================
+    # Powers
+    # =========================================================================
+    def pick_power(self):
+        """Random power whose reserve is below the cap (None if all are full)."""
+        open_ = {p: w for p, w in self.config.power_pick_weights.items()
+                 if self.reserve[p] < self.config.power_reserve_cap}
+        return get_random_outcome(open_) if open_ else None
+
+    def _basic_names_on_board(self):
+        return sorted({self.board[c][r].name for c, r in self.all_cells() if self.is_basic(self.board[c][r])})
+
+    def power_enhance(self) -> None:
+        names = self._basic_names_on_board()
+        if not names:
+            return
+        name = random.choice(names)
+        f = get_random_outcome(self.config.enhance_factor_weights)
+        cells = [(c, r) for c, r in self.all_cells() if self.board[c][r].name == name]
+        for c, r in cells:
+            self.enhance[c][r] += f
+        emit(self, "powerActivated", power="enhance", symbol=name, factor=f,
+             cells=[pos(self, c, r) for c, r in cells])
+
+    def power_upgrade(self) -> None:
+        names = self._basic_names_on_board()
+        if not names:
+            return
+        name = random.choice(names)
+        target = get_random_outcome(self.config.upgrade_target_weights)
+        cells = [(c, r) for c, r in self.all_cells() if self.board[c][r].name == name]
+        for c, r in cells:
+            self.board[c][r] = self.make_symbol(target)  # Enhance stays with the cell
+        board_cells_event(self, "powerActivated", cells, power="upgrade", fromSymbol=name, toSymbol=target)
+
+    def power_transform(self) -> None:
+        cand = [(c, r) for c, r in self.all_cells()
+                if not self.is_wild(self.board[c][r]) and not self.is_weapon(self.board[c][r])
+                and (self.config.transform_can_hit_scatter or not self.is_scatter(self.board[c][r]))]
+        n = min(len(cand), random.randint(*self.config.transform_count_range))
+        cells = random.sample(cand, n)
+        for c, r in cells:
+            self.board[c][r] = self.make_symbol("W")
+        board_cells_event(self, "powerActivated", cells, power="transform")
+
+    def _replace_eligible(self):
+        """Basic-symbol cells whose symbol is NOT present in at least 2 of the
+        first 3 columns."""
+        cols = [{self.board[c][r].name for r in range(5) if self.is_basic(self.board[c][r])} for c in range(3)]
+        ok = {n for n in self.config.basic_symbols if sum(n in s for s in cols) >= 2}
+        return [(c, r) for c, r in self.all_cells()
+                if self.is_basic(self.board[c][r]) and self.board[c][r].name not in ok]
+
+    def power_replace(self) -> bool:
+        cells = self._replace_eligible()
+        if not cells:
+            return False
+        allowed = self.allowed_basic_symbols()
+        for c, r in cells:
+            old = self.board[c][r].name
+            choices = [s for s in allowed if s != old] or allowed
+            self.board[c][r] = self.make_symbol(random.choice(choices))
+        board_cells_event(self, "powerActivated", cells, power="replace")
+        return True
+
+    def power_destroy(self) -> None:
+        """Every symbol except Wild is destroyed (step 8). Paying symbols
+        deal damage (Q13) but are not lit; destroyed weapons are lit."""
+        cells, hits, lit = [], [], []
+        for c, r in self.all_cells():
+            s = self.board[c][r]
+            if s is None or self.is_wild(s):
+                continue
+            cells.append((c, r))
+            if self.is_basic(s) and self.config.destroy_deals_damage:
+                hits.append((c, r, self.config.symbol_damage[s.name]))
+            if self.is_weapon(s):
+                lit.append((c, r))
+        emit(self, "powerActivated", power="destroy", cells=[pos(self, c, r) for c, r in cells])
+        self.destroy_cells(cells, lit)
+        self.deal_damage(hits, "destroy")
+
+    def allowed_basic_symbols(self):
+        removed = self.config.stage_removed_lows.get(self.stage, 0) if self.stage is not None else 0
+        return self.config.low_symbols[removed:] + self.config.high_symbols
+
+    # =========================================================================
+    # Wild events (step 4)
+    # =========================================================================
+    def draw_coin(self, min_value: float, min_tier: str = None) -> float:
+        """Coin value >= min_value (and >= min_tier's lowest value)."""
+        if getattr(self, "force_wincap", False):
+            return 25000
+        if min_tier is not None:
+            min_value = max(min_value, self.config.coin_tiers[min_tier][0])
+        pool = {v: w for v, w in self.config.coin_value_weights.items() if v >= min_value}
+        return get_random_outcome(pool)
+
+    def current_min_coin(self) -> float:
+        if self.treasure_hunt:
+            return self.config.treasure_hunt_min_coin
+        return self.config.stage_min_coin.get(self.stage, 0.2)
+
+    def wild_events(self, wins) -> bool:
+        connected = {(p["reel"], p["row"]) for w in wins for p in w["positions"]
+                     if self.is_wild(self.board[p["reel"]][p["row"]])}
+        acted = False
+        chance = 1.0 if (self.heroic or getattr(self, "force_wincap", False)) else self.config.wild_event_chance
+        for cell in [x for x in self.all_cells() if x in connected]:
+            if random.random() >= chance:
+                continue
+            weights = dict(self.config.wild_event_weights)
+            if getattr(self, "force_wincap", False):
+                weights = {"coin": 1}
+            if self.pick_power() is None:
+                weights.pop("power", None)
+            kind = get_random_outcome(weights)
+            acted = True
+            c, r = cell
+            if kind == "multiplier":
+                f = get_random_outcome(self.config.wild_mult_weights)
+                self.wild_mult[cell] = f
+                emit(self, "wildEvent", event="multiplier", position=pos(self, c, r), factor=f)
+            elif kind == "coin":
+                v = self.draw_coin(self.current_min_coin())
+                g = self.global_factor() if self.config.wild_coin_uses_global else 1
+                paid = self.award(v * g)
+                emit(self, "wildEvent", event="coin", position=pos(self, c, r), value=v, globalMult=g, paid=paid)
+            else:
+                p = self.pick_power()
+                self.reserve[p] += 1
+                emit(self, "wildEvent", event="power", position=pos(self, c, r), power=p)
+            if self.wincap_triggered:
+                break
+        return acted
+
+    # =========================================================================
+    # Steps (1)-(6)
+    # =========================================================================
+    def step_scatters(self) -> bool:
+        if not self.in_bonus:
+            return False
+        new = [(c, r) for c, r in self.all_cells()
+               if self.is_scatter(self.board[c][r]) and (c, r) not in self.darkened]
+        if not new:
+            return False
+        self.darkened.update(new)
+        self.free_spins_left += len(new)
+        self.spin_had_scatter = True
+        emit(self, "scatterCollected", cells=[pos(self, c, r) for c, r in new], added=len(new),
+             freeSpinsLeft=self.free_spins_left)
+        return True
+
+    def step_reserved_powers(self) -> bool:
+        acted = False
+        while self.reserve["replace"] > 0 and self._replace_eligible():
+            self.reserve["replace"] -= 1
+            self.power_replace()
+            acted = True
+        for name, fn in (("enhance", self.power_enhance), ("upgrade", self.power_upgrade),
+                         ("transform", self.power_transform)):
+            while self.reserve[name] > 0:
+                self.reserve[name] -= 1
+                fn()
+                acted = True
+        return acted
+
+    def step_connect(self) -> bool:
+        """Steps (4)-(6) for one pass. Returns True if anything connected."""
+        wins = self.evaluate_lines()
+        if not wins:
+            return False
+        self.wild_events(wins)
+        if self.wincap_triggered:
+            return True
+        self.pay_lines(wins)
+        if self.wincap_triggered:
+            return True
+        names = {w["symbol"] for w in wins if w["symbol"] in self.config.basic_symbols}
+        wild_cells = {(p["reel"], p["row"]) for w in wins for p in w["positions"]
+                      if self.is_wild(self.board[p["reel"]][p["row"]])}
+        cells, hits = [], []
+        for c, r in self.all_cells():
+            s = self.board[c][r]
+            if (self.is_basic(s) and s.name in names) or (c, r) in wild_cells:
+                cells.append((c, r))
+                hits.append((c, r, self.config.symbol_damage[s.name]))
+        dark = [cell for cell in self.darkened if self.is_scatter(self.board[cell[0]][cell[1]])]
+        emit(self, "destroy", cause="connect", cells=[pos(self, c, r) for c, r in cells],
+             scatters=[pos(self, c, r) for c, r in dark])
+        self.destroy_cells(cells + dark, lit_cells=cells)
+        self.darkened.clear()
+        self.wild_mult.clear()
+        self.deal_damage(hits, "connect")
+        self.refill()
+        return True
+
+    def run_cycle(self) -> bool:
+        """Repeat passes of steps (1)-(6) until a pass does nothing. Returns
+        True if any pass acted."""
+        any_act = False
+        while not self.wincap_triggered and self.actions < self.config.max_actions_per_spin:
+            self.actions += 1
+            a1 = self.step_scatters()
+            a2 = self.step_reserved_powers()
+            a3 = self.step_connect()
+            if not (a1 or a2 or a3):
+                break
+            any_act = True
+            if self.darkened and not a3:
+                # Bonus Scatters darkened without a connection this pass are
+                # still destroyed in step (6).
+                cells = [cell for cell in self.darkened if self.is_scatter(self.board[cell[0]][cell[1]])]
+                emit(self, "destroy", cause="scatter", cells=[], scatters=[pos(self, c, r) for c, r in cells])
+                self.destroy_cells(cells)
+                self.darkened.clear()
+                self.refill()
+        return any_act
+
+    # =========================================================================
+    # Step (7): weapons
+    # =========================================================================
+    def _weapon_targets(self, c, r, name):
+        cfg = self.config
+
+        def paying(s):
+            return self.is_basic(s) or (cfg.weapons_destroy_wild and self.is_wild(s))
+
+        if name == "BM":
+            area = [(cc, rr) for cc in range(c - 1, c + 2) for rr in range(r - 1, r + 2)
+                    if 0 <= cc < 6 and 0 <= rr < 5 and (cc, rr) != (c, r)]
+            return [x for x in area if paying(self.board[x[0]][x[1]])]
+        if name == "SW":
+            return [(cc, r) for cc in range(6) if cc != c and paying(self.board[cc][r])]
+        if name == "LT":
+            names = self._basic_names_on_board()
+            if not names:
+                return []
+            pick = random.choice(names)
+            return [(cc, rr) for cc, rr in self.all_cells() if self.board[cc][rr] is not None
+                    and self.board[cc][rr].name == pick]
+        return []
+
+    def arrow_damage(self, b) -> int:
+        k = random.choice(self.config.arrow_k_choices)
+        dmg = self.config.arrow_base + b["hp_max"] * k
+        if self.stage == ENDLESS:
+            dmg /= self.config.arrow_endless_divisor
+        return round_half_up(dmg)
+
+    def step_weapons(self) -> bool:
+        weapons = [(c, r) for c, r in self.all_cells() if self.is_weapon(self.board[c][r])]
+        if not weapons:
+            return False
+        for c, r in weapons:
+            if self.wincap_triggered:
+                break
+            sym = self.board[c][r]
+            if sym is None or not self.is_weapon(sym):
+                continue
+            name = sym.name
+            if name == "AR":
+                b = self.boss_for_col(c)
+                dmg = self.arrow_damage(b) if (b is not None and b["alive"]) else 0
+                emit(self, "weapon", weapon="arrow", position=pos(self, c, r), damage=dmg,
+                     boss=b["id"] if b else None)
+                self.destroy_cells([(c, r)], lit_cells=[(c, r)])
+                if dmg:
+                    self.deal_damage([(c, r, dmg)], "arrow")
+                continue
+            factor = sym.prize or 1
+            targets = self._weapon_targets(c, r, name)
+            hits = [(tc, tr, self.config.symbol_damage[self.board[tc][tr].name] * factor) for tc, tr in targets]
+            emit(self, "weapon", weapon={"BM": "bomb", "SW": "sword", "LT": "lightning"}[name],
+                 position=pos(self, c, r), factor=factor, cells=[pos(self, tc, tr) for tc, tr in targets])
+            # weapon-destroyed paying cells are NOT lit; the weapon's own cell is
+            self.destroy_cells(targets + [(c, r)], lit_cells=[(c, r)])
+            self.deal_damage(hits, name)
+        self.refill()
+        return True
+
+    # =========================================================================
+    # Full action loop (1)-(8)
+    # =========================================================================
+    def resolve_actions(self) -> None:
+        self.actions = 0
+        while not self.wincap_triggered and self.actions < self.config.max_actions_per_spin:
+            self.run_cycle()
+            if self.wincap_triggered:
+                break
+            if self.step_weapons():
+                continue
+            if self.reserve["destroy"] > 0:
+                self.reserve["destroy"] -= 1
+                self.power_destroy()
+                self.refill()
+                continue
+            break
+
+    # =========================================================================
+    # Step (9): chests
+    # =========================================================================
+    def open_chest(self, b) -> None:
+        cfg = self.config
+        tier = b["chest"]
+        upgraded = None
+        order = cfg.chest_order
+        if random.random() < cfg.chest_upgrade_chance and order.index(tier) < len(order) - 1:
+            upgraded = random.choice(order[order.index(tier) + 1:])
+            tier = upgraded
+        n = get_random_outcome(cfg.chest_gift_count_weights[tier])
+        kinds = []
+        for _ in range(n):
+            if self.in_bonus and random.random() < cfg.chest_gift_power_chance:
+                kinds.append("power")
+            else:
+                kinds.append("coin")
+        if order.index(tier) >= order.index("vang") and "coin" not in kinds:
+            kinds[0] = "coin"
+        g = self.global_factor()
+        gifts, got_power = [], False
+        for kind in kinds:
+            if kind == "power":
+                p = self.pick_power()
+                if p is not None:
+                    self.reserve[p] += 1
+                    got_power = True
+                    gifts.append({"kind": "power", "power": p})
+                    continue
+                if not cfg.chest_power_overflow_to_coin:
+                    continue
+            v = self.draw_coin(0, min_tier=tier)
+            paid = self.award(v * g)
+            gifts.append({"kind": "coin", "value": v, "globalMult": g, "paid": paid})
+            if self.wincap_triggered:
+                break
+        if got_power and self.in_bonus and self.free_spins_left <= 0:
+            self.free_spins_left += 1
+        b["chest_opened"] = True
+        emit(self, "chestOpened", boss=b["id"], chest=b["chest"], upgradedTo=upgraded, gifts=gifts,
+             freeSpinsLeft=self.free_spins_left if self.in_bonus else None)
+
+    def open_chests(self) -> None:
+        for b in self.bosses:  # boss1 -> boss3 = left to right
+            if b["killed_this_spin"] and not b["chest_opened"] and not self.wincap_triggered:
+                self.open_chest(b)
+
+    # =========================================================================
+    # Treasure
+    # =========================================================================
+    def _treasure_cell(self, kind, min_coin):
+        cfg = self.config
+        if kind == "coin":
+            v = self.draw_coin(min_coin)
+            sym = self.make_symbol("TC")
+        elif kind == "magnet":
+            v = 0.0
+            sym = self.make_symbol("TM")
+        elif kind == "clover":
+            v = get_random_outcome(cfg.clover_factor_weights)
+            sym = self.make_symbol("TV")
+        elif kind == "global":
+            v = get_random_outcome(cfg.global_factor_weights)
+            sym = self.make_symbol("TG")
+        else:
+            v = 0
+            sym = self.make_symbol("SC")
+        sym.prize = v
+        return sym
+
+    def roll_treasure_kind(self, weights) -> str:
+        return get_random_outcome(weights)
+
+    def run_treasure(self, cells, min_coin) -> float:
+        """Treasure feature on `cells` (the lit cells). Returns the payout."""
+        cfg = self.config
+        cells = [x for x in self.all_cells() if x in set(cells)]
+        if not cells:
+            return 0.0
+        emit(self, "treasureStart", cells=[pos(self, c, r) for c, r in cells])
+        kinds = {}
+        for cell in cells:
+            self.board[cell[0]][cell[1]] = None
+        first = True
+        used_clovers, used_magnets = set(), set()
+        for _ in range(cfg.treasure_max_rounds):
+            # (1) appear on empty lit cells
+            empty = [x for x in cells if self.board[x[0]][x[1]] is None]
+            new = []
+            for c, r in empty:
+                weights = dict(cfg.treasure_kind_weights)
+                if self.no_scatter_spin or (cfg.treasure_scatter_capped and not self.scatter_allowed(c, r)):
+                    weights.pop("scatter", None)
+                kind = self.roll_treasure_kind(weights)
+                self.board[c][r] = self._treasure_cell(kind, min_coin)
+                kinds[(c, r)] = kind
+                new.append((c, r))
+            if first and new and not any(kinds[x] == "coin" for x in cells if x in kinds):
+                c, r = random.choice(new)
+                self.board[c][r] = self._treasure_cell("coin", min_coin)
+                kinds[(c, r)] = "coin"
+            first = False
+            n_sc = 0
+            for c, r in new:
+                if kinds[(c, r)] == "global":
+                    self.global_mult += self.board[c][r].prize
+                elif kinds[(c, r)] == "scatter":
+                    n_sc += 1
+            if n_sc and self.in_bonus:
+                self.free_spins_left += n_sc
+                self.spin_had_scatter = True
+            emit(self, "treasureSymbols", cells=[
+                {**pos(self, c, r), "kind": kinds[(c, r)], "value": self.board[c][r].prize} for c, r in new],
+                globalMult=self.global_factor())
+            # (2) clovers in cell order
+            for c, r in cells:
+                if kinds.get((c, r)) != "clover" or (c, r) in used_clovers:
+                    continue
+                if cfg.clover_only_new:
+                    used_clovers.add((c, r))
+                f = self.board[c][r].prize
+                hit = []
+                for cc in range(c - 1, c + 2):
+                    for rr in range(r - 1, r + 2):
+                        if (cc, rr) != (c, r) and kinds.get((cc, rr)) in cfg.clover_hits \
+                                and self.board[cc][rr] is not None:
+                            self.board[cc][rr].prize *= f
+                            hit.append(pos(self, cc, rr))
+                emit(self, "treasureClover", position=pos(self, c, r), factor=f, cells=hit)
+            # (3) next magnet in cell order
+            magnet = next((x for x in cells if kinds.get(x) == "magnet" and x not in used_magnets
+                           and self.board[x[0]][x[1]] is not None), None)
+            if magnet is None:
+                break
+            used_magnets.add(magnet)
+            mc, mr = magnet
+            taken = [x for x in cells if x != magnet and kinds.get(x) in ("coin", "magnet")
+                     and self.board[x[0]][x[1]] is not None]
+            gained = sum(self.board[x[0]][x[1]].prize for x in taken)
+            self.board[mc][mr].prize += gained
+            for x in taken:
+                self.board[x[0]][x[1]] = None
+                kinds.pop(x, None)
+                used_magnets.discard(x)
+            emit(self, "treasureMagnet", position=pos(self, mc, mr), collected=gained,
+                 value=self.board[mc][mr].prize, cells=[pos(self, c, r) for c, r in taken])
+        # (4) collect everything
+        total = sum(self.board[c][r].prize for c, r in cells
+                    if kinds.get((c, r)) in ("coin", "magnet") and self.board[c][r] is not None)
+        g = self.global_factor()
+        paid = self.award(total * g)
+        emit(self, "treasureEnd", total=total, globalMult=g, paid=paid)
+        self.record({"kind": "treasure", "symbol": "treasure", "gametype": self.gametype})
+        return paid
+
+    # =========================================================================
+    # Hold and Spin
+    # =========================================================================
+    def hold_and_spin(self, force: bool = False) -> None:
+        wins = self.evaluate_lines()
+        if not wins:
+            return
+        if not force and random.random() >= self.config.hold_spin_chance:
+            return
+        names = {w["symbol"] for w in wins if w["symbol"] in self.config.basic_symbols}
+
+        def is_held(s):
+            return s is not None and (s.name in names or self.is_wild(s) or self.is_scatter(s) or self.is_weapon(s))
+
+        held = {x for x in self.all_cells() if is_held(self.board[x[0]][x[1]])}
+        emit(self, "holdSpinStart", symbols=sorted(names), held=[pos(self, c, r) for c, r in sorted(held)])
+        for _ in range(self.config.hold_spin_max_respins):
+            if len(held) == 30:
+                break
+            spun = [x for x in self.all_cells() if x not in held]
+            for c, r in spun:
+                self.board[c][r] = None
+            for c, r in spun:
+                self.board[c][r] = self.draw_symbol_for(c, r)
+            new = [x for x in spun if is_held(self.board[x[0]][x[1]])]
+            board_cells_event(self, "holdSpinRespin", spun, newHeld=[pos(self, c, r) for c, r in new])
+            if not new:
+                break
+            held.update(new)
+        emit(self, "holdSpinEnd", held=len(held))

@@ -1,0 +1,4 @@
+_scratch/
+library/
+__pycache__/
+.pytest_cache/
