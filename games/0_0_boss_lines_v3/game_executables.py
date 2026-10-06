@@ -582,7 +582,7 @@ class GameExecutables(GameCalculations):
         for c, r in cells:
             self.board[c][r] = None
         first = True
-        used_magnets = set()
+        used_magnets, used_clovers = set(), set()
         rounds = 0
         while True:
             rounds += 1
@@ -621,17 +621,20 @@ class GameExecutables(GameCalculations):
                 for c, r in new], globalMult=self.global_factor(), addedSpins=n_sc if self.in_bonus else 0)
             if self._treasure_maxwin_check(cells, kinds):
                 return self.win_manager.running_bet_win - start_win
-            # (3) Stars, in cell order: add to every coin and magnet, then the Star cell empties
+            # (3) Stars, in cell order: add to every coin and magnet, then the Star
+            # turns into a coin with its own value (N3, answered 2026-10-07)
             for c, r in [x for x in cells if kinds.get(x) == "star"]:
                 v = self.board[c][r].prize
                 hit = [x for x, _ in self._treasure_values(cells, kinds)]
                 for x in hit:
                     self.board[x[0]][x[1]].prize += v
-                self.board[c][r] = None
-                kinds.pop((c, r))
-                emit(self, "treasureStar", position=pos(self, c, r), value=v, cells=[pos(self, *x) for x in hit])
+                self.board[c][r] = self.make_symbol("TC")
+                self.board[c][r].prize = v
+                kinds[(c, r)] = "coin"
+                emit(self, "treasureStar", position=pos(self, c, r), value=v, cells=[pos(self, *x) for x in hit],
+                     becomesCoin=True)
             # (4) Clovers, simultaneous: each target x product of covering clovers
-            clovers = [x for x in cells if kinds.get(x) == "clover"]
+            clovers = [x for x in cells if kinds.get(x) == "clover" and x not in used_clovers]
             if clovers:
                 mult = {}
                 for c, r in clovers:
@@ -645,17 +648,14 @@ class GameExecutables(GameCalculations):
                 emit(self, "treasureClover", clovers=[{**pos(self, c, r), "factor": self.board[c][r].prize}
                                                        for c, r in clovers],
                      cells=[{**pos(self, c, r), "factor": f} for (c, r), f in mult.items()])
-                for c, r in clovers:
-                    self.board[c][r] = None
-                    kinds.pop((c, r))
+                used_clovers.update(clovers)  # N10: stays on the board, inactive
             # (5) Golden clovers, one after another: x every reward cell on the board
-            for c, r in [x for x in cells if kinds.get(x) == "golden"]:
+            for c, r in [x for x in cells if kinds.get(x) == "golden" and x not in used_clovers]:
                 f = self.board[c][r].prize
                 hit = [x for x, _ in self._treasure_values(cells, kinds)]
                 for x in hit:
                     self.board[x[0]][x[1]].prize *= f
-                self.board[c][r] = None
-                kinds.pop((c, r))
+                used_clovers.add((c, r))  # N10: stays on the board, inactive
                 emit(self, "treasureGoldenClover", position=pos(self, c, r), factor=f,
                      cells=[pos(self, *x) for x in hit])
             if self._treasure_maxwin_check(cells, kinds):

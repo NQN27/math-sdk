@@ -43,7 +43,7 @@ def test_five_wilds_pay_as_symbol(gs):
     assert (w["symbol"], w["kind"], w["win"]) == ("H5", 6, 20)
 
 
-def test_line_factor_enhance_add_then_wild_then_global(gs):
+def test_line_factor_enhance_add_wild_mul_then_global(gs):
     set_board(gs, board_with_top("H1 H1 W H1 L2 L3"))
     gs.enhance[0][0] = 2
     gs.enhance[1][0] = 3
@@ -52,6 +52,10 @@ def test_line_factor_enhance_add_then_wild_then_global(gs):
     (w,) = line1(gs)
     ef, wf = gs.line_factor(w)
     assert (ef, wf) == (5, 4)
+    gs.wild_mult[(2, 0)] = 2
+    gs.wild_mult[(1, 0)] = 5  # Q2: two Multiplier Wilds on one line multiply
+    assert gs.line_factor(w)[1] == 10
+    gs.wild_mult = {(2, 0): 4}
     paid = gs.pay_lines([w])
     assert paid == pytest.approx(1.25 * 5 * 4 * 5)  # 4x H1 = 1.25
 
@@ -350,18 +354,19 @@ def test_magnet_needs_two_coins_then_collects_and_cells_reappear(gs):
     assert paid == pytest.approx(sum(gs.board[c][r].prize for c, r in cells))
 
 
-def test_star_adds_to_coins_and_magnets_then_empties(gs):
+def test_star_adds_to_coins_then_becomes_a_coin(gs):
     set_board(gs, FILLER)
     gs.stage = 1
     cells = [(0, 0), (1, 0), (0, 1)]
     gs.roll_treasure_kind = _seq_roller(["coin", "coin", "star"])
     random.seed(4)
-    gs.run_treasure(cells, 0.2)
+    paid = gs.run_treasure(cells, 0.2)
     star = [e for e in gs.book.events if e["type"] == "treasureStar"][0]
     first = [e for e in gs.book.events if e["type"] == "treasureSymbols"][0]["cells"]
-    assert gs.board[0][1] is None  # star cell emptied (no magnet -> not refilled, N10)
+    assert gs.board[0][1].name == "TC" and gs.board[0][1].prize == pytest.approx(star["value"])  # N3
     for c in first[:2]:
         assert gs.board[c["reel"]][c["row"] - 1].prize == pytest.approx(c["value"] + star["value"])
+    assert paid == pytest.approx(sum(gs.board[c][r].prize for c, r in cells))
 
 
 def test_clover_simultaneous_and_golden_whole_board(gs):
@@ -379,6 +384,9 @@ def test_clover_simultaneous_and_golden_whole_board(gs):
     g = [e for e in ev if e["type"] == "treasureGoldenClover"][0]["factor"]
     assert gs.board[0][0].prize == pytest.approx(first[(0, 0)] * f1 * f2 * g)  # next to both clovers
     assert gs.board[5][4].prize == pytest.approx(first[(5, 4)] * g)  # only the golden clover
+    # N10: activated clovers stay on their cells, inactive
+    assert gs.board[1][0].name == "TV" and gs.board[0][1].name == "TV" and gs.board[2][0].name == "TV"
+    assert len([e for e in ev if e["type"] == "treasureClover"]) == 1
 
 
 def test_treasure_maxwin_check_stops(gs, cfg):

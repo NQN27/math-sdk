@@ -171,7 +171,7 @@ class GameConfig(Config):
         self.wild_event_chance = 0.15
         self.wild_event_weights = {"multiplier": 50, "coin": 35, "power": 15}
         self.wild_mult_weights = {2: 40, 3: 25, 4: 15, 5: 12, 10: 8}
-        self.wild_mult_combine = "add"  # Q2
+        self.wild_mult_combine = "mul"  # Q2 (answered 2026-10-07): 2x and 5x on one line -> 10x
         self.wild_coin_uses_global = True  # Q1
 
         # ---- Powers --------------------------------------------------------------
@@ -228,7 +228,9 @@ class GameConfig(Config):
         self.super_min_wild_or_weapon = 3
         self.heroic_min_wild_or_weapon = 5
         self.base_global_into_bonus = False  # Q25
-        self.feature_heroic_chance = 0.5  # Q27
+        # Q27 (answered): placeholder 50/50; tune only inside [0.2, 0.8].
+        self.feature_heroic_chance = 0.5
+        self.feature_heroic_chance_range = (0.2, 0.8)
         self.max_actions_per_spin = 400  # safety cap on cycles of steps (1)-(8)
         # A 25,000x win should only come from the "wincap" fence. OFF until the
         # first tuning pass: with placeholder weights most Bonus rounds hit the

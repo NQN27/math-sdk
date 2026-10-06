@@ -1,14 +1,13 @@
 # Boss Lines v3 — trạng thái (cập nhật theo "Kịch bản 1", 2026-10-06)
 
 Nguồn luật: `Proposal_KichBan1_2026-10-06.md`. Paylines và sơ đồ thứ tự ô vẫn lấy từ `Proposal_2026-10-06.docx`
-(bản dán không có hình 35 dòng, xem câu N9). Câu hỏi còn mở nằm trong `QUESTIONS.md`; mỗi câu ứng với một cờ
-`Q<n>`/`N<n>` trong `game_config.py`.
+(bản dán không có hình 35 dòng, xem câu N9). Mọi câu hỏi đã được trả lời ngày 2026-10-07 trừ Q3 (payout lẻ, chờ xác nhận với Stake); xem `QUESTIONS.md`.
 
 ## Module
 
 | Module | Trạng thái | Ghi chú |
 |---|---|---|
-| Bảng 6x5, thứ tự ô, 35 dòng | ✅ | Test đọc từ docx cũ; chờ N9 để xác nhận không đổi |
+| Bảng 6x5, thứ tự ô, 35 dòng | ✅ | Test đọc từ docx cũ; N9: xác nhận không đổi |
 | Bảng trả thưởng, damage | ✅ | Test đọc từ bản Kịch bản 1; giá trị lẻ 0.05 chờ Q3 |
 | Bảng chặng (HP 3 = 45–65, 4 = 65–90, 5 = 85–120, rương, xu) | ✅ | Test đọc từ bản Kịch bản 1 |
 | Xu: Đồng/Bạc/Vàng/Kim cương/**Maxwin 25.000x**, nhãn theo giá trị hiện tại | ✅ | |

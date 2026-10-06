@@ -25,62 +25,35 @@ nguyên. Các cơ chế của v2 không có trong spec (HP người chơi, spin 
 - Q28: trong Bonus, ô sáng đang là Scatter thì vẫn giữ Scatter khi Treasure chạy.
 - Epic: không còn ép bảng đầu phải có kết nối; Hold and Spin **luôn** kích hoạt khi bảng đầu có kết nối.
 
-## B. Câu còn mở từ lần trước
-0. **Ô bị phá được lấp tại chỗ (không rơi như cascade)?** Hệ số Enhance, ô sáng nền và ô giữ của Hold and Spin đều
-   gắn với vị trí ô. Mặc định: **lấp tại chỗ**, rút ngẫu nhiên theo reel của cột đó.
-2. **Nhiều Multiplier Wild trên cùng một dòng: cộng hay nhân?** Mặc định: **cộng** (như Enhance).
-3. **Payout lẻ:** các giá trị 0.15, 0.25, 0.45, 0.75, 1.25, 2.25, 3.75, 6.25, 12.5 không chia hết 0.10, nên bước kiểm
-   định dạng RGS của Stake sẽ báo lỗi. Làm tròn tổng mỗi lượt về 0.10, hay đổi bảng? Mặc định: **chưa làm tròn**.
-4. **Hold and Spin nằm ở đâu trong thứ tự hành động?** Mặc định: xét **một lần, ngay sau bảng đầu tiên**, trước bước (1).
-6. **Hold and Spin có trong Heroic spin không?** Mặc định: **có**.
-7. **"Loại bỏ L1/L2…" là cộng dồn và gắn với chặng** (Super bắt đầu chặng 2 thì không có L1 ngay từ đầu)?
-   Mặc định: **đúng vậy**.
-8. **Boss Endless mới xuất hiện ngay trong vòng quay đó hay vòng quay sau?** Mặc định: **vòng quay sau**.
-9. **Bước tăng HP boss Endless:** mặc định HP mới = HP cũ + bội số của 5 ngẫu nhiên trong [0, 50].
-10. **Heroic spin diệt hết boss chặng 5:** kích hoạt Treasure rồi kết thúc. Đúng không?
-11. **"Mỗi lần gây sát thương" để roll Last hit và rơi đồ là đơn vị nào?** Mặc định: **mỗi bước hành động roll 1 lần
-    cho mỗi boss bị đánh** (một lượt phá kết nối, một vũ khí, một lần Destroy). Roll theo từng ô trước đây làm mean
-    tăng 2–3 lần.
-12. **Công thức Last hit:** mặc định `base + scale × (1 − HP_sau / HP_tối_đa)`, ×2 ở vòng quay Bonus cuối không có
-    Scatter. `base`/`scale` là số tạm.
-16. **Loại rương của mỗi boss:** gán lúc boss xuất hiện = mức tối thiểu của chặng, có tỷ lệ ra loại cao hơn, cộng cơ
-    hội nâng cấp một lần lúc mở. Đúng không?
-17. **Rương ngoài Bonus chỉ có xu:** rương Đồng ở base có 1–3 xu, mỗi xu từ bảng Xu Đồng trở lên. Đúng không?
-18. **Quà Power trong rương khi kho loại đó đã đủ 3:** mặc định **đổi thành đồng xu** cùng cấp rương.
-20. **Clover, Golden clover nhân "ô có chứa hệ số thưởng":** mặc định gồm **Đồng xu và Nam châm** (Star đã kích hoạt
-    và rời bảng trước bước Clover).
-21. **Global multiplier trong Treasure cộng vào bộ đếm lúc nào?** Mặc định: **lúc nó xuất hiện**, nên áp dụng cho
-    chính lần Treasure đó.
-26. **Số Scatter để vào Bonus ở base:** đếm trên bảng cuối, gồm Scatter giữ trong Hold and Spin và Scatter trong
-    Treasure. Đúng không?
-27. **Tỷ lệ chia Feature spin** (Heroic/Treasure hunt): mặc định tạm 50/50.
+## B. Trả lời ngày 2026-10-07 (đã áp dụng vào code)
+- Q0: ô bị phá được **lấp tại chỗ**.
+- Q2: nhiều Multiplier Wild trên một dòng thì **nhân** với nhau (2x và 5x thành 10x). Đã đổi code.
+- Q4: Hold and Spin xét **một lần ngay sau bảng đầu**. Q6: **có** trong Heroic spin.
+- Q7: biểu tượng bị loại **cộng dồn, theo chặng**.
+- Q8: boss Endless mới xuất hiện ở **vòng quay sau**. Q9: HP mới = HP cũ + bội số của 5 trong [0, 50].
+- Q10: Heroic dọn chặng 5 thì **Treasure rồi kết thúc**.
+- Q11: Last hit và boss rơi đồ roll **mỗi bước hành động, mỗi boss**. Q12: giữ công thức tuyến tính, base/scale tune sau.
+- Q16: loại rương **gán lúc boss xuất hiện**, có cơ hội nâng cấp một lần lúc mở.
+- Q17: rương ngoài Bonus chỉ có xu, mỗi xu ≥ cấp rương.
+- Q18: Power đã đủ 3 thì **không xuất hiện nữa** (rương/Wild/boss chọn loại khác còn chỗ). Khi cả 5 loại đều
+  đầy thì quà thành đồng xu.
+- Q20: Clover/Golden clover nhân **Đồng xu + Nam châm**. Q21: Global cộng **ngay khi xuất hiện**.
+- Q26: số Scatter đếm **trên bảng cuối**. Q27: Feature spin chia Heroic/Treasure hunt tự tune trong khoảng
+  **20–80%** (tạm 50/50).
+- N1: Bom/Dao phá cả **Wild** và **Scatter trong Bonus**; ngoài Bonus giữ Scatter. Vũ khí bị phá thì không kích hoạt.
+- N2: giá trị Treasure **cộng ngầm qua từng bước**, chỉ hiện ở bước 7; tổng ngầm chạm 25.000x thì dừng ngay.
+- N3: Star kích hoạt xong **biến thành đồng xu** mang giá trị của nó. Đã đổi code.
+- N5: Treasure đầu Epic dùng xu ≥ 1x, Global thu được **mang vào** các vòng quay Epic.
+- N6: "không xu Đồng trong Epic" áp cho **cả 4 loại**: xu Wild, xu rương, xu Treasure, Star.
+- N7: Treasure ở base **giữ ô Scatter**; các ô đó sáng sẵn khi vào Bonus.
+- N8: Heroic spin **không có Scatter nào**. N9: 35 dòng **không đổi**.
+- N10: Clover/Golden clover kích hoạt xong **ở lại trên ô**, không kích hoạt lại, không bị lấp. Đã đổi code.
+  (Spec bước 2 ghi các ô này được làm trống rồi lấp lại; câu trả lời này thay cho đoạn đó.)
 
-## C. Câu mới từ bản "Kịch bản 1"
-N1. **Bom/Dao phá "các biểu tượng": gồm cả Scatter và vũ khí khác?** Vũ khí bị phá như vậy có còn được kích hoạt
-    không? Mặc định: phá **mọi biểu tượng trừ Scatter ngoài Bonus**, cùng quy tắc giữ Scatter như Destroy và
-    Transform. Vũ khí bị phá thì **không** kích hoạt.
-N2. **Kiểm tra Maxwin "theo từng bước" trong Treasure:** Treasure chỉ cộng tiền ở bước (7). Mặc định: sau mỗi bước,
-    nếu `bộ đếm hiện tại + tổng hệ số thưởng đang có × Global ≥ 25.000` thì trả Maxwin và dừng ngay. Một đồng xu đạt
-    ≥ 25.000x (xu Maxwin) cũng dừng ngay.
-N3. **Star sau khi kích hoạt:** giá trị của chính Star có được tính ở bước (7) không, hay ô Star chỉ được làm trống?
-    Mặc định: **chỉ làm trống**; giá trị Star đã cộng vào xu và nam châm.
-N4. **"Nam châm chỉ xuất hiện khi trên màn hình có ≥ 2 đồng xu":** có tính cả các đồng xu vừa xuất hiện trước nó
-    trong cùng một loạt (theo thứ tự ô) không? Mặc định: **có tính**.
-N5. **Treasure đầu Epic Bonus:** mức xu tối thiểu là của chặng 2 (1x), đúng không? Global multiplier thu được ở lần
-    Treasure này có mang vào các vòng quay Epic không? Mặc định: **1x, và có mang vào** (Global giữ suốt Bonus).
-N6. **"Không xuất hiện xu Đồng trong Epic":** áp dụng cho xu từ Wild, xu trong rương, xu và Star trong Treasure.
-    Đúng không? Mặc định: **cả bốn đều tối thiểu 5x**.
-N7. **Vòng quay base vừa diệt hết boss chặng 0 vừa đủ Scatter vào Bonus:** luật ô sáng nói "ô đã chứa Scatter kích
-    hoạt Bonus" cũng biến thành biểu tượng Treasure. Nhưng câu về Scatter trong Treasure và luật "giữ ô sáng chứa
-    Scatter kích hoạt Bonus" lại gợi ý các ô đó vẫn là Scatter. Mặc định: **Treasure ở base không đụng ô Scatter**;
-    các ô đó mang trạng thái sáng vào Bonus, rồi thành biểu tượng Treasure ở lần Treasure đầu tiên trong Bonus.
-N8. **Heroic spin "không xuất hiện Scatter để kích hoạt Bonus":** nghĩa là Heroic không có Scatter nào, hay có
-    Scatter nhưng không tính? Mặc định: **không có Scatter**.
-N9. **Paylines:** bản dán không có hình 35 dòng. Bạn xác nhận 35 dòng **không đổi** so với docx cũ và lưu lại file
-    docx mới, để test đọc lại toàn bộ từ docx.
-N10. **Thứ tự Treasure khi không có nam châm:** sau bước (3)–(5), ô Star/Clover đã kích hoạt bị làm trống. Chúng chỉ
-     được lấp lại khi quay về bước (2), mà việc này chỉ xảy ra sau một nam châm. Không có nam châm thì các ô đó để
-     trống đến bước (7). Đúng không?
+## C. Còn mở
+3. **Payout lẻ** (0.15, 0.25, 1.25, 2.25…): bạn cho biết Stake mới không còn yêu cầu bội số 0.1. Bản SDK mới
+   nhất của Stake trên GitHub (`utils/rgs_verification.py`) **vẫn kiểm tra** "Payout values must be in increments
+   of 10", tức bội số 0.1x. Chưa làm tròn; cần xác nhận lại với Stake trước khi chạy bước kiểm tra định dạng.
 
 ## D. Cảnh báo cấu trúc (mục 7: báo những chỗ gây biến động lớn)
 - **Treasure gần như phủ kín bảng:** mỗi kết nối phá mọi bản sao của biểu tượng, nên khi Treasure kích hoạt đã có
