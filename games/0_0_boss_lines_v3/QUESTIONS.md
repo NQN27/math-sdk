@@ -50,6 +50,13 @@ nguyên. Các cơ chế của v2 không có trong spec (HP người chơi, spin 
 - N10: Clover/Golden clover kích hoạt xong **ở lại trên ô**, không kích hoạt lại, không bị lấp. Đã đổi code.
   (Spec bước 2 ghi các ô này được làm trống rồi lấp lại; câu trả lời này thay cho đoạn đó.)
 
+## B2. Mục tiêu tune (2026-10-07)
+- RTP **96.7%** cho mọi chế độ: base 0.967x/spin, ante 2.901x/spin, buy3 96.7x, buy4 290.1x, Feature 483.5x.
+- Feature: Heroic và Treasure hunt **không cần mean bằng nhau**; cân bằng bằng tỷ lệ ra p (20–80%) sao cho
+  p × mean_Heroic + (1 − p) × mean_Treasure_hunt = 483.5x.
+- Chờ duyệt: mean Bonus ≈ 68x / Super ≈ 226x / Epic 1.500x, tỷ lệ tier buy3 90/9/1 và buy4 95/5, Bonus chiếm
+  30% RTP của base.
+
 ## C. Còn mở
 3. **Payout lẻ** (0.15, 0.25, 1.25, 2.25…): bạn cho biết Stake mới không còn yêu cầu bội số 0.1. Bản SDK mới
    nhất của Stake trên GitHub (`utils/rgs_verification.py`) **vẫn kiểm tra** "Payout values must be in increments

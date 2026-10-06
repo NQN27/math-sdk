@@ -229,6 +229,9 @@ class GameConfig(Config):
         self.heroic_min_wild_or_weapon = 5
         self.base_global_into_bonus = False  # Q25
         # Q27 (answered): placeholder 50/50; tune only inside [0.2, 0.8].
+        # Heroic and Treasure hunt may have DIFFERENT means (designer 2026-10-07);
+        # only p*mean_heroic + (1-p)*mean_treasure_hunt = 0.967*500 = 483.5x is fixed,
+        # balanced through this chance p.
         self.feature_heroic_chance = 0.5
         self.feature_heroic_chance_range = (0.2, 0.8)
         self.max_actions_per_spin = 400  # safety cap on cycles of steps (1)-(8)
