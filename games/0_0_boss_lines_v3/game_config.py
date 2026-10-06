@@ -268,7 +268,7 @@ class GameConfig(Config):
                                  conditions=cond(reel, force_wincap=True)),
                     Distribution(criteria="freegame", quota=0.1,
                                  conditions=cond(reel, force_freegame=True,
-                                                 scatter_triggers={3: 96.9, 4: 2.85, 5: 0.25})),
+                                                 scatter_triggers={3: 95.67, 4: 4.23, 5: 0.1})),
                     Distribution(criteria="0", quota=0.4, win_criteria=0.0, conditions=cond(reel)),
                     Distribution(criteria="basegame", quota=0.5, conditions=cond(reel)),
                 ],
@@ -284,9 +284,9 @@ class GameConfig(Config):
             ],
         ))
         # Tier means (designer 2026-10-07): Bonus 88.9x, Super 240x, Epic 1492.5x. Mix derived for 96.7% RTP:
-        # buy3 = Bonus 96.9 / Super 2.85 / Epic 0.25 (= 96.72x), buy4 = Super 96 / Epic 4 (= 290.1x).
+        # buy3 = Bonus 95.67 / Super 4.23 / Epic 0.1 (= 96.70x), buy4 = Super 96 / Epic 4 (= 290.1x).
         self.tier_mean_targets = {"bonus": 88.9, "super": 240.0, "epic": 1492.5}
-        for name, cost, triggers in (("buy3", 100.0, {3: 96.9, 4: 2.85, 5: 0.25}), ("buy4", 300.0, {4: 96, 5: 4})):
+        for name, cost, triggers in (("buy3", 100.0, {3: 95.67, 4: 4.23, 5: 0.1}), ("buy4", 300.0, {4: 96, 5: 4})):
             self.bet_modes.append(BetMode(
                 name=name, cost=cost, rtp=self.rtp, max_win=maxwin,
                 auto_close_disabled=False, is_feature=False, is_buybonus=True,

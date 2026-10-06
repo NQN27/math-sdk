@@ -55,7 +55,7 @@ nguyên. Các cơ chế của v2 không có trong spec (HP người chơi, spin 
 - Feature: Heroic và Treasure hunt **không cần mean bằng nhau**; cân bằng bằng tỷ lệ ra p (20–80%) sao cho
   p × mean_Heroic + (1 − p) × mean_Treasure_hunt = 483.5x.
 - Mean từng tier (chốt 2026-10-07): **Bonus 88.9x / Super 240x / Epic 1.492,5x**. Tỷ lệ tier suy ra:
-  buy3 = Bonus 96.9 / Super 2.85 / Epic 0.25 (= 96.72x), buy4 = Super 96 / Epic 4 (= 290.1x).
+  buy3 = Bonus 95.67 / Super 4.23 / Epic 0.1 (= 96.70x), buy4 = Super 96 / Epic 4 (= 290.1x).
   Base/ante dùng cùng tỷ lệ 3/4/5 Scatter như buy3. Bonus chiếm 30% RTP của base (tạm).
 
 ## C. Còn mở
