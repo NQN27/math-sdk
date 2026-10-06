@@ -56,18 +56,8 @@ class GameState(GameStateOverride):
         self.draw_board(reel, force_scatters)
         if min_wild_weapon:
             self._guarantee_wild_or_weapon(min_wild_weapon)
-        if epic:  # the opening board must connect (checked AFTER the guarantee)
-            for _ in range(200):
-                if self.evaluate_lines():
-                    break
-                self.draw_board(reel)
-                if min_wild_weapon:
-                    self._guarantee_wild_or_weapon(min_wild_weapon)
-            else:
-                self.note_cap("epic_redraw")
-                self._force_connection()
         reveal_event(self)
-        if epic:
+        if epic:  # Epic: Hold and Spin always fires when the opening board connects
             self.hold_and_spin(force=True)
         elif not self.heroic or self.config.hold_spin_in_heroic:
             self.hold_and_spin()
@@ -76,10 +66,15 @@ class GameState(GameStateOverride):
             self.open_chests()
         if not self.wincap_triggered and self.stage_cleared:
             self.run_treasure(self.treasure_cells(), self.current_min_coin())
-            if self.in_bonus and self.bonus_tier != "epic" and self.config.lit_reset_after_treasure:
-                self.lit = set()
-        emit(self, "spinEnd", spinWin=round(self.win_manager.spin_win, 2),
-             totalWin=round(self.win_manager.running_bet_win, 2), stageCleared=self.stage_cleared)
+        self.emit_spin_end()
+
+    def win_levels(self, amount: float) -> list:
+        return [name for bound, name in self.config.win_levels if amount >= bound]
+
+    def emit_spin_end(self) -> None:
+        spin_win = round(self.win_manager.spin_win, 2)
+        emit(self, "spinEnd", spinWin=spin_win, totalWin=round(self.win_manager.running_bet_win, 2),
+             stageCleared=self.stage_cleared, winLevels=self.win_levels(spin_win))
 
     def treasure_cells(self) -> set:
         """Lit cells (all cells in Epic), minus cells now holding a Scatter (Q28)."""
@@ -88,13 +83,20 @@ class GameState(GameStateOverride):
             cells = {x for x in cells if not self.is_scatter(self.board[x[0]][x[1]])}
         return cells
 
-    def _force_connection(self) -> None:
-        """Fallback: make line 1 open with three of one allowed symbol."""
-        name = random.choice(self.allowed_basic_symbols())
-        for c in range(3):
-            r = self.config.paylines[1][c]
-            if not (self.is_wild(self.board[c][r]) or self.is_weapon(self.board[c][r])):
-                self.board[c][r] = self.make_symbol(name)
+    def epic_opening_treasure(self) -> None:
+        """Epic Bonus starts with a Treasure on every cell, as if stage 2 had
+        just been cleared (N5: stage 2's coin minimum; Epic's no-Dong rule
+        does not apply here)."""
+        self.win_manager.reset_spin_win()
+        self.begin_spin()
+        self.draw_board(self.config.bonus_stage_reel[self.stage])
+        reveal_event(self)
+        self.epic_opening = True
+        emit(self, "epicOpeningTreasure")
+        self.run_treasure(self.treasure_cells(), self.config.stage_min_coin[self.config.epic_opening_treasure_stage])
+        self.epic_opening = False
+        self.emit_spin_end()
+        self.win_manager.update_gametype_wins(self.gametype)
 
     def scatter_tier(self):
         n = min(self.scatter_count(), self.config.max_scatters_on_board)
@@ -107,7 +109,8 @@ class GameState(GameStateOverride):
         if cond["force_freegame"] or self.betmode == "feature":
             self.triggered_freegame = True
             self.record({"kind": n, "symbol": "scatter", "gametype": self.gametype})
-            self.run_bonus(tier)
+            trigger_cells = {(c, r) for c, r in self.all_cells() if self.is_scatter(self.board[c][r])}
+            self.run_bonus(tier, trigger_cells)
         else:
             self.accidental_bonus = True  # keep Bonus out of the non-freegame fences
 
@@ -137,14 +140,13 @@ class GameState(GameStateOverride):
             self.draw_board("BR0")
             reveal_event(self)
             self.run_treasure(self.all_cells(), self.current_min_coin())
-            emit(self, "spinEnd", spinWin=round(self.win_manager.spin_win, 2),
-                 totalWin=round(self.win_manager.running_bet_win, 2))
+            self.emit_spin_end()
         self.win_manager.update_gametype_wins(self.gametype)
         if self.treasure_hunt:
             self.maybe_enter_bonus(cond)
 
     # ---------------------------------------------------------------------------
-    def run_bonus(self, tier: str) -> None:
+    def run_bonus(self, tier: str, trigger_cells=()) -> None:
         cfg = self.config
         self.in_bonus = True
         self.bonus_tier = tier
@@ -155,12 +157,15 @@ class GameState(GameStateOverride):
         if not cfg.base_global_into_bonus:
             self.global_mult = 0
         self.reserve = {p: 0 for p in cfg.power_names}
-        self.lit = set()
+        # Q25: lit cells reset, except the Scatter cells that triggered the Bonus
+        self.lit = set(self.all_cells()) if tier == "epic" else set(trigger_cells)
         self.last_endless_hp = None
         spec = cfg.bonus_tiers[tier]
         self.free_spins_left = spec["spins"]
         emit(self, "bonusStart", tier=tier, freeSpins=self.free_spins_left, stage=spec["start_stage"])
         self.spawn_stage(spec["start_stage"])
+        if tier == "epic":
+            self.epic_opening_treasure()
         spin_no = 0
         while self.free_spins_left > 0 and not self.wincap_triggered:
             spin_no += 1
@@ -177,5 +182,8 @@ class GameState(GameStateOverride):
             self.win_manager.update_gametype_wins(self.gametype)
         emit(self, "bonusEnd", tier=tier, spins=spin_no,
              totalWin=round(self.win_manager.running_bet_win, 2))
+        if not self.wincap_triggered:
+            emit(self, "totalWin", amount=round(self.win_manager.freegame_wins, 2),
+                 winLevels=self.win_levels(self.win_manager.freegame_wins))
         boss_state_event(self)
         self.in_bonus = False

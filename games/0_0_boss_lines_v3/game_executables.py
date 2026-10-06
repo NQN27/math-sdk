@@ -214,7 +214,7 @@ class GameExecutables(GameCalculations):
     def power_transform(self) -> None:
         cand = [(c, r) for c, r in self.all_cells()
                 if not self.is_wild(self.board[c][r]) and not self.is_weapon(self.board[c][r])
-                and (self.config.transform_can_hit_scatter or not self.is_scatter(self.board[c][r]))]
+                and (self.in_bonus or not self.is_scatter(self.board[c][r]))]
         n = min(len(cand), random.randint(*self.config.transform_count_range))
         cells = random.sample(cand, n)
         for c, r in cells:
@@ -244,18 +244,16 @@ class GameExecutables(GameCalculations):
     def power_destroy(self) -> None:
         """Every symbol except Wild is destroyed (step 8). Paying symbols
         deal damage (Q13) but are not lit; destroyed weapons are lit."""
-        cells, hits, lit = [], [], []
+        cells, hits = [], []
         for c, r in self.all_cells():
             s = self.board[c][r]
-            if s is None or self.is_wild(s):
+            if s is None or self.is_wild(s) or (self.is_scatter(s) and not self.in_bonus):
                 continue
             cells.append((c, r))
             if self.is_basic(s) and self.config.destroy_deals_damage:
                 hits.append((c, r, self.config.symbol_damage[s.name]))
-            if self.is_weapon(s):
-                lit.append((c, r))
         emit(self, "powerActivated", power="destroy", cells=[pos(self, c, r) for c, r in cells])
-        self.destroy_cells(cells, lit)
+        self.destroy_cells(cells)
         self.deal_damage(hits, "destroy")
 
     def allowed_basic_symbols(self):
@@ -269,6 +267,8 @@ class GameExecutables(GameCalculations):
         """Coin value >= min_value (and >= min_tier's lowest value)."""
         if getattr(self, "force_wincap", False):
             return 25000
+        if self.in_bonus and self.bonus_tier == "epic" and not self.epic_opening:
+            min_value = max(min_value, self.config.epic_min_coin)  # N6
         if min_tier is not None:
             min_value = max(min_value, self.config.coin_tiers[min_tier][0])
         pool = {v: w for v, w in self.config.coin_value_weights.items() if v >= min_value}
@@ -366,7 +366,8 @@ class GameExecutables(GameCalculations):
         dark = [cell for cell in self.darkened if self.is_scatter(self.board[cell[0]][cell[1]])]
         emit(self, "destroy", cause="connect", cells=[pos(self, c, r) for c, r in cells],
              scatters=[pos(self, c, r) for c, r in dark])
-        self.destroy_cells(cells + dark, lit_cells=cells)
+        lit = [(c, r) for c, r in cells if (c, r) not in wild_cells]  # basic symbols only
+        self.destroy_cells(cells + dark, lit_cells=lit)
         self.darkened.clear()
         self.wild_mult.clear()
         self.deal_damage(hits, "connect")
@@ -403,15 +404,15 @@ class GameExecutables(GameCalculations):
     def _weapon_targets(self, c, r, name):
         cfg = self.config
 
-        def paying(s):
-            return self.is_basic(s) or (cfg.weapons_destroy_wild and self.is_wild(s))
+        def hit(s):  # N1: any symbol, except Scatter outside Bonus
+            return s is not None and (self.in_bonus or not self.is_scatter(s))
 
         if name == "BM":
             area = [(cc, rr) for cc in range(c - 1, c + 2) for rr in range(r - 1, r + 2)
                     if 0 <= cc < 6 and 0 <= rr < 5 and (cc, rr) != (c, r)]
-            return [x for x in area if paying(self.board[x[0]][x[1]])]
+            return [x for x in area if hit(self.board[x[0]][x[1]])]
         if name == "SW":
-            return [(cc, r) for cc in range(6) if cc != c and paying(self.board[cc][r])]
+            return [(cc, r) for cc in range(6) if cc != c and hit(self.board[cc][r])]
         if name == "LT":
             names = self._basic_names_on_board()
             if not names:
@@ -444,17 +445,18 @@ class GameExecutables(GameCalculations):
                 dmg = self.arrow_damage(b) if (b is not None and b["alive"]) else 0
                 emit(self, "weapon", weapon="arrow", position=pos(self, c, r), damage=dmg,
                      boss=b["id"] if b else None)
-                self.destroy_cells([(c, r)], lit_cells=[(c, r)])
+                self.destroy_cells([(c, r)])
                 if dmg:
                     self.deal_damage([(c, r, dmg)], "arrow")
                 continue
             factor = sym.prize or 1
             targets = self._weapon_targets(c, r, name)
-            hits = [(tc, tr, self.config.symbol_damage[self.board[tc][tr].name] * factor) for tc, tr in targets]
+            hits = [(tc, tr, self.config.symbol_damage[self.board[tc][tr].name] * factor) for tc, tr in targets
+                    if self.board[tc][tr].name in self.config.symbol_damage]  # only paying symbols deal damage
             emit(self, "weapon", weapon={"BM": "bomb", "SW": "sword", "LT": "lightning"}[name],
                  position=pos(self, c, r), factor=factor, cells=[pos(self, tc, tr) for tc, tr in targets])
-            # weapon-destroyed paying cells are NOT lit; the weapon's own cell is
-            self.destroy_cells(targets + [(c, r)], lit_cells=[(c, r)])
+            # nothing destroyed by a weapon lights its cell; a destroyed weapon never fires
+            self.destroy_cells(targets + [(c, r)])
             self.deal_damage(hits, name)
         self.refill()
         return True
@@ -491,7 +493,7 @@ class GameExecutables(GameCalculations):
         n = get_random_outcome(cfg.chest_gift_count_weights[tier])
         kinds = []
         for _ in range(n):
-            if self.in_bonus and random.random() < cfg.chest_gift_power_chance:
+            if self.in_bonus and random.random() < cfg.chest_gift_power_chance[tier]:
                 kinds.append("power")
             else:
                 kinds.append("coin")
@@ -532,57 +534,74 @@ class GameExecutables(GameCalculations):
     # =========================================================================
     def _treasure_cell(self, kind, min_coin):
         cfg = self.config
-        if kind == "coin":
+        names = {"coin": "TC", "magnet": "TM", "clover": "TV", "golden": "TV", "star": "TS",
+                 "global": "TG", "scatter": "SC"}
+        if kind in ("coin", "star"):
             v = self.draw_coin(min_coin)
-            sym = self.make_symbol("TC")
         elif kind == "magnet":
             v = 0.0
-            sym = self.make_symbol("TM")
         elif kind == "clover":
             v = get_random_outcome(cfg.clover_factor_weights)
-            sym = self.make_symbol("TV")
+        elif kind == "golden":
+            v = get_random_outcome(cfg.golden_factor_weights)
         elif kind == "global":
             v = get_random_outcome(cfg.global_factor_weights)
-            sym = self.make_symbol("TG")
         else:
             v = 0
-            sym = self.make_symbol("SC")
+        sym = self.make_symbol(names[kind])
         sym.prize = v
         return sym
 
     def roll_treasure_kind(self, weights) -> str:
         return get_random_outcome(weights)
 
+    def _treasure_values(self, cells, kinds):
+        return [(x, self.board[x[0]][x[1]].prize) for x in cells
+                if kinds.get(x) in ("coin", "magnet") and self.board[x[0]][x[1]] is not None]
+
+    def _treasure_maxwin_check(self, cells, kinds) -> bool:
+        """N2: stop with Maxwin as soon as the Treasure, if collected now, would
+        reach 25,000x (also covers a single Maxwin coin on the board)."""
+        g = self.global_factor()
+        total = sum(v for _, v in self._treasure_values(cells, kinds)) * g
+        if self.win_manager.running_bet_win + total >= self.config.wincap:
+            emit(self, "treasureMaxwin", value=round(total, 2))
+            self.award(total)
+            return True
+        return False
+
     def run_treasure(self, cells, min_coin) -> float:
-        """Treasure feature on `cells` (the lit cells). Returns the payout."""
+        """Treasure on `cells` (Proposal section 6, Treasure steps 1-7)."""
         cfg = self.config
         cells = [x for x in self.all_cells() if x in set(cells)]
         if not cells:
             return 0.0
+        start_win = self.win_manager.running_bet_win
         emit(self, "treasureStart", cells=[pos(self, c, r) for c, r in cells])
         kinds = {}
-        for cell in cells:
-            self.board[cell[0]][cell[1]] = None
+        for c, r in cells:
+            self.board[c][r] = None
         first = True
-        used_clovers, used_magnets = set(), set()
+        used_magnets = set()
         rounds = 0
         while True:
             rounds += 1
             if rounds > cfg.treasure_max_rounds:
                 self.note_cap("treasure_rounds")
                 break
-            # (1) appear on empty lit cells
-            empty = [x for x in cells if self.board[x[0]][x[1]] is None]
+            # (1)/(2) symbols appear on empty lit cells
             new = []
-            for c, r in empty:
+            for c, r in [x for x in cells if self.board[x[0]][x[1]] is None]:
                 weights = dict(cfg.treasure_kind_weights)
                 if self.no_scatter_spin or (cfg.treasure_scatter_capped and not self.scatter_allowed(c, r)):
                     weights.pop("scatter", None)
+                if sum(1 for x in cells if kinds.get(x) == "coin") < cfg.magnet_min_coins:
+                    weights.pop("magnet", None)
                 kind = self.roll_treasure_kind(weights)
                 self.board[c][r] = self._treasure_cell(kind, min_coin)
                 kinds[(c, r)] = kind
                 new.append((c, r))
-            if first and new and not any(kinds[x] == "coin" for x in cells if x in kinds):
+            if first and new and not any(kinds[x] == "coin" for x in new):
                 c, r = random.choice(new)
                 self.board[c][r] = self._treasure_cell("coin", min_coin)
                 kinds[(c, r)] = "coin"
@@ -590,39 +609,64 @@ class GameExecutables(GameCalculations):
             n_sc = 0
             for c, r in new:
                 if kinds[(c, r)] == "global":
-                    self.global_mult += self.board[c][r].prize
+                    self.global_mult += self.board[c][r].prize  # Q21: collected on appearance
                 elif kinds[(c, r)] == "scatter":
                     n_sc += 1
             if n_sc and self.in_bonus:
                 self.free_spins_left += n_sc
                 self.spin_had_scatter = True
             emit(self, "treasureSymbols", cells=[
-                {**pos(self, c, r), "kind": kinds[(c, r)], "value": self.board[c][r].prize} for c, r in new],
-                globalMult=self.global_factor(), addedSpins=n_sc if self.in_bonus else 0)
-            # (2) clovers in cell order
-            for c, r in cells:
-                if kinds.get((c, r)) != "clover" or (c, r) in used_clovers:
-                    continue
-                if cfg.clover_only_new:
-                    used_clovers.add((c, r))
+                {**pos(self, c, r), "kind": kinds[(c, r)], "value": self.board[c][r].prize,
+                 **({"coin": self.coin_label(self.board[c][r].prize)} if kinds[(c, r)] == "coin" else {})}
+                for c, r in new], globalMult=self.global_factor(), addedSpins=n_sc if self.in_bonus else 0)
+            if self._treasure_maxwin_check(cells, kinds):
+                return self.win_manager.running_bet_win - start_win
+            # (3) Stars, in cell order: add to every coin and magnet, then the Star cell empties
+            for c, r in [x for x in cells if kinds.get(x) == "star"]:
+                v = self.board[c][r].prize
+                hit = [x for x, _ in self._treasure_values(cells, kinds)]
+                for x in hit:
+                    self.board[x[0]][x[1]].prize += v
+                self.board[c][r] = None
+                kinds.pop((c, r))
+                emit(self, "treasureStar", position=pos(self, c, r), value=v, cells=[pos(self, *x) for x in hit])
+            # (4) Clovers, simultaneous: each target x product of covering clovers
+            clovers = [x for x in cells if kinds.get(x) == "clover"]
+            if clovers:
+                mult = {}
+                for c, r in clovers:
+                    f = self.board[c][r].prize
+                    for cc in range(c - 1, c + 2):
+                        for rr in range(r - 1, r + 2):
+                            if (cc, rr) != (c, r) and kinds.get((cc, rr)) in cfg.clover_hits:
+                                mult[(cc, rr)] = mult.get((cc, rr), 1) * f
+                for (cc, rr), f in mult.items():
+                    self.board[cc][rr].prize *= f
+                emit(self, "treasureClover", clovers=[{**pos(self, c, r), "factor": self.board[c][r].prize}
+                                                       for c, r in clovers],
+                     cells=[{**pos(self, c, r), "factor": f} for (c, r), f in mult.items()])
+                for c, r in clovers:
+                    self.board[c][r] = None
+                    kinds.pop((c, r))
+            # (5) Golden clovers, one after another: x every reward cell on the board
+            for c, r in [x for x in cells if kinds.get(x) == "golden"]:
                 f = self.board[c][r].prize
-                hit = []
-                for cc in range(c - 1, c + 2):
-                    for rr in range(r - 1, r + 2):
-                        if (cc, rr) != (c, r) and kinds.get((cc, rr)) in cfg.clover_hits \
-                                and self.board[cc][rr] is not None:
-                            self.board[cc][rr].prize *= f
-                            hit.append(pos(self, cc, rr))
-                emit(self, "treasureClover", position=pos(self, c, r), factor=f, cells=hit)
-            # (3) next magnet in cell order
-            magnet = next((x for x in cells if kinds.get(x) == "magnet" and x not in used_magnets
-                           and self.board[x[0]][x[1]] is not None), None)
+                hit = [x for x, _ in self._treasure_values(cells, kinds)]
+                for x in hit:
+                    self.board[x[0]][x[1]].prize *= f
+                self.board[c][r] = None
+                kinds.pop((c, r))
+                emit(self, "treasureGoldenClover", position=pos(self, c, r), factor=f,
+                     cells=[pos(self, *x) for x in hit])
+            if self._treasure_maxwin_check(cells, kinds):
+                return self.win_manager.running_bet_win - start_win
+            # (6) next magnet in cell order; then back to (2)
+            magnet = next((x for x in cells if kinds.get(x) == "magnet" and x not in used_magnets), None)
             if magnet is None:
                 break
             used_magnets.add(magnet)
             mc, mr = magnet
-            taken = [x for x in cells if x != magnet and kinds.get(x) in ("coin", "magnet")
-                     and self.board[x[0]][x[1]] is not None]
+            taken = [x for x, _ in self._treasure_values(cells, kinds) if x != magnet]
             gained = sum(self.board[x[0]][x[1]].prize for x in taken)
             self.board[mc][mr].prize += gained
             for x in taken:
@@ -631,9 +675,8 @@ class GameExecutables(GameCalculations):
                 used_magnets.discard(x)
             emit(self, "treasureMagnet", position=pos(self, mc, mr), collected=gained,
                  value=self.board[mc][mr].prize, cells=[pos(self, c, r) for c, r in taken])
-        # (4) collect everything
-        total = sum(self.board[c][r].prize for c, r in cells
-                    if kinds.get((c, r)) in ("coin", "magnet") and self.board[c][r] is not None)
+        # (7) collect every reward on the board x Global
+        total = sum(v for _, v in self._treasure_values(cells, kinds))
         g = self.global_factor()
         paid = self.award(total * g)
         emit(self, "treasureEnd", total=total, globalMult=g, paid=paid)

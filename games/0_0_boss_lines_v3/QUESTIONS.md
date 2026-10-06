@@ -1,142 +1,98 @@
 # Boss Lines v3: câu hỏi chờ trả lời
 
-Nguồn: `Proposal_2026-10-06.docx` (bản lưu 01:34 ngày 2026-10-06, đã copy vào thư mục này).
+**Nguồn hiện tại:** `Proposal_KichBan1_2026-10-06.md` (bản "Kịch bản 1: Cơ chế Line" dán vào chat ngày 2026-10-06).
+Bản trước là `Proposal_2026-10-06.docx` (01:34). File docx trên đĩa **chưa được cập nhật**, nên:
+- Hình 35 dòng trả thưởng và sơ đồ thứ tự ô vẫn được test đọc từ docx cũ.
+- Bảng chặng (HP, rương, xu) được test đọc từ bản .md mới.
 
-Mỗi câu ghi kèm **mặc định đang code**. Đây là cách tôi tạm hiểu để code chạy được, và nó nằm sau một tham số trong
-`game_config.py`, nên đổi lại không phải sửa logic. Bạn chỉ cần trả lời theo số câu. Câu nào đồng ý với mặc định
-thì ghi "OK".
+Mỗi câu ghi kèm **mặc định đang code**. Mặc định nằm sau một cờ trong `game_config.py`, nên đổi lại không phải
+sửa logic. Bạn chỉ cần trả lời theo số câu; câu nào đồng ý với mặc định thì ghi "OK".
 
-**Quyết định tôi tự đưa ra (bạn có thể đảo lại):** spec mới khác v2 quá nhiều (Hold and Spin, 35 dòng, Treasure,
-vũ khí, rương có quà, Endless, số vòng quay cố định), nên tôi viết **game mới `0_0_boss_lines_v3`** theo đúng thứ tự
-hành động mục 6. `0_0_boss_lines_v2` giữ nguyên, không sửa. Các cơ chế của v2 không có trong spec mới (HP người chơi,
-spin budget, deadspin, chain-block...) không được mang sang.
+**Quyết định tôi tự đưa ra (bạn có thể đảo lại):** game viết mới là `0_0_boss_lines_v3`. `0_0_boss_lines_v2` giữ
+nguyên. Các cơ chế của v2 không có trong spec (HP người chơi, spin budget, deadspin, chain-block...) không được mang sang.
 
-## Đã chốt từ buổi QA trước (để đối chiếu)
-- Ô hàng 3 cột 6 trong sơ đồ thứ tự là 25 (file mới đã sửa).
-- Tên chế độ: Ante spin.
-- Scatter chặn tối đa 5 khi sinh bảng: nếu 5 cột đầu đã có scatter thì cột 6 không có.
-- Endless lần đầu HP 350–400; các lần sau chỉ cần HP ≥ boss Endless trước, không giới hạn trên.
-- HP các chặng được phép chồng khoảng nhau.
-- Wild gây damage 3 (ô gộp với H5 trong bảng).
-- Scatter và vũ khí bị phá thì không trả thưởng, không gây damage. Vũ khí nổ: mỗi ô nó phá gây damage = damage của ô × hệ số vũ khí.
-- Cung tên không có hệ số 1–10x.
-- Upgrade: cả nhóm ô ra cùng một kết quả.
-- Last hit dùng HP tối đa của boss.
-- Scatter giữ trong Hold and Spin được tính vào điều kiện vào Bonus.
-- Diệt boss chặng 0 chỉ nhận rương, không vào Bonus.
+## A. Câu bản "Kịch bản 1" đã trả lời (đã cập nhật code)
+- Q1: xu từ sự kiện Wild **có** nhân Global multiplier.
+- Q5: không trả thưởng hay kích hoạt gì trong lúc Hold and Spin đang chạy.
+- Q13: Destroy **được tính là phá huỷ**, nên gây damage. Không làm sáng nền.
+- Q14: Bom và Dao phá **mọi biểu tượng** trong vùng (không chỉ biểu tượng trả thưởng). Xem câu mới N1.
+- Q15: Transform không đụng Scatter **ngoài Bonus**; trong Bonus thì được. Destroy cũng vậy.
+- Q19: Clover, Golden clover và Star sau khi kích hoạt thì làm trống ô và được lấp lại biểu tượng mới.
+- Q22, Q24: Scatter từ Treasure cộng với Scatter thường để vào Bonus; Treasure hunt có Scatter để vào Bonus.
+- Q23: ô sáng nền **giữ suốt Bonus**, không xoá sau khi Treasure chạy.
+- Q25: vào Bonus thì Global multiplier và ô sáng nền được đặt lại, **trừ các ô chứa Scatter đã kích hoạt Bonus**
+  (những ô này sáng sẵn khi bắt đầu Bonus).
+- Q28: trong Bonus, ô sáng đang là Scatter thì vẫn giữ Scatter khi Treasure chạy.
+- Epic: không còn ép bảng đầu phải có kết nối; Hold and Spin **luôn** kích hoạt khi bảng đầu có kết nối.
 
-## Câu hỏi mới
+## B. Câu còn mở từ lần trước
+0. **Ô bị phá được lấp tại chỗ (không rơi như cascade)?** Hệ số Enhance, ô sáng nền và ô giữ của Hold and Spin đều
+   gắn với vị trí ô. Mặc định: **lấp tại chỗ**, rút ngẫu nhiên theo reel của cột đó.
+2. **Nhiều Multiplier Wild trên cùng một dòng: cộng hay nhân?** Mặc định: **cộng** (như Enhance).
+3. **Payout lẻ:** các giá trị 0.15, 0.25, 0.45, 0.75, 1.25, 2.25, 3.75, 6.25, 12.5 không chia hết 0.10, nên bước kiểm
+   định dạng RGS của Stake sẽ báo lỗi. Làm tròn tổng mỗi lượt về 0.10, hay đổi bảng? Mặc định: **chưa làm tròn**.
+4. **Hold and Spin nằm ở đâu trong thứ tự hành động?** Mặc định: xét **một lần, ngay sau bảng đầu tiên**, trước bước (1).
+6. **Hold and Spin có trong Heroic spin không?** Mặc định: **có**.
+7. **"Loại bỏ L1/L2…" là cộng dồn và gắn với chặng** (Super bắt đầu chặng 2 thì không có L1 ngay từ đầu)?
+   Mặc định: **đúng vậy**.
+8. **Boss Endless mới xuất hiện ngay trong vòng quay đó hay vòng quay sau?** Mặc định: **vòng quay sau**.
+9. **Bước tăng HP boss Endless:** mặc định HP mới = HP cũ + bội số của 5 ngẫu nhiên trong [0, 50].
+10. **Heroic spin diệt hết boss chặng 5:** kích hoạt Treasure rồi kết thúc. Đúng không?
+11. **"Mỗi lần gây sát thương" để roll Last hit và rơi đồ là đơn vị nào?** Mặc định: **mỗi bước hành động roll 1 lần
+    cho mỗi boss bị đánh** (một lượt phá kết nối, một vũ khí, một lần Destroy). Roll theo từng ô trước đây làm mean
+    tăng 2–3 lần.
+12. **Công thức Last hit:** mặc định `base + scale × (1 − HP_sau / HP_tối_đa)`, ×2 ở vòng quay Bonus cuối không có
+    Scatter. `base`/`scale` là số tạm.
+16. **Loại rương của mỗi boss:** gán lúc boss xuất hiện = mức tối thiểu của chặng, có tỷ lệ ra loại cao hơn, cộng cơ
+    hội nâng cấp một lần lúc mở. Đúng không?
+17. **Rương ngoài Bonus chỉ có xu:** rương Đồng ở base có 1–3 xu, mỗi xu từ bảng Xu Đồng trở lên. Đúng không?
+18. **Quà Power trong rương khi kho loại đó đã đủ 3:** mặc định **đổi thành đồng xu** cùng cấp rương.
+20. **Clover, Golden clover nhân "ô có chứa hệ số thưởng":** mặc định gồm **Đồng xu và Nam châm** (Star đã kích hoạt
+    và rời bảng trước bước Clover).
+21. **Global multiplier trong Treasure cộng vào bộ đếm lúc nào?** Mặc định: **lúc nó xuất hiện**, nên áp dụng cho
+    chính lần Treasure đó.
+26. **Số Scatter để vào Bonus ở base:** đếm trên bảng cuối, gồm Scatter giữ trong Hold and Spin và Scatter trong
+    Treasure. Đúng không?
+27. **Tỷ lệ chia Feature spin** (Heroic/Treasure hunt): mặc định tạm 50/50.
 
-### Trả thưởng
-1. **Xu từ sự kiện Wild (Coin drop) có nhân Global multiplier không?** Mục 6 chỉ nói xu trong rương và Treasure
-   nhân Global; Coin drop xảy ra ở bước (4), trước bước trả thưởng dòng.
-   Mặc định: **có nhân** (`wild_coin_uses_global = True`).
-2. **Nhiều Multiplier Wild trên cùng một dòng: cộng hay nhân?** (Hệ số Enhance thì spec ghi rõ là cộng.)
-   Mặc định: **cộng** như Enhance (`wild_mult_combine = "add"`).
-3. **Payout lẻ:** bảng trả thưởng có giá trị không chia hết 0.10 (0.15, 0.25, 0.45, 0.75, 1.25, 2.25, 3.75, 6.25,
-   12.5). Khi xuất thư viện cho Stake, RGS kiểm tra payout là bội số 0.10 nên bước kiểm định dạng sẽ báo lỗi.
-   Mục 7 nói không tự sửa bảng nên tôi chỉ báo. Hướng xử lý: làm tròn xuống tổng mỗi lượt về 0.10, hay đổi bảng?
-   Mặc định: **chưa làm tròn**.
+## C. Câu mới từ bản "Kịch bản 1"
+N1. **Bom/Dao phá "các biểu tượng": gồm cả Scatter và vũ khí khác?** Vũ khí bị phá như vậy có còn được kích hoạt
+    không? Mặc định: phá **mọi biểu tượng trừ Scatter ngoài Bonus**, cùng quy tắc giữ Scatter như Destroy và
+    Transform. Vũ khí bị phá thì **không** kích hoạt.
+N2. **Kiểm tra Maxwin "theo từng bước" trong Treasure:** Treasure chỉ cộng tiền ở bước (7). Mặc định: sau mỗi bước,
+    nếu `bộ đếm hiện tại + tổng hệ số thưởng đang có × Global ≥ 25.000` thì trả Maxwin và dừng ngay. Một đồng xu đạt
+    ≥ 25.000x (xu Maxwin) cũng dừng ngay.
+N3. **Star sau khi kích hoạt:** giá trị của chính Star có được tính ở bước (7) không, hay ô Star chỉ được làm trống?
+    Mặc định: **chỉ làm trống**; giá trị Star đã cộng vào xu và nam châm.
+N4. **"Nam châm chỉ xuất hiện khi trên màn hình có ≥ 2 đồng xu":** có tính cả các đồng xu vừa xuất hiện trước nó
+    trong cùng một loạt (theo thứ tự ô) không? Mặc định: **có tính**.
+N5. **Treasure đầu Epic Bonus:** mức xu tối thiểu là của chặng 2 (1x), đúng không? Global multiplier thu được ở lần
+    Treasure này có mang vào các vòng quay Epic không? Mặc định: **1x, và có mang vào** (Global giữ suốt Bonus).
+N6. **"Không xuất hiện xu Đồng trong Epic":** áp dụng cho xu từ Wild, xu trong rương, xu và Star trong Treasure.
+    Đúng không? Mặc định: **cả bốn đều tối thiểu 5x**.
+N7. **Vòng quay base vừa diệt hết boss chặng 0 vừa đủ Scatter vào Bonus:** luật ô sáng nói "ô đã chứa Scatter kích
+    hoạt Bonus" cũng biến thành biểu tượng Treasure. Nhưng câu về Scatter trong Treasure và luật "giữ ô sáng chứa
+    Scatter kích hoạt Bonus" lại gợi ý các ô đó vẫn là Scatter. Mặc định: **Treasure ở base không đụng ô Scatter**;
+    các ô đó mang trạng thái sáng vào Bonus, rồi thành biểu tượng Treasure ở lần Treasure đầu tiên trong Bonus.
+N8. **Heroic spin "không xuất hiện Scatter để kích hoạt Bonus":** nghĩa là Heroic không có Scatter nào, hay có
+    Scatter nhưng không tính? Mặc định: **không có Scatter**.
+N9. **Paylines:** bản dán không có hình 35 dòng. Bạn xác nhận 35 dòng **không đổi** so với docx cũ và lưu lại file
+    docx mới, để test đọc lại toàn bộ từ docx.
+N10. **Thứ tự Treasure khi không có nam châm:** sau bước (3)–(5), ô Star/Clover đã kích hoạt bị làm trống. Chúng chỉ
+     được lấp lại khi quay về bước (2), mà việc này chỉ xảy ra sau một nam châm. Không có nam châm thì các ô đó để
+     trống đến bước (7). Đúng không?
 
-0. **Ô bị phá được lấp tại chỗ (không rơi xuống như cascade), đúng không?** Spec ghi "xuất hiện biểu tượng mới
-   trên những ô bị phá huỷ". Hệ số Enhance, ô sáng nền và ô giữ của Hold and Spin đều gắn với **vị trí ô**, nên
-   chỉ đúng nghĩa khi các ô không bị dịch chuyển.
-   Mặc định: **lấp tại chỗ**, biểu tượng mới rút ngẫu nhiên theo reel của cột đó.
+## D. Cảnh báo cấu trúc (mục 7: báo những chỗ gây biến động lớn)
+- **Treasure gần như phủ kín bảng:** mỗi kết nối phá mọi bản sao của biểu tượng, nên khi Treasure kích hoạt đã có
+  khoảng 20+ ô sáng. Với xu tối thiểu 20x ở chặng 5/Endless, một lần Treasure ở đó có sàn khoảng vài trăm x, chưa nhân Global.
+- **Global multiplier chỉ tăng trong suốt Bonus** và nhân trả thưởng dòng, rương, xu Wild và Treasure.
+- **Rương Kim cương:** xu trong rương tối thiểu 100x, nhân Global.
+- **Scatter trong Bonus:** mỗi spin lấp lại khoảng 32 ô, ô nào cũng có thể ra Scatter (+1 spin). Ở mật độ 1% mỗi spin
+  tự cộng 1.38 spin, nên Bonus không bao giờ tự kết thúc. Reel Bonus hiện để 1 Scatter mỗi cột.
 
-### Hold and Spin
-4. **Hold and Spin nằm ở đâu trong thứ tự mục 6?** Mục 6 không liệt kê.
-   Mặc định: chỉ xét **một lần, ngay sau bảng đầu tiên của vòng quay**, trước bước (1). Kích hoạt khi bảng đầu có
-   ≥1 kết nối, với tỷ lệ `hold_spin_chance`.
-5. **Ô được giữ:** tôi hiểu là mọi ô chứa biểu tượng đã kết nối ở bảng đầu, cộng mọi Wild, Scatter và vũ khí.
-   Ô mới quay ra nếu trùng loại đó thì cũng được giữ. Các lượt quay lại chỉ đổi bảng, không trả thưởng hay gây
-   damage riêng; sau khi dừng thì vào chuỗi bước (1)–(9) bình thường. Đúng không?
-6. **Hold and Spin có trong Heroic spin không?** Mục 3 ghi "bất kì vòng quay nào".
-   Mặc định: **có** (cùng tỷ lệ với base).
-
-### Biểu tượng theo chặng và Endless
-7. **Biểu tượng "Loại bỏ L1/L2…" là cộng dồn và gắn với chặng, không phụ thuộc lịch sử?** Ví dụ Super Bonus bắt
-   đầu ở chặng 2 thì không có L1 ngay từ đầu; chặng 4 không có L1, L2, L3; Endless và chặng 5 không còn L nào.
-   Mặc định: **đúng như vậy** (reel mỗi chặng không chứa các L đã loại).
-8. **Boss Endless mới xuất hiện lúc nào sau khi diệt boss Endless cũ:** ngay trong vòng quay đó, hay vòng quay
-   sau (như luật chuyển chặng)?
-   Mặc định: **vòng quay sau**.
-9. **Bước tăng HP boss Endless:** "≥ boss trước, không giới hạn" vẫn cần một quy tắc để sinh số.
-   Mặc định: HP mới = HP cũ + một bội số của 5 ngẫu nhiên trong [0, 50] (`endless_hp_step_choices`).
-10. **Heroic spin diệt hết boss chặng 5 thì sao?** (Không lên Endless.) Tôi hiểu là kích hoạt Treasure như mọi
-    lần dọn chặng, rồi kết thúc vòng quay. Đúng không?
-
-### Damage, Last hit, boss rơi đồ
-11. **"Mỗi lần gây sát thương" để roll Last hit và roll boss rơi Wild/Power được tính theo đơn vị nào?** Bước (6)
-    phá nhiều ô cùng lúc.
-    Mặc định: **mỗi bước hành động roll 1 lần cho mỗi boss bị đánh** (một lượt phá kết nối, một vũ khí, một lần
-    Destroy). Roll theo từng ô trước đây đã làm mean tăng 2–3 lần.
-12. **Công thức Last hit:** spec chỉ nói "HP sau sát thương / HP tối đa càng thấp thì tỷ lệ càng cao".
-    Mặc định: `chance = base + scale × (1 − HP_sau / HP_tối_đa)`, nhân 2 ở vòng quay Bonus cuối không có Scatter.
-    `base`/`scale` là số tạm, sẽ tune sau.
-13. **Destroy (bước 8):** các biểu tượng trả thưởng bị phá **có gây damage không?** Spec chỉ nói chúng không làm
-    sáng nền cho Treasure. Mặc định: **có gây damage** (luật chung mục 5, hệ số 1x).
-14. **Bom và Dao phá "biểu tượng trả thưởng": có tính Wild không?** (Sấm chớp ghi rõ "biểu tượng trả thưởng cơ
-    bản", còn Bom và Dao không có chữ "cơ bản".) Mặc định: **có tính Wild** (Wild bị phá gây damage 3 × hệ số).
-15. **Transform** ("2–5 ô bất kì, trừ Wild và Vũ khí"): **có được biến ô Scatter thành Wild không?**
-    Mặc định: **không đụng Scatter** (tránh làm mất trigger Bonus).
-
-### Rương
-16. **Loại rương của mỗi boss:** gán lúc boss xuất hiện theo mức tối thiểu của chặng, có tỷ lệ ra loại cao hơn,
-    cộng cơ hội nâng cấp một lần lúc mở. Đúng không? (Tỷ lệ là số tạm.)
-17. **Rương ngoài Bonus chỉ có Đồng xu.** Vậy Đồng xu trong rương Đồng ở base là 1–3 xu, mỗi xu thuộc bảng Xu Đồng
-    trở lên. Đúng không?
-18. **Quà Power trong rương khi kho dự trữ loại đó đã đủ 3:** bỏ qua, hay đổi thành Đồng xu?
-    Mặc định: **đổi thành Đồng xu** cùng cấp rương.
-
-### Treasure
-19. **Thứ tự Clover sau mỗi vòng Nam châm:** khi quay lại bước (1) rồi (2), chỉ Clover **mới xuất hiện** mới kích
-    hoạt, hay mọi Clover kích hoạt lại? Mặc định: **chỉ Clover mới**.
-20. **Clover nhân "ô có chứa hệ số thưởng xung quanh":** gồm Đồng xu và Nam châm, không gồm ô Global multiplier,
-    đúng không? Mặc định: **xu + nam châm**.
-21. **Global multiplier trong Treasure được cộng vào bộ đếm lúc nào?** Mặc định: lúc nó xuất hiện. Nó áp dụng
-    cho trả thưởng của chính lần Treasure đó, và cho các trả thưởng sau trong Bonus.
-22. **Scatter xuất hiện trong Treasure:** ở base thì tính vào số Scatter để vào Bonus; trong Bonus thì +1 vòng quay
-    mỗi cái. Có giới hạn tối đa 5 Scatter và 1 Scatter mỗi cột như bảng thường không?
-    Mặc định: **có giới hạn** (5 tổng, 1 mỗi cột).
-23. **Ô sáng nền trong Bonus (không phải Epic):** sau khi Treasure dùng chúng thì bị xoá, hay giữ tiếp đến hết
-    Bonus? Mặc định: **xoá sau khi Treasure chạy**. Epic thì luôn sáng toàn bộ.
-24. **Treasure hunt "không đánh boss":** bảng 30 ô đều là biểu tượng Treasure. Mức xu tối thiểu là 1x (spec), còn
-    Global multiplier xuất hiện thì vẫn nhân trả thưởng Treasure, đúng không? Scatter trong Treasure hunt đủ 3/4/5
-    thì vào Bonus/Super/Epic.
-
-### Chuyển chế độ
-25. **Global multiplier thu được ở base spin (qua Treasure) có mang vào Bonus vừa trúng không?**
-    Mặc định: **không**, Bonus bắt đầu với Global = 0x (hiển thị 1x).
-26. **Vòng quay base trúng Bonus:** mặc định số Scatter tính ở bước tổng kết, gồm scatter trên bảng cuối cùng cộng
-    scatter giữ trong Hold and Spin và scatter trong Treasure. Scatter bị Destroy phá ở base thì không tính. Đúng không?
-27. **Tỷ lệ chia Feature spin** (Heroic / Treasure hunt) và mức "Ante tăng 5 lần tỷ lệ 3+ Scatter" sẽ được tune
-    sau. Mặc định tạm: 50/50.
-
-28. **Ô sáng nền đang chứa Scatter khi Treasure kích hoạt:** Treasure làm trống mọi ô sáng. Nếu một ô sáng đã được
-    lấp lại bằng Scatter thì ở base, Treasure sẽ xoá mất Scatter đó và có thể làm mất lượt vào Bonus.
-    Mặc định: **bỏ qua ô đang chứa Scatter**, cùng tinh thần với điều spec loại trừ Scatter khỏi Treasure
-    (`treasure_skips_scatter_cells = True`).
-
-## Cảnh báo cấu trúc (mục 7: báo những chỗ gây biến động lớn)
-Đo trên số liệu tạm, nhưng các điểm dưới đây đến từ **luật**, không chỉ từ weight:
-
-- **Treasure gần như phủ kín bảng.** Mỗi kết nối phá mọi bản sao của biểu tượng, nên khi Treasure kích hoạt thì
-  trung bình đã có **25–29/30 ô sáng**. Kết hợp với xu tối thiểu theo chặng (5x ở chặng 4, **20x ở chặng 5/Endless**),
-  một lần Treasure ở chặng 5 có mức sàn khoảng 25 × 20x = 500x, **chưa nhân Global**.
-- **Global multiplier chỉ tăng, không giảm trong suốt Bonus**, và nhân cả trả thưởng dòng, rương lẫn Treasure. Với
-  weight tạm, Global trung vị đạt 19–31 ngay trong một lần Treasure. Đây là nguồn khuếch đại lớn nhất, cần thống
-  nhất mức trần hoặc tần suất mong muốn trước khi tune.
-- **Rương Kim cương:** xu trong rương tối thiểu 100x (cấp rương), có 3 quà và nhân Global. Ở chặng 5/Endless mỗi boss
-  chết là ≥ 100x × Global.
-- **Scatter trong Bonus:** mỗi spin lấp lại khoảng 32 ô, ô nào cũng có thể ra Scatter (+1 spin). Ở mật độ 1%, mỗi spin
-  tự cộng trung bình 1.38 spin, nên Bonus **không bao giờ tự kết thúc**. Tôi đã hạ xuống 1 Scatter/cột trên reel Bonus
-  (còn 0.44 spin cộng thêm mỗi spin). Mật độ Scatter trong Bonus phải giữ thấp như vậy.
-
-## Đề xuất gộp để giảm thời gian chạy (mục 7)
-- **Sấm chớp** gần như một "kết nối giả": phá mọi ô của một biểu tượng. Có thể gộp với Bom/Dao thành một vũ khí
-  nổ theo hình ngẫu nhiên (3x3 / hàng / cả biểu tượng).
-- **Transform và Upgrade** đều tạo Wild. Có thể gộp thành Upgrade (một nhóm ô thành H5/Wild).
-- **Replace** chạy lặp lại mỗi pass với điều kiện "2 trên 3 cột đầu", là bước tốn thời gian nhất trong chuỗi
-  (1)–(6). Nếu bỏ Replace và chỉ giữ Destroy thì vẫn còn một Power "đổi bảng".
-- **Hold and Spin ở base:** cộng với cascade làm số lượt xử lý mỗi spin tăng mạnh. Có thể chỉ giữ cho Epic Bonus
-  (vốn đã luôn kích hoạt).
+## E. Đề xuất gộp để giảm thời gian chạy (mục 7)
+- **Sấm chớp** gần như một "kết nối giả" (phá mọi ô của một biểu tượng). Có thể gộp với Bom/Dao thành một vũ khí nổ
+  theo hình ngẫu nhiên.
+- **Transform và Upgrade** đều tạo Wild. Có thể gộp thành Upgrade.
+- **Clover và Golden clover** chỉ khác phạm vi (3x3 / toàn bảng); có thể là một biểu tượng với hai mức.
+- **Replace** chạy lặp mỗi pass với điều kiện "2 trên 3 cột đầu", là bước tốn thời gian nhất trong chuỗi (1)–(6).

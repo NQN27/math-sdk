@@ -111,10 +111,23 @@ def test_bomb_area_clipped_at_corner(gs):
     assert t == [(0, 1), (1, 0)]  # (1,1) is a Scatter, not paying
 
 
-def test_sword_hits_row_and_wild(gs, cfg):
+def test_sword_hits_every_symbol_but_base_scatter(gs):
     set_board(gs, ["SW W AR L1 SC H2"] + FILLER[1:])
-    t = sorted(gs._weapon_targets(0, 0, "SW"))
-    assert t == [(1, 0), (3, 0), (5, 0)] if cfg.weapons_destroy_wild else [(3, 0), (5, 0)]
+    gs.in_bonus = False
+    assert sorted(gs._weapon_targets(0, 0, "SW")) == [(1, 0), (2, 0), (3, 0), (5, 0)]
+    gs.in_bonus = True
+    assert sorted(gs._weapon_targets(0, 0, "SW")) == [(1, 0), (2, 0), (3, 0), (4, 0), (5, 0)]
+
+
+def test_bomb_destroyed_weapon_does_not_fire(gs):
+    gs.spawn_stage(4)
+    for b in gs.bosses:
+        b["hp"] = b["hp_max"] = 500
+    set_board(gs, ["BM AR L1 L2 L3 L4"] + FILLER[1:])
+    gs.board[0][0].prize = 1
+    gs.refill = lambda: []
+    gs.step_weapons()
+    assert not any(e["type"] == "weapon" and e["weapon"] == "arrow" for e in gs.book.events)
 
 
 def test_weapon_factor_multiplies_damage(gs):
@@ -129,7 +142,7 @@ def test_weapon_factor_multiplies_damage(gs):
     assert gs.bosses[0]["hp"] == 500 - 4 * (2 + 2 + 3 + 1 + 1)
 
 
-def test_arrow_formula_and_endless_halving(gs):
+def test_arrow_formula_and_endless_divided_by_3(gs):
     gs.spawn_stage(5)
     b = gs.bosses[0]
     b["hp_max"] = 100
@@ -139,7 +152,7 @@ def test_arrow_formula_and_endless_halving(gs):
     assert gs.arrow_damage(b) == round_half_up(3 + 100 * k)
     gs.stage = ENDLESS
     random.seed(0)
-    assert gs.arrow_damage(b) == round_half_up((3 + 100 * k) / 2)
+    assert gs.arrow_damage(b) == round_half_up((3 + 100 * k) / 3)
 
 
 def test_round_half_up():
@@ -173,12 +186,35 @@ def test_replace_rule_two_of_first_three_columns(gs):
     assert {"H2", "H4", "H5", "L2"} <= elig
 
 
-def test_transform_skips_wild_weapon_and_scatter(gs, cfg):
+def test_transform_skips_wild_weapon_and_base_scatter(gs, cfg):
     set_board(gs, ["W AR SC W W W"] + ["W W W W W W"] * 3 + ["W W W W W H1"])
     random.seed(5)
+    gs.in_bonus = False
     gs.power_transform()
     assert gs.board[1][0].name == "AR" and gs.board[2][0].name == "SC"
     assert gs.board[5][4].name == "W"
+
+
+def test_transform_may_hit_scatter_in_bonus(gs):
+    set_board(gs, ["W AR SC W W W"] + ["W W W W W W"] * 4)
+    gs.in_bonus = True
+    random.seed(5)
+    gs.power_transform()
+    assert gs.board[2][0].name == "W"
+
+
+def test_destroy_keeps_wild_and_base_scatter(gs):
+    gs.spawn_stage(1)
+    set_board(gs, ["W SC AR H1 L1 L2"] + FILLER[1:])
+    gs.in_bonus = False
+    gs.power_destroy()
+    assert gs.board[0][0].name == "W" and gs.board[1][0].name == "SC"
+    assert gs.board[2][0] is None and gs.board[3][0] is None
+    assert not gs.lit  # Destroy never lights cells
+    set_board(gs, ["W SC AR H1 L1 L2"] + FILLER[1:])
+    gs.in_bonus = True
+    gs.power_destroy()
+    assert gs.board[1][0] is None
 
 
 def test_power_reserve_cap(gs, cfg):
@@ -282,28 +318,117 @@ def test_treasure_first_round_guarantees_a_coin(gs, cfg):
         gs.stage = 1
         random.seed(1)
         gs.run_treasure([(0, 0), (1, 0)], 0.2)
-        kinds = [gs.board[c][r].name for c, r in [(0, 0), (1, 0)]]
-        assert "TC" in kinds
+        first = [e for e in gs.book.events if e["type"] == "treasureSymbols"][0]
+        assert "coin" in [c["kind"] for c in first["cells"]]
     finally:
         cfg.treasure_kind_weights.clear()
         cfg.treasure_kind_weights.update(saved)
 
 
-def test_magnet_collects_and_cells_reappear(gs):
+def _seq_roller(seq):
+    it = iter(seq)
+
+    def roll(weights):
+        k = next(it, "coin")
+        return k if k in weights else "coin"
+    return roll
+
+
+def test_magnet_needs_two_coins_then_collects_and_cells_reappear(gs):
     set_board(gs, FILLER)
     gs.stage = 1
-    cells = [(0, 0), (1, 0), (0, 1)]  # priority 1, 2, 3
-    seq = iter(["magnet", "coin", "coin"])
-    gs.roll_treasure_kind = lambda weights: next(seq, "coin")
+    cells = [(0, 0), (1, 0), (0, 1), (2, 0)]  # priority 1, 2, 3, 4
+    gs.roll_treasure_kind = _seq_roller(["magnet", "coin", "coin", "magnet"])
     random.seed(2)
     paid = gs.run_treasure(cells, 0.2)
-    mags = [e for e in gs.book.events if e["type"] == "treasureMagnet"]
-    assert len(mags) == 1 and mags[0]["collected"] > 0
-    assert len(mags[0]["cells"]) == 2  # both coins were collected
     fills = [e for e in gs.book.events if e["type"] == "treasureSymbols"]
-    assert len(fills) == 2 and len(fills[1]["cells"]) == 2  # collected cells reappear
-    final = sum(gs.board[c][r].prize for c, r in cells)
-    assert paid == pytest.approx(final)
+    kinds = [c["kind"] for c in fills[0]["cells"]]
+    assert kinds == ["coin", "coin", "coin", "magnet"]  # first magnet blocked: <2 coins yet
+    mags = [e for e in gs.book.events if e["type"] == "treasureMagnet"]
+    assert len(mags) == 1 and len(mags[0]["cells"]) == 3
+    assert len(fills) == 2 and len(fills[1]["cells"]) == 3  # collected cells reappear
+    assert paid == pytest.approx(sum(gs.board[c][r].prize for c, r in cells))
+
+
+def test_star_adds_to_coins_and_magnets_then_empties(gs):
+    set_board(gs, FILLER)
+    gs.stage = 1
+    cells = [(0, 0), (1, 0), (0, 1)]
+    gs.roll_treasure_kind = _seq_roller(["coin", "coin", "star"])
+    random.seed(4)
+    gs.run_treasure(cells, 0.2)
+    star = [e for e in gs.book.events if e["type"] == "treasureStar"][0]
+    first = [e for e in gs.book.events if e["type"] == "treasureSymbols"][0]["cells"]
+    assert gs.board[0][1] is None  # star cell emptied (no magnet -> not refilled, N10)
+    for c in first[:2]:
+        assert gs.board[c["reel"]][c["row"] - 1].prize == pytest.approx(c["value"] + star["value"])
+
+
+def test_clover_simultaneous_and_golden_whole_board(gs):
+    set_board(gs, FILLER)
+    gs.stage = 1
+    cells = [(0, 0), (1, 0), (0, 1), (2, 0), (5, 4)]  # priority order; (5,4) is far away
+    gs.roll_treasure_kind = _seq_roller(["coin", "clover", "clover", "golden", "coin"])
+    random.seed(7)
+    gs.run_treasure(cells, 0.2)
+    ev = gs.book.events
+    first = {(c["reel"], c["row"] - 1): c["value"] for c in
+             [e for e in ev if e["type"] == "treasureSymbols"][0]["cells"]}
+    clov = [e for e in ev if e["type"] == "treasureClover"][0]
+    f1, f2 = [c["factor"] for c in clov["clovers"]]
+    g = [e for e in ev if e["type"] == "treasureGoldenClover"][0]["factor"]
+    assert gs.board[0][0].prize == pytest.approx(first[(0, 0)] * f1 * f2 * g)  # next to both clovers
+    assert gs.board[5][4].prize == pytest.approx(first[(5, 4)] * g)  # only the golden clover
+
+
+def test_treasure_maxwin_check_stops(gs, cfg):
+    set_board(gs, FILLER)
+    gs.stage = 1
+    gs.global_mult = 10
+    gs.award(24000)
+    gs.roll_treasure_kind = _seq_roller(["coin", "coin"])
+    gs.force_wincap = True  # every coin = 25,000x
+    gs.run_treasure([(0, 0), (1, 0)], 0.2)
+    assert gs.wincap_triggered
+    assert any(e["type"] == "treasureMaxwin" for e in gs.book.events)
+    assert gs.win_manager.running_bet_win == pytest.approx(cfg.wincap)
+
+
+def test_coin_labels(gs):
+    assert [gs.coin_label(v) for v in (4, 5, 19, 20, 99, 100, 24999, 25000)] == \
+        ["dong", "bac", "bac", "vang", "vang", "kimcuong", "kimcuong", "maxwin"]
+
+
+def test_lit_rule_basic_only(gs):
+    gs.spawn_stage(1)
+    set_board(gs, board_with_top("H2 H2 W H2 L1 L2"))
+    gs.refill = lambda: []
+    gs.step_connect()
+    assert (2, 0) not in gs.lit  # connected Wild: destroyed but not lit
+    assert (0, 0) in gs.lit and (1, 0) in gs.lit
+
+
+def test_weapon_allowed_rules(gs):
+    gs.spawn_stage(1)
+    gs.bosses[2]["alive"] = False  # boss 3 dead -> no Arrow in columns 5-6
+    assert gs.weapon_allowed("AR", 0) and not gs.weapon_allowed("AR", 5)
+    assert gs.weapon_allowed("BM", 5)
+    for b in gs.bosses:
+        b["alive"] = False
+    assert not gs.weapon_allowed("BM", 0) and not gs.weapon_allowed("AR", 0)
+
+
+def test_epic_free_spin_coins_have_no_dong(gs):
+    gs.in_bonus, gs.bonus_tier, gs.epic_opening = True, "epic", False
+    random.seed(1)
+    assert min(gs.draw_coin(0.2) for _ in range(500)) >= 5
+    gs.epic_opening = True
+    assert min(gs.draw_coin(0.2) for _ in range(500)) < 5
+
+
+def test_chest_power_share_rises_with_tier(cfg):
+    p = cfg.chest_gift_power_chance
+    assert p["dong"] < p["bac"] < p["vang"] < p["kimcuong"]
 
 
 # ---- last hit / wincap -----------------------------------------------------------------

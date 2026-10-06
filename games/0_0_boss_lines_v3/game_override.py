@@ -28,6 +28,7 @@ class GameStateOverride(GameExecutables):
         self.actions = 0
         self.accidental_bonus = False
         self.cap_hits = {}
+        self.epic_opening = False
 
     def assign_special_sym_function(self) -> None:
         self.special_symbol_functions = {}

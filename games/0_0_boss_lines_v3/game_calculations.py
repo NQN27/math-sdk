@@ -52,12 +52,31 @@ class GameCalculations(Executables):
                     if (cc, rr) != (c, r) and self.is_scatter(self.board[cc][rr]))
         return not col_has and total < self.config.max_scatters_on_board
 
+    def weapon_allowed(self, name: str, c: int) -> bool:
+        """Section 7: no new weapons once every boss of the stage is dead (or
+        there are no bosses), and no Arrow in a column whose boss is dead."""
+        bosses = getattr(self, "bosses", [])
+        if not any(b["alive"] for b in bosses):
+            return False
+        if name == "AR":
+            b = next((x for x in bosses if c in x["zone"]), None)
+            return b is not None and b["alive"]
+        return True
+
+    def coin_label(self, value: float) -> str:
+        for bound, label in self.config.coin_label_bounds:
+            if value < bound:
+                return label
+        return "maxwin"
+
     def draw_symbol_for(self, c: int, r: int):
         """Fresh symbol for one cell from the current reel's column `c`."""
         strip = self.config.reels[self.reel_name][c]
-        for _ in range(200):
+        for _ in range(500):
             name = strip[random.randrange(len(strip))]
             if name == "SC" and not self.scatter_allowed(c, r):
+                continue
+            if name in self.config.weapon_symbols and not self.weapon_allowed(name, c):
                 continue
             return self.make_symbol(name)
         raise RuntimeError("could not draw a symbol")

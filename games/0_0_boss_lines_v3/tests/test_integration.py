@@ -24,8 +24,10 @@ def test_round_invariants(gs, cfg, mode, crit):
     for g in rounds(gs, cfg, mode, crit):
         ev = g.book.events
         assert 0 <= g.final_win <= cfg.wincap
-        assert all(g.board[c][r] is not None for c in range(6) for r in range(5))
-        sc = [sum(g.is_scatter(g.board[c][r]) for r in range(5)) for c in range(6)]
+        had_treasure = any(e["type"] == "treasureStart" for e in ev)
+        # empty cells only after a Treasure (activated Star/Clover cells stay empty, N10)
+        assert had_treasure or all(g.board[c][r] is not None for c in range(6) for r in range(5))
+        sc = [sum(g.is_scatter(g.board[c][r]) for r in range(5) if g.board[c][r] is not None) for c in range(6)]
         assert sum(sc) <= 5 and max(sc) <= 1
         if crit == "0":
             assert g.final_win == 0
@@ -67,7 +69,8 @@ def test_bonus_stage_progression_and_endless_hp(gs, cfg):
                 endless_hp.append(e["bosses"][0]["hpMax"])
         assert stages == sorted(stages)
         assert endless_hp == sorted(endless_hp)
-        assert stages[0] >= cfg.bonus_tiers["super"]["start_stage"]
+        if stages:  # an Epic can hit Maxwin in its opening Treasure, before spin 1
+            assert stages[0] >= cfg.bonus_tiers["super"]["start_stage"]
 
 
 def _segments(events):
@@ -82,6 +85,8 @@ def _segments(events):
         if t == "reveal":
             cur = {"ctx": dict(ctx), "events": []}
             out.append(cur)
+        if t == "epicOpeningTreasure" and cur is not None:
+            cur["ctx"]["opening"] = True
         if cur is not None:
             cur["events"].append(e)
     return out
@@ -128,16 +133,21 @@ def test_mode_guarantees_and_bookkeeping(gs, tame, mode):
         for seg in _segments(ev):
             reveal = seg["events"][0]
             tier, feat = seg["ctx"]["tier"], seg["ctx"]["feature"]
-            if tier in ("super", "epic"):
+            if tier in ("super", "epic") and not seg["ctx"].get("opening", False):
                 assert _wild_weapon_count(reveal, cfg) >= cfg.super_min_wild_or_weapon
             if feat == "heroic" and tier is None:
                 assert _wild_weapon_count(reveal, cfg) >= cfg.heroic_min_wild_or_weapon
-            if tier == "epic":
+            opening = seg["ctx"].get("opening", False)
+            if tier == "epic" and not opening:
                 epic_spins += 1
-                assert any(e["type"] == "holdSpinStart" for e in seg["events"])
+                # Epic: Hold and Spin fires iff the opening board connects, i.e. it
+                # comes before the first line win (and there is a line win at all).
+                first = next((e["type"] for e in seg["events"]
+                              if e["type"] in ("holdSpinStart", "lineWins")), None)
+                assert (first == "holdSpinStart") == any(e["type"] == "holdSpinStart" for e in seg["events"])
             end = [e for e in seg["events"] if e["type"] == "spinEnd"]
             treasure = any(e["type"] == "treasureStart" for e in seg["events"])
-            if end and not capped and feat != "treasureHunt":
+            if end and not capped and feat != "treasureHunt" and not opening:
                 assert treasure == end[0]["stageCleared"]
         # every killed boss opens its chest exactly once (unless the cap ended the round)
         if not capped:
@@ -148,6 +158,8 @@ def test_mode_guarantees_and_bookkeeping(gs, tame, mode):
         starts = [e for e in ev if e["type"] == "bonusStart"]
         if starts and not capped:
             checked += 1
+            if starts[0]["tier"] == "epic":
+                assert any(e["type"] == "epicOpeningTreasure" for e in ev)
             played = sum(e["type"] == "freeSpinStart" for e in ev)
             added = (sum(e["added"] for e in ev if e["type"] == "scatterCollected")
                      + sum(e.get("addedSpins", 0) for e in ev if e["type"] == "treasureSymbols")

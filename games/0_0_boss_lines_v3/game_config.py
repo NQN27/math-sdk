@@ -1,4 +1,4 @@
-"""Boss Lines v3 configuration (Proposal_2026-10-06.docx).
+"""Boss Lines v3 configuration (Proposal_KichBan1_2026-10-06.md; paylines from Proposal_2026-10-06.docx).
 
 Rule data that the proposal fixes (paytable, damage, HP, paylines, coin
 values, chest rules, mode costs) is copied exactly. Every DISTRIBUTION weight
@@ -101,7 +101,7 @@ class GameConfig(Config):
         self.high_symbols = ["H1", "H2", "H3", "H4", "H5"]
         self.basic_symbols = self.low_symbols + self.high_symbols
         self.weapon_symbols = ["AR", "BM", "SW", "LT"]  # Arrow, Bomb, Sword, Lightning
-        self.treasure_symbols = ["TC", "TM", "TV", "TG"]  # Coin, Magnet, Clover, Global
+        self.treasure_symbols = ["TC", "TM", "TV", "TS", "TG"]  # Coin, Magnet, Clover/Golden, Star, Global
         self.special_symbols = {
             "wild": ["W"],
             "scatter": ["SC"],
@@ -123,8 +123,8 @@ class GameConfig(Config):
                               "H1": 2, "H2": 2, "H3": 2, "H4": 2, "H5": 3, "W": 3}
 
         # ---- Stages (HP fixed by the proposal) --------------------------------
-        self.stage_hp_range = {0: (25, 25), 1: (30, 40), 2: (35, 50), 3: (45, 70),
-                               4: (65, 85), 5: (80, 120), ENDLESS: (350, 400)}
+        self.stage_hp_range = {0: (25, 25), 1: (30, 40), 2: (35, 50), 3: (45, 65),
+                               4: (65, 90), 5: (85, 120), ENDLESS: (350, 400)}
         self.hp_round = 5
         # Q9: later Endless bosses: previous HP + one of these.
         self.endless_hp_step_choices = list(range(0, 55, 5))
@@ -142,8 +142,11 @@ class GameConfig(Config):
             "dong": [0.2, 0.5, 1, 2, 3, 4],
             "bac": [5, 6, 8, 10, 12, 15],
             "vang": [20, 25, 30, 40, 50],
-            "kimcuong": [100, 150, 200, 250, 500, 1000, 25000],
+            "kimcuong": [100, 150, 200, 250, 500, 1000],
+            "maxwin": [25000],
         }
+        # Coin label by CURRENT value (after Global/Clover/Star changes it).
+        self.coin_label_bounds = [(5, "dong"), (20, "bac"), (100, "vang"), (25000, "kimcuong")]
         self.coin_value_weights = {
             0.2: 30, 0.5: 26, 1: 22, 2: 16, 3: 12, 4: 10,
             5: 8, 6: 7, 8: 6, 10: 5, 12: 4, 15: 3,
@@ -159,7 +162,9 @@ class GameConfig(Config):
             "dong": {1: 60, 2: 30, 3: 10}, "bac": {2: 70, 3: 30},
             "vang": {3: 1}, "kimcuong": {3: 1},
         }
-        self.chest_gift_power_chance = 0.30  # Bonus only; outside Bonus chests hold coins only
+        # Bonus only (outside Bonus chests hold coins only). Section 7: the higher
+        # the chest, the LOWER the chance a gift is a coin.
+        self.chest_gift_power_chance = {"dong": 0.15, "bac": 0.25, "vang": 0.35, "kimcuong": 0.45}
         self.chest_power_overflow_to_coin = True  # Q18
 
         # ---- Wild events ---------------------------------------------------------
@@ -176,15 +181,14 @@ class GameConfig(Config):
         self.enhance_factor_weights = {2: 30, 3: 22, 4: 16, 5: 12, 10: 8, 15: 5, 20: 3, 25: 2, 50: 1, 100: 0.5}
         self.upgrade_target_weights = {"H5": 1, "W": 1}
         self.transform_count_range = (2, 5)
-        self.transform_can_hit_scatter = False  # Q15
-        self.destroy_deals_damage = True  # Q13
+        # Transform/Destroy/Bomb/Sword never touch Scatter outside Bonus (Q15, N1).
+        self.destroy_deals_damage = True  # Q13 (answered: Destroy counts as destruction)
 
         # ---- Weapons -------------------------------------------------------------
         self.weapon_factor_weights = {1: 30, 2: 20, 3: 14, 4: 10, 5: 8, 6: 6, 7: 4, 8: 3, 9: 3, 10: 2}
         self.arrow_base = 3
         self.arrow_k_choices = [round(0.05 * i, 2) for i in range(1, 11)]
-        self.arrow_endless_divisor = 2
-        self.weapons_destroy_wild = True  # Q14 (Bomb/Sword)
+        self.arrow_endless_divisor = 3
 
         # ---- Last hit / boss drops ----------------------------------------------
         self.last_hit_base = 0.005
@@ -199,16 +203,20 @@ class GameConfig(Config):
         self.hold_spin_max_respins = 60
 
         # ---- Treasure --------------------------------------------------------------
-        self.treasure_kind_weights = {"coin": 65, "magnet": 7, "clover": 10, "global": 6, "scatter": 1}
+        self.treasure_kind_weights = {"coin": 60, "magnet": 7, "clover": 8, "golden": 2, "star": 4,
+                                      "global": 6, "scatter": 1}
         self.clover_factor_weights = {2: 40, 3: 25, 4: 15, 5: 10, 10: 7, 20: 3}
+        self.golden_factor_weights = {2: 40, 3: 25, 4: 15, 5: 10, 10: 7, 20: 3}
+        self.magnet_min_coins = 2  # a magnet only appears with >= 2 coins on the Treasure board (N4)
         self.global_factor_weights = {2: 30, 3: 22, 4: 15, 5: 11, 6: 8, 7: 6, 8: 4, 9: 2, 10: 2}
-        self.clover_only_new = True  # Q19
         self.clover_hits = ("coin", "magnet")  # Q20
-        self.treasure_scatter_capped = True  # Q22
-        self.lit_reset_after_treasure = True  # Q23
+        self.treasure_scatter_capped = True
         self.treasure_max_rounds = 60
         self.treasure_hunt_min_coin = 1
-        self.treasure_skips_scatter_cells = True  # Q28: a lit cell now holding a Scatter keeps it
+        self.treasure_skips_scatter_cells = True  # Q28 (answered) / N7
+        self.epic_min_coin = 5  # N6: no Dong coins during Epic free spins
+        self.epic_opening_treasure_stage = 2  # N5: Epic starts with a Treasure "as if stage 2 was cleared"
+        self.win_levels = [(20, "nice"), (50, "big"), (100, "super"), (500, "mega"), (25000, "maxwin")]
 
         # ---- Bonus ------------------------------------------------------------------
         self.bonus_tiers = {

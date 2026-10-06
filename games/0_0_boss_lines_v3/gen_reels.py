@@ -26,6 +26,9 @@ N_ROWS_STRIP = 300
 LOWS = ["L1", "L2", "L3", "L4"]
 SHAPE = {"L1": 60, "L2": 52, "L3": 46, "L4": 40, "H1": 22, "H2": 17, "H3": 12, "H4": 8, "H5": 5}
 WEAPON_MIX = {"AR": 35, "BM": 25, "SW": 25, "LT": 15}
+# Section 7: columns 4-6 carry slightly more Arrows (boss 3 / boss 2's right
+# half), so every boss is about equally likely to be the last one killed.
+ARROW_BOOST_COLS = {3: 1.4, 4: 1.4, 5: 1.4}
 
 # (wild %, scatter %, weapon %) per reel. Placeholders.
 # Bonus reels: 1 Scatter per column (0.34%). At 1% (3 per column) a Bonus
@@ -70,8 +73,10 @@ def build_column(name, col, spec):
     if spec["sc"] > 0:
         counts["SC"] = max(1, round(spec["sc"] / 100 * n))
     total_w = round(spec["weapon"] / 100 * n)
-    ratio = sum(WEAPON_MIX.values())
-    for sym, r in WEAPON_MIX.items():
+    mix = dict(WEAPON_MIX)
+    mix["AR"] *= ARROW_BOOST_COLS.get(col, 1.0)
+    ratio = sum(mix.values())
+    for sym, r in mix.items():
         k = round(total_w * r / ratio)
         if k:
             counts[sym] = k

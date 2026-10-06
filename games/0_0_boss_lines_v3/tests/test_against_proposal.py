@@ -63,12 +63,55 @@ def test_paytable_and_damage_match(cfg):
                 assert cfg.paytable[(kind, name)] == pytest.approx(float(cell["text"]))
 
 
-def test_stage_table_matches(cfg):
-    rows = TABLES[38][2:]
+MD = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Proposal_KichBan1_2026-10-06.md")
+
+
+def _md_table(header_start):
+    lines = open(MD, encoding="utf-8").read().splitlines()
+    i = next(k for k, ln in enumerate(lines) if ln.startswith(header_start))
+    rows = []
+    for ln in lines[i + 2:]:
+        if not ln.startswith("|"):
+            break
+        rows.append([c.strip() for c in ln.strip("|").split("|")])
+    return rows
+
+
+def test_stage_table_matches_kichban1(cfg):
+    """Stage table now comes from the Kich ban 1 text (HP changed at stages 3-5)."""
     tiers = {"Đồng": "dong", "Bạc": "bac", "Vàng": "vang", "Kim cương": "kimcuong"}
+    rows = _md_table("| Chặng |")
+    assert len(rows) == 7
     for row in rows:
-        stage = 6 if row[0]["text"] == "Endless" else int(row[0]["text"])
-        lo_hi = [int(v) for v in re.findall(r"\d+", row[1]["text"])]
-        assert cfg.stage_hp_range[stage] == (lo_hi[0], lo_hi[-1])
-        assert cfg.stage_min_chest[stage] == tiers[row[3]["text"]]
-        assert cfg.stage_min_coin[stage] == float(row[4]["text"].rstrip("x"))
+        stage = 6 if row[0] == "Endless" else int(row[0])
+        lo_hi = [int(v) for v in re.findall(r"\d+", row[1])]
+        assert cfg.stage_hp_range[stage] == (lo_hi[0], lo_hi[-1]), stage
+        assert cfg.stage_min_chest[stage] == tiers[row[3]]
+        assert cfg.stage_min_coin[stage] == float(row[4].rstrip("x"))
+
+
+def test_paytable_matches_kichban1(cfg):
+    rows = _md_table("| Biểu tượng |")
+    for row in rows:
+        name = {"Wild": "W"}.get(row[0], row[0])
+        for kind, cell in zip((3, 4, 5, 6), row[1:5]):
+            if cell == "-":
+                assert (kind, name) not in cfg.paytable
+            else:
+                assert cfg.paytable[(kind, name)] == pytest.approx(float(cell))
+
+
+def _num(v):
+    # "1.000" / "25.000" use '.' as a thousands separator in the proposal
+    if v.count(".") == 1 and len(v.split(".")[1]) == 3:
+        return float(v.replace(".", ""))
+    return float(v)
+
+
+def test_coin_tiers_match_kichban1(cfg):
+    text = open(MD, encoding="utf-8").read()
+    for label, key in (("Xu Đồng", "dong"), ("Xu Bạc", "bac"), ("Xu Vàng", "vang"),
+                       ("Xu Kim cương", "kimcuong"), ("Xu Maxwin", "maxwin")):
+        body = re.search(label + r" \(([^)]*)\)", text).group(1)
+        vals = [_num(v) for v in re.findall(r"([\d.]+)x", body)]
+        assert cfg.coin_tiers[key] == vals, key
