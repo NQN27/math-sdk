@@ -13,7 +13,7 @@ from optimization_program.optimization_config import (
     verify_optimization_input,
 )
 
-TARGET = 0.97
+TARGET = 0.967  # 96.7% RTP for every bet mode (designer, 2026-10-07)
 WINCAP_RTP = 0.001
 
 

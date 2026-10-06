@@ -83,7 +83,7 @@ class GameConfig(Config):
         self.working_name = "Boss Lines v3 (Proposal 2026-10-06)"
         self.wincap = 25000.0
         self.win_type = "lines"
-        self.rtp = 0.97
+        self.rtp = 0.967  # designer target 2026-10-07: 96.7% for every bet mode
         self.construct_paths()
 
         # ---- Board ------------------------------------------------------------
