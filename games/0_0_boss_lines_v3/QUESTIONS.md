@@ -54,8 +54,9 @@ nguyên. Các cơ chế của v2 không có trong spec (HP người chơi, spin 
 - RTP **96.7%** cho mọi chế độ: base 0.967x/spin, ante 2.901x/spin, buy3 96.7x, buy4 290.1x, Feature 483.5x.
 - Feature: Heroic và Treasure hunt **không cần mean bằng nhau**; cân bằng bằng tỷ lệ ra p (20–80%) sao cho
   p × mean_Heroic + (1 − p) × mean_Treasure_hunt = 483.5x.
-- Chờ duyệt: mean Bonus ≈ 68x / Super ≈ 226x / Epic 1.500x, tỷ lệ tier buy3 90/9/1 và buy4 95/5, Bonus chiếm
-  30% RTP của base.
+- Mean từng tier (chốt 2026-10-07): **Bonus 88.9x / Super 240x / Epic 1.492,5x**. Tỷ lệ tier suy ra:
+  buy3 = Bonus 96.9 / Super 2.85 / Epic 0.25 (= 96.72x), buy4 = Super 96 / Epic 4 (= 290.1x).
+  Base/ante dùng cùng tỷ lệ 3/4/5 Scatter như buy3. Bonus chiếm 30% RTP của base (tạm).
 
 ## C. Còn mở
 3. **Payout lẻ** (0.15, 0.25, 1.25, 2.25…): bạn cho biết Stake mới không còn yêu cầu bội số 0.1. Bản SDK mới

@@ -226,6 +226,8 @@ class GameConfig(Config):
         }
         self.scatter_to_tier = {3: "bonus", 4: "super", 5: "epic"}
         self.super_min_wild_or_weapon = 3
+        # Which symbol fills a guaranteed Wild-or-weapon slot (Super/Epic/Heroic); placeholder.
+        self.guarantee_symbol_weights = {"W": 70, "AR": 10, "BM": 8, "SW": 8, "LT": 4}
         self.heroic_min_wild_or_weapon = 5
         self.base_global_into_bonus = False  # Q25
         # Q27 (answered): placeholder 50/50; tune only inside [0.2, 0.8].
@@ -266,7 +268,7 @@ class GameConfig(Config):
                                  conditions=cond(reel, force_wincap=True)),
                     Distribution(criteria="freegame", quota=0.1,
                                  conditions=cond(reel, force_freegame=True,
-                                                 scatter_triggers={3: 90, 4: 9, 5: 1})),
+                                                 scatter_triggers={3: 96.9, 4: 2.85, 5: 0.25})),
                     Distribution(criteria="0", quota=0.4, win_criteria=0.0, conditions=cond(reel)),
                     Distribution(criteria="basegame", quota=0.5, conditions=cond(reel)),
                 ],
@@ -281,7 +283,10 @@ class GameConfig(Config):
                 Distribution(criteria="basegame", quota=0.899, conditions=cond("HERO")),
             ],
         ))
-        for name, cost, triggers in (("buy3", 100.0, {3: 90, 4: 9, 5: 1}), ("buy4", 300.0, {4: 95, 5: 5})):
+        # Tier means (designer 2026-10-07): Bonus 88.9x, Super 240x, Epic 1492.5x. Mix derived for 96.7% RTP:
+        # buy3 = Bonus 96.9 / Super 2.85 / Epic 0.25 (= 96.72x), buy4 = Super 96 / Epic 4 (= 290.1x).
+        self.tier_mean_targets = {"bonus": 88.9, "super": 240.0, "epic": 1492.5}
+        for name, cost, triggers in (("buy3", 100.0, {3: 96.9, 4: 2.85, 5: 0.25}), ("buy4", 300.0, {4: 96, 5: 4})):
             self.bet_modes.append(BetMode(
                 name=name, cost=cost, rtp=self.rtp, max_win=maxwin,
                 auto_close_disabled=False, is_feature=False, is_buybonus=True,
