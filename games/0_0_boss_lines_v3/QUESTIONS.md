@@ -56,7 +56,8 @@ nguyên. Các cơ chế của v2 không có trong spec (HP người chơi, spin 
   p × mean_Heroic + (1 − p) × mean_Treasure_hunt = 483.5x.
 - Mean từng tier (chốt 2026-10-07): **Bonus 88.9x / Super 240x / Epic 1.492,5x**. Tỷ lệ tier suy ra:
   buy3 = Bonus 95.67 / Super 4.23 / Epic 0.1 (= 96.70x), buy4 = Super 96 / Epic 4 (= 290.1x).
-  Base/ante dùng cùng tỷ lệ 3/4/5 Scatter như buy3. Bonus chiếm 30% RTP của base (tạm).
+  Base/ante dùng cùng tỷ lệ 3/4/5 Scatter như buy3. Bonus chiếm **50% RTP của base**: suy ra từ ante 3x giá, 5x tần suất
+  (xem TUNING_NOTES.md mục 1); muốn khác thì phải đổi giá ante hoặc hệ số 5x.
 
 ## B3. Quyết định ngày 2026-10-07 (sau lượt tune t3–t5)
 - **Bỏ hoàn toàn Hold and Spin** khỏi mọi mode. Lý do đo được: ở Epic, Hold and Spin giữ trung bình 27,8/30 ô,
