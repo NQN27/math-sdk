@@ -425,15 +425,17 @@ Chi tiết từng lượt: `tuning/results/findings_20261007.md`. Các file over
 
 ## 7. Việc còn lại
 
-1. **Designer xem b6** (t17 + base/ante/Feature) và đưa yêu cầu median/phân bố/var. Đồng ý thì ghi b6 vào `game_config.py` (kể cả
-   `tier_weights` và reel trong `gen_reels.py`, nhớ chạy lại `python gen_reels.py`), chạy pytest rồi commit.
-2. Chỉnh nốt: Super −6%, Epic −8%. Ứng viên: Treasure của Epic/Super trong `tier_weights`, xu 5x/20x của Epic.
-   Chạy ≥ 20.000 phiên để thấy thay đổi nhỏ.
-3. Base / ante / Feature đã có ứng viên b6 (mục 3B). Designer cần xem: Treasure ở base gần như mất; phân bố
-   Feature (64,9% lượt mua < 250x); tỷ lệ Bonus 50% của base (suy ra từ spec).
-4. Bật `reject_wincap_outside_wincap_fence` sau khi tune xong, rồi chạy optimizer (`run.py`, đang tắt) để chốt
-   RTP 96.7% chính xác.
-5. Q3 (payout lẻ bội 0.1x) vẫn chờ xác nhận với Stake trước bước kiểm tra RGS.
+1. **Designer xem p3** (đầu file). Cần quyết:
+   - Xung đột ở Epic giữa "60% phiên ≤ 746x" và "ít spin không kết nối / clear chặng nhiều hơn" (Phase 3c).
+   - Trả bù 600x đang chi cho khoảng 53% phiên Epic (117x/phiên, 8% mean).
+   - Treasure ở base gần như mất (0,03% spin); Bonus chiếm 50% RTP của base (suy ra từ spec).
+   - Super/Bonus: tỷ trọng dòng chỉ tăng nhẹ ở Super (13,8 thành 14,1%).
+2. Đồng ý thì ghi p3 vào `game_config.py`: `tier_weights` (bonus, super, epic, treasure_hunt), các tham số chung, reel
+   (`_reel_specs` vào `gen_reels.REEL_SPECS`, kể cả `shape`, rồi chạy `python gen_reels.py`), `feature_heroic_chance` 0,512.
+   Chạy pytest, chạy lại `spec_check` trên config mới (override rỗng) để chắc kết quả trùng p3, rồi commit.
+3. Bật `reject_wincap_outside_wincap_fence`, chạy optimizer (`run.py`), rồi **kiểm tra spec trên phân bố sau optimizer**
+   (bảng trọng số đã tối ưu ghép với tier của từng sách).
+4. Q3 (payout lẻ bội 0.1x) vẫn chờ xác nhận với Stake trước bước kiểm tra RGS.
 
 ## 8. Công cụ (`tuning/`)
 
@@ -443,6 +445,9 @@ Chi tiết từng lượt: `tuning/results/findings_20261007.md`. Các file over
 | `python tuning/stage_split.py TIER N overrides.json TAG` | Tiền theo chặng × nguồn (dòng, xu Wild, rương, Treasure, Treasure bị cắt bởi Max Win) |
 | `python tuning/dist_stats.py TAG [TIER...]` | Đọc CSV của TAG: mean, median, sd, var, CV, SE, phân vị, % phiên theo khoảng của mục tiêu |
 | `python tuning/base_stats.py base\|ante N overrides.json TAG` | Base/ante tự nhiên: mean phần quay thường, hit rate, tần suất và tỷ lệ tier khi vào Bonus, Treasure, nguồn tiền |
+| `python tuning/spec_check.py TAG [--save]` | Chấm spec 2026-10-08 (PASS/FAIL): phân vị, mean, sàn và Max Win, luật rương, các hướng yêu cầu so với p0, RTP lấy mẫu 5/20/100/1000 theo tier và mode |
+| `python tuning/band_sources.py TIER N overrides.json` | Nguồn tiền theo từng khoảng phân vị (p0–5, 5–25, 25–60, 60–75, 75–90, 90–99, 99–100) |
+| `python tuning/treasure_probe.py TIER N overrides.json` | Một lần Treasure: số ô, tiền, Global, loại ký hiệu theo khoảng |
 
 - Override: `{tên_thuộc_tính_config: giá_trị}`. Key số viết dạng chuỗi (`"0.2"`), harness tự đổi kiểu.
 - `_reel_specs`: `{"BON_S1": {"wild": 5.8, "weapon": 1.15}}` dựng lại reel trong bộ nhớ từ `gen_reels.REEL_SPECS`.
