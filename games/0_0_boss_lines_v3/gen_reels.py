@@ -81,7 +81,8 @@ def build_column(name, col, spec):
         if k:
             counts[sym] = k
     placed = place_specials(n, counts, rng)
-    shape = {k: v for k, v in SHAPE.items() if k not in LOWS[: spec["removed"]]}
+    # optional per-reel symbol shape (tuning); default SHAPE
+    shape = {k: v for k, v in spec.get("shape", SHAPE).items() if k not in LOWS[: spec["removed"]]}
     n_fill = n - len(placed)
     n_wild = min(n_fill, round(spec["wild"] / 100 * n))
     filler = ["W"] * n_wild + rng.choices(list(shape), weights=list(shape.values()), k=n_fill - n_wild)

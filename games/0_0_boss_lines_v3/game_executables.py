@@ -264,12 +264,11 @@ class GameExecutables(GameCalculations):
     # Wild events (step 4)
     # =========================================================================
     def weights(self, name: str) -> dict:
-        """Weight table `name`, overridden per Bonus tier by config.tier_weights."""
-        if self.in_bonus:
-            table = self.config.tier_weights.get(self.bonus_tier, {}).get(name)
-            if table is not None:
-                return table
-        return getattr(self.config, name)
+        """Weight table `name`, overridden per Bonus tier (and for the Treasure hunt
+        feature spin, key "treasure_hunt") by config.tier_weights."""
+        key = self.bonus_tier if self.in_bonus else ("treasure_hunt" if self.treasure_hunt else None)
+        table = self.config.tier_weights.get(key, {}).get(name) if key else None
+        return table if table is not None else getattr(self.config, name)
 
     def draw_coin(self, min_value: float, min_tier: str = None) -> float:
         """Coin value >= min_value (and >= min_tier's lowest value)."""

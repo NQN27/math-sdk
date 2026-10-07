@@ -1,8 +1,9 @@
 # Boss Lines v3: ghi chú tune (cập nhật 2026-10-07)
 
-Đọc file này trước khi tune tiếp. Trạng thái: các tier Bonus/Super/Epic **đã sát mục tiêu mean** với bộ weight
-`tuning/overrides/t17.json`. Bộ weight này **chưa ghi vào `game_config.py`**: designer sẽ xem lại vì ngoài mean còn
-yêu cầu về median, phân bố và phương sai. Base, Ante và Feature **chưa tune lại** sau khi bỏ Hold and Spin.
+Đọc file này trước khi tune tiếp. Trạng thái: **mọi mode đã có bộ weight ứng viên** trong
+`tuning/overrides/b6.json`, gồm t17 (Bonus/Super/Epic, mục 3) cộng base/ante/Feature (mục 3B). Bộ weight này
+**chưa ghi vào `game_config.py`**: designer sẽ xem lại vì ngoài mean còn yêu cầu về median, phân bố và phương sai.
+`t17.json` chỉ có phần Bonus; `b6.json` là bản đầy đủ, dùng bản này.
 
 ---
 
@@ -15,7 +16,7 @@ yêu cầu về median, phân bố và phương sai. Base, Ante và Feature **ch
 | buy3 (100x) | Bonus 95.67 / Super 4.23 / Epic 0.1 (%), cho mean 96.70x. Base và ante dùng cùng tỷ lệ 3/4/5 Scatter |
 | buy4 (300x) | Super 96 / Epic 4 (%), cho mean 290.1x |
 | Feature | p × mean_Heroic + (1 − p) × mean_TreasureHunt = 483.5x, p trong [0.2, 0.8] (tạm 0.5); hai mean không cần bằng nhau |
-| Base | Bonus chiếm khoảng 30% RTP (tạm, chưa chốt) |
+| Base / Ante | Bonus chiếm **50% RTP của base** (0.4835), tần suất vào Bonus 1/200; ante 1/40. Tỷ lệ này **suy ra từ spec**, không phải chọn: ante tốn 3x và ra Bonus 5x, nên base_game + 5·B = 3·(base_game + B), suy ra base_game = B. Nếu muốn khác 50% thì phải đổi giá ante hoặc hệ số 5x. Phần quay thường = 0.4825x/spin ở cả hai mode |
 | Wincap | 25.000x |
 | Chưa chốt | Yêu cầu về **median, phân bố, var**: designer sẽ đưa sau. Số đo hiện tại ở mục 3 |
 
@@ -83,6 +84,62 @@ rồi `python tuning/dist_stats.py t17`. Kết quả gốc (CSV từng phiên + 
   không đổi gì của Super). Muốn kết luận một thay đổi < 10% thì chạy ≥ 20.000 phiên, hoặc so cùng seed (harness
   dùng seed cố định theo chỉ số phiên).
 
+## 3B. Base / Ante / Feature: b6 (`tuning/overrides/b6.json` = t17 + các thay đổi dưới đây)
+
+### Thay đổi so với t17
+
+| Tham số | b6 | Mặc định |
+|---|---|---|
+| Reel `BR0` | wild 1.0, weapon 0.6, sc 0.9 (= 3 Scatter/cột), `shape` phẳng hơn: L1 50, L2 48, L3 46, L4 44, H1 22, H2 17, H3 12, H4 8, H5 5 | wild 5, weapon 1.5, sc 1.4 |
+| Reel `ANTE` | như BR0, sc 2.0 (= 6 Scatter/cột) | wild 5, weapon 1.5, sc 3.0 |
+| Reel `HERO` | wild 5.5, weapon 1.8 | wild 8, weapon 3 |
+| `tier_weights.treasure_hunt` | Treasure: coin 83, magnet 1.3, clover 2.6, golden .2, star 1.0, global 0, scatter 1. Xu: dốc ít hơn t17 (2:14, 3:9, 4:6, 5:4, … 25000:2e-7) | |
+| `feature_heroic_chance` | **0.5365** (tính từ hai mean bên dưới) | 0.5 |
+
+Code mới (không đổi luật): `gen_reels.py` nhận khóa `shape` riêng cho từng reel; `tier_weights` có khóa
+`"treasure_hunt"`; `game_optimization.py` tính RTP fence Bonus từ mean 96.7x và tần suất vào Bonus (bỏ số 0.30 tạm).
+
+### Base / Ante (40.000 spin, Bonus được kích hoạt thì KHÔNG chơi, chỉ đếm)
+Lệnh: `python tuning/base_stats.py base|ante 40000 tuning/overrides/b6.json TAG`
+
+| Mode | Mean phần quay thường | Median | SD | Hit rate | Thắng TB / spin có thắng | Vào Bonus | Tỷ lệ tier tự nhiên (B/S/E %) | Treasure base |
+|---|---|---|---|---|---|---|---|---|
+| base | 0,828 | 0,10 | 8,66 | 51,9% | 1,59 | 1 / 213 | 93,6 / 6,4 / 0 | 0,05% spin |
+| ante | 0,817 | 0,15 | 8,70 | 53,0% | 1,54 | 1 / 34,7 | 89,9 / 9,4 / 0,6 | 0,04% spin |
+
+Phân vị base: p90 1,75 · p99 7,1 · p99.9 61,5 · p99.99 408 · max 1.215. Nguồn base: dòng 0,586, rương 0,219,
+Treasure 0,015, xu Wild 0,008.
+
+- **Mean tự nhiên 0,83 > 0,4825 là bình thường:** optimizer trộn thêm spin trắng (fence "0") và chỉnh tần suất.
+  Chỉ số cần khớp là **thắng trung bình mỗi spin có thắng**: fence basegame (hr 3.5) cần 0,4825 × 3,5 ≈ 1,69
+  (ante: 0,16017 × 3,5 × 3 ≈ 1,68). Tự nhiên đang là 1,59 / 1,54, đủ gần.
+- **Tần suất vào Bonus:** base 1/213 so với 1/200 (đạt). Ante 1/34,7 so với 1/40: reel 300 ô/cột nên Scatter chỉ
+  đổi theo bậc. 6 Scatter/cột cho 1/34,7, 5 Scatter/cột cho 1/59; giữ 6. Optimizer chốt chính xác.
+- **Đánh đổi cần designer xem:** để hạ base phải giảm Wild/vũ khí trên `BR0`, nên **Treasure ở base gần như mất**:
+  boss chặng 0 (HP 25) bị hạ cả 3 con chỉ 0,05% spin (t17 reel cũ: 1%). Nếu muốn Treasure ở base xuất hiện
+  thường hơn thì phải tăng vũ khí `BR0` và bù bằng cách giảm dòng hoặc rương.
+- Tỷ lệ tier khi vào Bonus từ base/ante được **ép** theo `scatter_triggers` (95,67 / 4,23 / 0,1) ở fence freegame,
+  nên tỷ lệ tự nhiên ở trên không ảnh hưởng RTP.
+
+### Feature (6.000 phiên mỗi loại)
+Lệnh: `python tuning/tune_harness.py feature_heroic|feature_treasure 6000 tuning/overrides/b6.json TAG`
+
+| Loại | Mean | Median | SD | CV | p10 | p90 | p99 | < 100x | Max Win |
+|---|---|---|---|---|---|---|---|---|---|
+| Heroic | 663,8 | 112,5 | 1.271 | 1,91 | 12 | 2.371 | 4.456 | 46,5% | 3 / 6.000 |
+| Treasure hunt | 274,8 | 174 | 495 | 1,80 | 88 | 527 | 1.530 | 18,3% | 1 / 6.000 |
+| **Gộp (p = 0,5365)** | **483,5** | 148,8 | 1.009 | 2,09 | 34 | 1.224 | 3.782 | 33,4% | |
+
+p = (483,5 − 274,8) / (663,8 − 274,8) = 0,5365. Phân vị gộp: p5 9,2 · p25 82 · p75 424 · p95 2.462.
+Tỷ lệ lượt mua Feature (giá 500x) nhận < 250x: 64,9%; < 500x: 78,1%.
+
+- Heroic: nguồn rương 321 (rương Kim cương ở chặng 5, xu ≥ 100x), dòng 137, Treasure 138, xu Wild 67. Median thấp
+  (112x) vì phần lớn tiền đến từ việc hạ boss chặng 5. Đòn bẩy chính là reel `HERO` (wild/weapon).
+- Treasure hunt: gần như toàn bộ là Treasure. Khoảng 2% phiên vào được Bonus nhờ Scatter. Đòn bẩy là
+  `tier_weights.treasure_hunt`. Nếu bật lại Global trong Treasure hunt thì mean tăng mạnh.
+- Lịch sử: b3 Heroic 1.184 / Treasure hunt 87,9 (p sẽ là 0,36); b4 Treasure hunt 517 (quá cao); b5 585 / 211
+  (p sẽ là 0,73); b6 664 / 275 (p 0,54).
+
 ## 4. Bộ weight t17 (`tuning/overrides/t17.json`)
 
 Override áp lên `GameConfig` lúc chạy harness. Bảng dạng dict bị **thay toàn bộ**, không merge.
@@ -148,12 +205,12 @@ Chi tiết từng lượt: `tuning/results/findings_20261007.md`. Các file over
 
 ## 7. Việc còn lại
 
-1. **Designer xem t17** và đưa yêu cầu median/phân bố/var. Đồng ý thì ghi t17 vào `game_config.py` (kể cả
+1. **Designer xem b6** (t17 + base/ante/Feature) và đưa yêu cầu median/phân bố/var. Đồng ý thì ghi b6 vào `game_config.py` (kể cả
    `tier_weights` và reel trong `gen_reels.py`, nhớ chạy lại `python gen_reels.py`), chạy pytest rồi commit.
 2. Chỉnh nốt: Super −6%, Epic −8%. Ứng viên: Treasure của Epic/Super trong `tier_weights`, xu 5x/20x của Epic.
    Chạy ≥ 20.000 phiên để thấy thay đổi nhỏ.
-3. **Tune base / ante / Feature** (chưa đo lại sau khi bỏ Hold and Spin). Base: Bonus khoảng 30% RTP, scatter rate từ
-   `BR0`. Feature: đo `feature_heroic` và `feature_treasure` rồi chọn p trong [0.2, 0.8].
+3. Base / ante / Feature đã có ứng viên b6 (mục 3B). Designer cần xem: Treasure ở base gần như mất; phân bố
+   Feature (64,9% lượt mua < 250x); tỷ lệ Bonus 50% của base (suy ra từ spec).
 4. Bật `reject_wincap_outside_wincap_fence` sau khi tune xong, rồi chạy optimizer (`run.py`, đang tắt) để chốt
    RTP 96.7% chính xác.
 5. Q3 (payout lẻ bội 0.1x) vẫn chờ xác nhận với Stake trước bước kiểm tra RGS.
@@ -165,6 +222,7 @@ Chi tiết từng lượt: `tuning/results/findings_20261007.md`. Các file over
 | `python tuning/tune_harness.py TIER N overrides.json TAG` | TIER: bonus, super, epic, feature_heroic, feature_treasure, base. Lưu `tuning/results/TAG_TIER_<time>.csv` (1 payout/phiên) và `.json` (mean, median, phân vị, Max Win, nguồn tiền, chặng cuối, spin, số Treasure) |
 | `python tuning/stage_split.py TIER N overrides.json TAG` | Tiền theo chặng × nguồn (dòng, xu Wild, rương, Treasure, Treasure bị cắt bởi Max Win) |
 | `python tuning/dist_stats.py TAG [TIER...]` | Đọc CSV của TAG: mean, median, sd, var, CV, SE, phân vị, % phiên theo khoảng của mục tiêu |
+| `python tuning/base_stats.py base\|ante N overrides.json TAG` | Base/ante tự nhiên: mean phần quay thường, hit rate, tần suất và tỷ lệ tier khi vào Bonus, Treasure, nguồn tiền |
 
 - Override: `{tên_thuộc_tính_config: giá_trị}`. Key số viết dạng chuỗi (`"0.2"`), harness tự đổi kiểu.
 - `_reel_specs`: `{"BON_S1": {"wild": 5.8, "weapon": 1.15}}` dựng lại reel trong bộ nhớ từ `gen_reels.REEL_SPECS`.

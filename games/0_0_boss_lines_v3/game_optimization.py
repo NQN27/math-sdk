@@ -30,9 +30,15 @@ class OptimizationSetup:
         caps = {bm.get_name(): bm.get_wincap() for bm in game_config.bet_modes}
         opt = {}
         # Proposal: Ante spin = 5x the rate of 3+ Scatter -> 1/5 of base's hit rate.
+        # A triggered Bonus pays the buy3 tier mix mean (96.7x base bets). rtp is a
+        # fraction of the mode's cost (optimizer: hr = avg_win / rtp / cost), so
+        # base: 96.7/200 = 0.4835 (half of 0.967); ante (cost 3): 96.7/(40*3) = 0.80583.
+        # Same base-game part in both: 0.4825 x base bet. (2026-10-07, replaces 0.30 placeholder)
         bonus_hr = {"base": 200, "ante": 40}
+        bonus_mean = 96.7
         for mode in ("base", "ante"):
-            bonus_rtp = 0.30
+            cost = {bm.get_name(): bm.get_cost() for bm in game_config.bet_modes}[mode]
+            bonus_rtp = round(bonus_mean / (bonus_hr[mode] * cost), 5)
             opt[mode] = {
                 "conditions": {
                     "wincap": ConstructConditions(rtp=WINCAP_RTP, av_win=caps[mode],
