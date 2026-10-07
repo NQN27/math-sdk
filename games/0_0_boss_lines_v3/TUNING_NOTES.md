@@ -112,6 +112,42 @@ Thay đổi (chỉ riêng Bonus: `tier_weights.bonus` và reel chặng 1, Super/
 - **Còn yếu:** tỷ trọng dòng + xu Wild gần như không tăng (13,8 thành 14,1%). Thêm Wild ở chặng 2 thì Super đi sâu hơn và
   khoảng giữa tăng; cần thêm cách khác nếu designer muốn tỷ trọng dòng cao hơn.
 
+**Phase 3: Epic (p3, `tuning/overrides/p3.json` = p2 + Epic; 20.000 phiên, đạt đủ 6 yêu cầu và luật rương)**
+
+| | p0 | **p3** | Yêu cầu |
+|---|---|---|---|
+| Mean | 1.654,5 | **1.474,0** (−1,2%) | 1.492,5 ± 3% |
+| min / p25 / median / p60 / p75 | 600 / 697 / 1.122 / 1.902 / 2.256 | **600 / 600 / 600 / 687 / 1.087** | ≥ 600 · p60 ≤ 746 · p75 746–1.343 |
+| p90 / p95 / p99 | 3.099 / 3.752 / 5.405 | 2.667 / 3.980 / 25.000 | tăng mạnh từ p95 |
+| Max Win | 0,11% | **1,20%** (240/20.000) | ≥ 1% |
+| Dòng + xu Wild / rương / Treasure (%) | 11,9 / 35,1 / 53,1 | 2,1 / 21,9 / 76,0 | |
+| Clear chặng / phiên | 2,41 | 1,14 | |
+| Clover: % ký hiệu, % hệ số > 2 | 0,10%, 10,1% | 0,19%, 89,7% | |
+| Trả bù lên 600x | 18,7% phiên, 37,6x | **54,7% phiên, 119,2x/phiên** | |
+| Spin trắng / spin không kết nối | 9,4% / 19,2% | 26,4% / 43,0% | |
+| RTP lấy mẫu N = 5/20/100/1000 | | 70 / 76 / 95 / 95% | |
+
+Nguồn theo khoảng: 60% phiên dưới nhận 600x (tự nhiên khoảng 380–480x: dòng ~18 + rương ~77 + Treasure mở đầu và
+Treasure chặng 3, cộng phần trả bù). p60–75 nhận 859x, p75–90 nhận 1.695x, p90–99 nhận 5.319x, 1% trên cùng nhận 25.000x.
+
+- **Thay đổi Epic:**
+  - Reel `EPI_S3` wild 1,0, `EPI_S4/S5/E` 0,6, không vũ khí trên reel (vũ khí chỉ đến từ bảo đảm 2/spin). Shape phẳng
+    (L 30/30/30/30, H 28/26/24/22/20) để ít kết nối, ít sát thương, qua chặng chậm.
+  - Quà rương ra Power 1/2/3/4% theo cấp (tăng dần theo luật). Rương: cấp {97, 2.5, 0.5}, nâng cấp 1%, Đồng {1:90, 2:10},
+    Bạc {2:95, 3:5}.
+  - Xu: mỗi pool dồn về mức tối thiểu (1:100 cho Treasure mở đầu, 5:100, 20:3 cho chặng 5/Endless, 100:.6 cho rương Kim cương),
+    **25000: 3,4e-3** (cho Max Win khoảng 1,2%).
+  - Treasure: coin 98, magnet .1, clover .2, **golden .27 (chỉ 10x/20x)**, star .05, global .1. Clover/Global dùng chung bảng với
+    Super (không còn giới hạn riêng cho Epic).
+  - Sự kiện Wild, Enhance, hệ số Wild giống Super.
+- **Đánh đổi cần designer xem:**
+  - 60% phiên Epic chỉ nhận đúng mức sàn; hơn một nửa nhờ trả bù (8% mean là tiền trả bù).
+  - Epic gần như không có dòng thắng (2%), 43% spin không có kết nối. Shape trung gian (p3g: L 45/42/40/38, H 26/22/18/14/11)
+    có nhiều kết nối hơn (34% spin không kết nối), nhưng Epic qua chặng nhanh hơn: p60 831 (vượt 746), mean +17%.
+    Yêu cầu "nhiều kết nối nhỏ" và "60% phiên ≤ 746x" kéo ngược nhau ở Epic, vì mỗi kết nối gây sát thương và mỗi lần
+    clear chặng 5/Endless trả tối thiểu 30 × 20x = 600x.
+  - Max Win 1,2% chủ yếu đến từ xu 25.000x trong Treasure và rương Kim cương.
+
 ---
 
 ## 1. Mục tiêu (designer, 2026-10-07)
