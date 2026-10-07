@@ -140,11 +140,8 @@ def test_mode_guarantees_and_bookkeeping(gs, tame, mode):
             opening = seg["ctx"].get("opening", False)
             if tier == "epic" and not opening:
                 epic_spins += 1
-                # Epic: Hold and Spin fires iff the opening board connects, i.e. it
-                # comes before the first line win (and there is a line win at all).
-                first = next((e["type"] for e in seg["events"]
-                              if e["type"] in ("holdSpinStart", "lineWins")), None)
-                assert (first == "holdSpinStart") == any(e["type"] == "holdSpinStart" for e in seg["events"])
+            # Hold and Spin was removed from every mode (designer 2026-10-07)
+            assert not any(e["type"].startswith("holdSpin") for e in seg["events"])
             end = [e for e in seg["events"] if e["type"] == "spinEnd"]
             treasure = any(e["type"] == "treasureStart" for e in seg["events"])
             if end and not capped and feat != "treasureHunt" and not opening:

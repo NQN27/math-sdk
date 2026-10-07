@@ -197,10 +197,7 @@ class GameConfig(Config):
         self.boss_drop_chance = 0.03  # Q11: per boss per damage step
         self.boss_drop_weights = {"wild": 60, "power": 40}
 
-        # ---- Hold and Spin ---------------------------------------------------------
-        self.hold_spin_chance = 0.06  # Q4: once, right after the first board
-        self.hold_spin_in_heroic = True  # Q6
-        self.hold_spin_max_respins = 60
+        # Hold and Spin: removed from every mode (designer 2026-10-07).
 
         # ---- Treasure --------------------------------------------------------------
         self.treasure_kind_weights = {"coin": 60, "magnet": 7, "clover": 8, "golden": 2, "star": 4,
@@ -225,7 +222,9 @@ class GameConfig(Config):
             "epic": {"spins": 8, "start_stage": 3},
         }
         self.scatter_to_tier = {3: "bonus", 4: "super", 5: "epic"}
-        self.super_min_wild_or_weapon = 3
+        # Super/Epic: Wild-or-weapon cells guaranteed on each free spin's opening board
+        # (spec said 3; designer 2026-10-07: 1, since 3 drove Super to ~1068x vs 240x).
+        self.super_min_wild_or_weapon = 1
         # Which symbol fills a guaranteed Wild-or-weapon slot (Super/Epic/Heroic); placeholder.
         self.guarantee_symbol_weights = {"W": 70, "AR": 10, "BM": 8, "SW": 8, "LT": 4}
         self.heroic_min_wild_or_weapon = 5

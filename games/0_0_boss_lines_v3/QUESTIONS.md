@@ -13,7 +13,7 @@ nguyên. Các cơ chế của v2 không có trong spec (HP người chơi, spin 
 
 ## A. Câu bản "Kịch bản 1" đã trả lời (đã cập nhật code)
 - Q1: xu từ sự kiện Wild **có** nhân Global multiplier.
-- Q5: không trả thưởng hay kích hoạt gì trong lúc Hold and Spin đang chạy.
+- Q5: không trả thưởng hay kích hoạt gì trong lúc Hold and Spin đang chạy. (Hold and Spin đã bỏ, xem B3.)
 - Q13: Destroy **được tính là phá huỷ**, nên gây damage. Không làm sáng nền.
 - Q14: Bom và Dao phá **mọi biểu tượng** trong vùng (không chỉ biểu tượng trả thưởng). Xem câu mới N1.
 - Q15: Transform không đụng Scatter **ngoài Bonus**; trong Bonus thì được. Destroy cũng vậy.
@@ -23,12 +23,12 @@ nguyên. Các cơ chế của v2 không có trong spec (HP người chơi, spin 
 - Q25: vào Bonus thì Global multiplier và ô sáng nền được đặt lại, **trừ các ô chứa Scatter đã kích hoạt Bonus**
   (những ô này sáng sẵn khi bắt đầu Bonus).
 - Q28: trong Bonus, ô sáng đang là Scatter thì vẫn giữ Scatter khi Treasure chạy.
-- Epic: không còn ép bảng đầu phải có kết nối; Hold and Spin **luôn** kích hoạt khi bảng đầu có kết nối.
+- Epic: không còn ép bảng đầu phải có kết nối. (Hold and Spin đã bỏ, xem B3.)
 
 ## B. Trả lời ngày 2026-10-07 (đã áp dụng vào code)
 - Q0: ô bị phá được **lấp tại chỗ**.
 - Q2: nhiều Multiplier Wild trên một dòng thì **nhân** với nhau (2x và 5x thành 10x). Đã đổi code.
-- Q4: Hold and Spin xét **một lần ngay sau bảng đầu**. Q6: **có** trong Heroic spin.
+- Q4, Q6: không còn áp dụng (Hold and Spin đã bỏ, xem B3).
 - Q7: biểu tượng bị loại **cộng dồn, theo chặng**.
 - Q8: boss Endless mới xuất hiện ở **vòng quay sau**. Q9: HP mới = HP cũ + bội số của 5 trong [0, 50].
 - Q10: Heroic dọn chặng 5 thì **Treasure rồi kết thúc**.
@@ -57,6 +57,12 @@ nguyên. Các cơ chế của v2 không có trong spec (HP người chơi, spin 
 - Mean từng tier (chốt 2026-10-07): **Bonus 88.9x / Super 240x / Epic 1.492,5x**. Tỷ lệ tier suy ra:
   buy3 = Bonus 95.67 / Super 4.23 / Epic 0.1 (= 96.70x), buy4 = Super 96 / Epic 4 (= 290.1x).
   Base/ante dùng cùng tỷ lệ 3/4/5 Scatter như buy3. Bonus chiếm 30% RTP của base (tạm).
+
+## B3. Quyết định ngày 2026-10-07 (sau lượt tune t3–t5)
+- **Bỏ hoàn toàn Hold and Spin** khỏi mọi mode. Lý do đo được: ở Epic, Hold and Spin giữ trung bình 27,8/30 ô,
+  sàn Epic 4.678x (weight tối thiểu) so với mục tiêu 1.492,5x.
+- Super/Epic **bảo đảm 1 ô** Wild/vũ khí mỗi spin (spec cũ 3). Với 3 ô Super ≈ 1.068x, với 1 ô ≈ 297x (mục tiêu 240x).
+- Số đo: `_scratch/results/findings_20261007_t3-t6.md`.
 
 ## C. Còn mở
 3. **Payout lẻ** (0.15, 0.25, 1.25, 2.25…): bạn cho biết Stake mới không còn yêu cầu bội số 0.1. Bản SDK mới

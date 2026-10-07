@@ -47,20 +47,17 @@ class GameState(GameStateOverride):
             return
         cand = [(c, r) for c, r in self.all_cells() if self.is_basic(self.board[c][r])]
         for c, r in random.sample(cand, min(len(cand), minimum - have)):
-            name = random.choice(["W"] + self.config.weapon_symbols)
-            self.board[c][r] = self.make_symbol(name)
+            weights = {k: w for k, w in self.config.guarantee_symbol_weights.items()
+                       if k == "W" or self.weapon_allowed(k, c)}
+            self.board[c][r] = self.make_symbol(get_random_outcome(weights))
 
-    def play_one_spin(self, reel, force_scatters=None, min_wild_weapon=0, epic=False) -> None:
-        """Opening board -> Hold and Spin -> steps (1)-(9) -> Treasure."""
+    def play_one_spin(self, reel, force_scatters=None, min_wild_weapon=0) -> None:
+        """Opening board -> steps (1)-(9) -> Treasure. (Hold and Spin removed by the designer 2026-10-07.)"""
         self.begin_spin()
         self.draw_board(reel, force_scatters)
         if min_wild_weapon:
             self._guarantee_wild_or_weapon(min_wild_weapon)
         reveal_event(self)
-        if epic:  # Epic: Hold and Spin always fires when the opening board connects
-            self.hold_and_spin(force=True)
-        elif not self.heroic or self.config.hold_spin_in_heroic:
-            self.hold_and_spin()
         self.resolve_actions()
         if not self.wincap_triggered:
             self.open_chests()
@@ -177,8 +174,7 @@ class GameState(GameStateOverride):
             emit(self, "freeSpinStart", spin=spin_no, freeSpinsLeft=self.free_spins_left,
                  stage=self.stage_label(), globalMult=self.global_factor())
             self.play_one_spin(cfg.bonus_stage_reel[self.stage],
-                               min_wild_weapon=cfg.super_min_wild_or_weapon if tier in ("super", "epic") else 0,
-                               epic=(tier == "epic"))
+                               min_wild_weapon=cfg.super_min_wild_or_weapon if tier in ("super", "epic") else 0)
             self.win_manager.update_gametype_wins(self.gametype)
         emit(self, "bonusEnd", tier=tier, spins=spin_no,
              totalWin=round(self.win_manager.running_bet_win, 2))

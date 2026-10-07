@@ -1,6 +1,6 @@
 """Boss Lines v3 game actions, in the order of the proposal's section 6.
 
-One spin = opening board -> (Hold and Spin) -> loop of steps (1)-(8) ->
+One spin = opening board -> loop of steps (1)-(8) ->
 step (9) chests -> Treasure if the stage was cleared.
 
   (1) Bonus only: Scatters add free spins and are darkened.
@@ -682,37 +682,3 @@ class GameExecutables(GameCalculations):
         emit(self, "treasureEnd", total=total, globalMult=g, paid=paid)
         self.record({"kind": "treasure", "symbol": "treasure", "gametype": self.gametype})
         return paid
-
-    # =========================================================================
-    # Hold and Spin
-    # =========================================================================
-    def hold_and_spin(self, force: bool = False) -> None:
-        wins = self.evaluate_lines()
-        if not wins:
-            return
-        if not force and random.random() >= self.config.hold_spin_chance:
-            return
-        names = {w["symbol"] for w in wins if w["symbol"] in self.config.basic_symbols}
-
-        def is_held(s):
-            return s is not None and (s.name in names or self.is_wild(s) or self.is_scatter(s) or self.is_weapon(s))
-
-        held = {x for x in self.all_cells() if is_held(self.board[x[0]][x[1]])}
-        emit(self, "holdSpinStart", symbols=sorted(names), held=[pos(self, c, r) for c, r in sorted(held)])
-        for i in range(self.config.hold_spin_max_respins + 1):
-            if i == self.config.hold_spin_max_respins:
-                self.note_cap("hold_spin_respins")
-                break
-            if len(held) == 30:
-                break
-            spun = [x for x in self.all_cells() if x not in held]
-            for c, r in spun:
-                self.board[c][r] = None
-            for c, r in spun:
-                self.board[c][r] = self.draw_symbol_for(c, r)
-            new = [x for x in spun if is_held(self.board[x[0]][x[1]])]
-            board_cells_event(self, "holdSpinRespin", spun, newHeld=[pos(self, c, r) for c, r in new])
-            if not new:
-                break
-            held.update(new)
-        emit(self, "holdSpinEnd", held=len(held))

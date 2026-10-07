@@ -20,7 +20,8 @@ Nguồn luật: `Proposal_KichBan1_2026-10-06.md`. Paylines và sơ đồ thứ 
 | Rương: quà, nâng cấp; cấp càng cao càng ít xu (Bonus) | ✅ | Q16–Q18 |
 | Treasure: Xu, Nam châm (cần ≥ 2 xu), Clover (đồng thời), Golden clover (lần lượt), Star, Global, Scatter; kiểm tra Maxwin từng bước | ✅ | N2–N4, N10, Q20, Q21 |
 | Bonus/Super/Epic; ô sáng giữ suốt Bonus; bắt đầu Bonus sáng sẵn ô Scatter kích hoạt | ✅ | |
-| Epic: Treasure ngay đầu (toàn bảng, xu ≥ 1x), không xu Đồng trong free spin, Hold and Spin khi có kết nối | ✅ | N5, N6 |
+| Epic: Treasure ngay đầu (toàn bảng, xu ≥ 1x), không xu Đồng trong free spin | ✅ | N5, N6 |
+| **Hold and Spin: đã bỏ khỏi mọi mode** (2026-10-07) | ✅ | Super/Epic bảo đảm 1 ô Wild/vũ khí (spec cũ: 3) |
 | Heroic / Treasure hunt, buy3, buy4, Ante | ✅ | N8, Q27 |
 | Hiệu ứng Nice/Big/Super/Mega/Maxwin (`spinEnd.winLevels`), Total win cuối Bonus | ✅ | |
 | Pipeline SDK `create_books` | ✅ | |
