@@ -230,9 +230,9 @@ class GameConfig(Config):
         # Scatter-count mix (%) of a forced Bonus: buy3 (also base/ante freegame fence) and buy4.
         self.tier_mix = {"buy3": {3: 95.67, 4: 4.23, 5: 0.1}, "buy4": {4: 96, 5: 4}}
         # Max Win (25,000x) rate per tier session (designer 2026-10-08: Super 0.1%, Epic >= 1%).
-        # Bonus has no target; 0 here. Feature: placeholder from b6 measurement (~3.5e-4).
+        # Bonus has no target; 0 here. Feature: measured on p3 (Heroic 3e-4, Treasure hunt 1e-4, p_heroic 0.512).
         self.tier_maxwin_rate = {"bonus": 0.0, "super": 0.001, "epic": 0.01}
-        self.feature_maxwin_rate = 3.5e-4
+        self.feature_maxwin_rate = 2.0e-4
         # Designer 2026-10-08: minimum total Bonus win per tier, topped up at Bonus end.
         self.bonus_min_total_win = {"epic": 600.0}
         # Weapons guaranteed on each free spin's opening board (designer 2026-10-07;

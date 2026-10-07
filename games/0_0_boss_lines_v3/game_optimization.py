@@ -84,8 +84,8 @@ class OptimizationSetup:
             },
             "scaling": ConstructScaling([]).return_dict(),
             "parameters": _params([10, 20, 50]),
-            "distribution_bias": ConstructFenceBias(applied_criteria=["basegame"], bias_ranges=[(500.0, 1500.0)],
-                                                    bias_weights=[0.3]).return_dict(),
+            # No bias (2026-10-08): pushing mass into 500-1500x fought the tuned Heroic/Treasure hunt shapes.
+            "distribution_bias": ConstructFenceBias(applied_criteria=[], bias_ranges=[], bias_weights=[]).return_dict(),
         }
         for mode in ("buy3", "buy4"):
             opt[mode] = {
@@ -96,8 +96,9 @@ class OptimizationSetup:
                 },
                 "scaling": ConstructScaling([]).return_dict(),
                 "parameters": _params([10, 20, 50]),
-                "distribution_bias": ConstructFenceBias(applied_criteria=["freegame"], bias_ranges=[(100.0, 300.0)],
-                                                        bias_weights=[0.3]).return_dict(),
+                # No bias (2026-10-08): the designer's percentile spec (p60 <= 0.5 m, p75 <= 0.9 m per tier) is
+                # built into the books; a 100-300x bias would undo it (Bonus tier p75 is ~64x).
+                "distribution_bias": ConstructFenceBias(applied_criteria=[], bias_ranges=[], bias_weights=[]).return_dict(),
             }
         self.game_config.opt_params = opt
         verify_optimization_input(self.game_config, self.game_config.opt_params)

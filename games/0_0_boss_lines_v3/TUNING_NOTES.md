@@ -1,9 +1,22 @@
 # Boss Lines v3: ghi chú tune (cập nhật 2026-10-07)
 
-Đọc file này trước khi tune tiếp. Trạng thái: **mọi mode đã có bộ weight ứng viên** trong
-`tuning/overrides/b6.json`, gồm t17 (Bonus/Super/Epic, mục 3) cộng base/ante/Feature (mục 3B). Bộ weight này
-**chưa ghi vào `game_config.py`**: designer sẽ xem lại vì ngoài mean còn yêu cầu về median, phân bố và phương sai.
-`t17.json` chỉ có phần Bonus; `b6.json` là bản đầy đủ, dùng bản này.
+Đọc file này trước khi tune tiếp.
+
+**Trạng thái (2026-10-08): ứng viên hiện tại là `tuning/overrides/p3.json`** (= b6 + Phase 1–4). Chưa ghi vào
+`game_config.py`, chờ designer duyệt. Kết quả: `tuning/results/p3_*`, bảng chấm `tuning/results/p3_speccheck.txt`.
+
+| Tier | Mean (mục tiêu) | p5 | Median | p60 | p75 | p99 | Max Win | Spec phân vị |
+|---|---|---|---|---|---|---|---|---|
+| Bonus (30k) | 88,3 (88,9) | 10,9 | 36,5 | 44,2 | 64,4 | 884 | 0% | đạt |
+| Super (50k) | 238,8 (240) | 37,8 | 92,2 | 117,2 | 179,2 | 2.291 | 0,086% | đạt |
+| Epic (20k) | 1.493,6 (1.492,5) | 600 | 600 | 660 | 1.081 | 25.000 | 1,14% | đạt; trượt 4 hướng yêu cầu (§0, Phase 3) |
+
+| Mode | RTP thô từ mean tier | Ghi chú |
+|---|---|---|
+| buy3 | 96,1% | 95,67/4,23/0,1 × 88,3/238,8/1.493,6 |
+| buy4 | 96,3% | 96/4 |
+| Feature | 96,7% | p_heroic 0,512; Heroic 683,2, Treasure hunt 274,0 |
+| base / ante | do optimizer | phần quay thường tự nhiên 0,80x/spin; vào Bonus 1/216 (base), 1/34,6 (ante) |
 
 ---
 
@@ -154,6 +167,30 @@ Treasure chặng 3, cộng phần trả bù). p60–75 nhận 859x, p75–90 nh�
     mang phần đuôi). Ba điểm đầu cùng một gốc: kết nối gây sát thương, nên nhiều kết nối thì qua chặng nhanh, mà clear
     chặng 5/Endless trả tối thiểu 600x, làm vỡ yêu cầu 60% phiên ≤ 746x. Designer cần chọn ưu tiên, hoặc nới một số cố định
     (xu tối thiểu chặng 5/Endless trong Epic, HP boss Epic, hay bảo đảm 2 vũ khí).
+
+**Phase 4: base / ante / Feature, optimizer (p3)**
+- Bonus: tăng đuôi xu ≥ 100x thêm 25% để mean 86,9 thành 88,3 (phân vị giữ nguyên), kéo buy3 thô lên khoảng 96,1%.
+- Feature (20.000 phiên mỗi loại): Heroic 683,2 (median 117,5, Max Win 3/20.000); Treasure hunt 274,0 (median 173, Max Win
+  2/20.000). **p_heroic = 0,512** (`feature_heroic_chance` trong p3). `feature_maxwin_rate` trong config 3,5e-4 thành 2,0e-4.
+- Base/ante (200.000 spin): phần quay thường 0,805 / 0,807x, hit 51,9 / 53,2%, vào Bonus 1/216 / 1/34,6. Không đổi so với b6.
+- **Optimizer `distribution_bias`:** bỏ bias của fence freegame buy3/buy4 (30% vào 100–300x) và Feature (500–1.500x), vì sẽ
+  phá spec phân vị (p75 của Bonus là 64x). Giữ bias 2–3x cho phần quay thường ở base/ante.
+- **Việc còn thiếu:** optimizer trộn lại trọng số các sách, nên phân bố người chơi thật là phân bố sau optimizer. Sau khi
+  chạy optimizer cần kiểm tra lại spec trên bảng trọng số đã tối ưu (ghép với tier của từng sách), không chỉ trên phiên harness.
+
+RTP lấy mẫu (trung vị 100 lần; `p3_speccheck.txt`):
+
+| | N=5 | N=20 | N=100 | N=1000 |
+|---|---|---|---|---|
+| Bonus | 66% | 76% | 90% | 94% |
+| Super | 60% | 73% | 85% | 97% |
+| Epic | 66% | 79% | 100% | 95% |
+| buy3 | 52% | 84% | 86% | 93% |
+| buy4 | 58% | 78% | 84% | 97% |
+| Feature | 57% | 80% | 96% | 97% |
+| base / ante | 51% / 18% | 57% / 40% | 72% / 70% | 108% / 122% |
+
+base/ante dùng tần suất vào Bonus và mean tự nhiên (chưa qua optimizer), nên với N lớn RTP cao hơn 96,7%.
 
 ---
 
