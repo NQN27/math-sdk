@@ -349,17 +349,17 @@
     "power": 20
    },
    "enhance_factor_weights": {
+    "15": 30,
+    "20": 25,
+    "25": 20,
+    "50": 25
+   },
+   "wild_mult_weights": {
     "2": 30,
     "3": 25,
     "4": 20,
     "5": 15,
     "10": 10
-   },
-   "wild_mult_weights": {
-    "2": 70,
-    "3": 20,
-    "4": 7,
-    "5": 3
    },
    "chest_upgrade_chance": 0.01,
    "chest_tier_step_weights": [
@@ -380,10 +380,15 @@
     "20": 40
    },
    "global_factor_weights": {
-    "2": 70,
-    "3": 20,
-    "4": 7,
-    "5": 3
+    "2": 30,
+    "3": 22,
+    "4": 15,
+    "5": 11,
+    "6": 8,
+    "7": 6,
+    "8": 4,
+    "9": 2,
+    "10": 2
    },
    "chest_gift_count_weights": {
     "dong": {
@@ -431,15 +436,15 @@
     "250": 0.006,
     "500": 0.002,
     "1000": 0.0006,
-    "25000": 0.0034
+    "25000": 0.0049
    },
    "treasure_kind_weights": {
     "coin": 98,
     "magnet": 0.1,
     "clover": 0.08,
-    "golden": 0.31,
+    "golden": 0.03,
     "star": 0.05,
-    "global": 0.1,
+    "global": 0.4,
     "scatter": 1
    },
    "power_pick_weights": {
