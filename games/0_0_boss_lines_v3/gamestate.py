@@ -53,7 +53,7 @@ class GameState(GameStateOverride):
         for c, r in cand:
             if have >= minimum:
                 break
-            weights = {k: w for k, w in self.config.guarantee_symbol_weights.items()
+            weights = {k: w for k, w in self.weights("guarantee_symbol_weights").items()
                        if (k == "W" and not weapons_only) or (k != "W" and self.weapon_allowed(k, c))}
             if not weights:  # no weapon may appear here (e.g. Arrow over a dead boss's column)
                 continue

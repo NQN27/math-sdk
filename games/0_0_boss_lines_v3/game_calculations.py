@@ -34,7 +34,7 @@ class GameCalculations(Executables):
         """Create a symbol; weapons other than Arrow carry a damage factor."""
         sym = self.create_symbol(name)
         if name in ("BM", "SW", "LT"):
-            sym.prize = get_random_outcome(self.config.weapon_factor_weights)
+            sym.prize = get_random_outcome(self.weights("weapon_factor_weights"))
         return sym
 
     def all_cells(self):

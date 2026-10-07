@@ -14,6 +14,7 @@ import random
 import statistics
 import sys
 import time
+import zlib
 from multiprocessing import Pool
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -35,11 +36,14 @@ def _setup(overrides):
         for name, spec in reel_specs.items():
             full = {**gen_reels.REEL_SPECS[name], **spec}
             cfg.reels[name] = [gen_reels.build_column(name, c, full) for c in range(6)]
-    def numkeys(base, table):  # JSON keys are strings; match the base table's key type
-        if all(isinstance(x, (int, float)) for x in base):
-            return {(int(float(k)) if float(k).is_integer() and all(isinstance(x, int) for x in base)
-                     else float(k)): w for k, w in table.items()}
-        return table
+    def numkeys(base, table):  # JSON keys are strings; match the base table's key types (recursively)
+        if not (isinstance(base, dict) and isinstance(table, dict)):
+            return table
+        if base and all(isinstance(x, (int, float)) for x in base):
+            ints = all(isinstance(x, int) for x in base)
+            table = {(int(float(k)) if ints and float(k).is_integer() else float(k)): w for k, w in table.items()}
+        sub = next(iter(base.values()), None)
+        return {k: numkeys(base.get(k, sub), v) for k, v in table.items()}
     if "tier_weights" in overrides:
         overrides["tier_weights"] = {
             tier: {name: numkeys(getattr(cfg, name), table) for name, table in tables.items()}
@@ -58,7 +62,7 @@ def _setup(overrides):
 
 
 def _one(gs, cfg, tier, i):
-    random.seed(1_000_003 * hash(tier) % 99991 + i)
+    random.seed(zlib.crc32(tier.encode()) % 99991 * 1_000_003 + i)  # stable across processes
     if tier == "base":
         gs.betmode, gs.criteria = "base", "basegame"
         gs.reset_book()

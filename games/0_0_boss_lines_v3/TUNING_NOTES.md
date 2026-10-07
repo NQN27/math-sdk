@@ -48,6 +48,36 @@
 - Bỏ giới hạn hệ số của Epic (p0u): 1.654,5 thành 1.647,5, không đáng kể vì Treasure Epic ra xu 98,8%.
 - RTP lấy mẫu (trung vị 100 lần): xem `tuning/results/p0_speccheck.json`.
 
+**Phase 1: Bonus (p1, `tuning/overrides/p1.json`; 30.000 phiên, đạt đủ 5 yêu cầu)**
+
+| | p0 | **p1** | Yêu cầu |
+|---|---|---|---|
+| Mean | 93,2 | **86,9** (−2,3%) | 88,9 ± 3% |
+| p5 / p25 / median / p60 / p75 | 3,3 / 12,3 / 53,5 / 68,7 / 101,8 | **10,9 / 23,6 / 36,5 / 44,1 / 64,0** | p5 ≥ 8,9 · p60 ≤ 44,5 · p75 44,5–80 |
+| p90 / p95 / p99 | 198 / 317 / 697 | 160 / 283 / 868 | |
+| Dòng + xu Wild / rương / Treasure (%) | 18,1 / 29,3 / 52,6 | 27,2 / 17,3 / 55,5 | tăng dòng + xu Wild |
+| Treasure trả TB mỗi lần | 84,7 | 49,0 | giảm |
+| Clear chặng / phiên | 0,58 | 0,98 | tăng |
+| Clover: % ký hiệu, % hệ số > 2 | 1,96%, 19,9% | 0,63%, 79,6% | ít hơn, lớn hơn |
+| Spin trắng | 28,0% | 25,1% | |
+| RTP lấy mẫu N = 5/20/100/1000 | | 66 / 76 / 90 / 94% | |
+
+Nguồn theo khoảng phân vị (`tuning/band_sources.py`): p25–60 nhận 32,6x (dòng 17,1 + Treasure 12,1); 1% cao nhất nhận 2.025x
+(Treasure 1.732). Một lần Treasure thông thường nhỏ (median 11,8x, khoảng 30 ô × 0,2x), đuôi đến từ Clover, Global và xu lớn.
+
+Thay đổi (chỉ riêng Bonus: `tier_weights.bonus` và reel chặng 1, Super/Epic không dùng):
+- Reel `BON_S1`: wild 4,3, weapon 2,8, shape nhiều biểu tượng thấp (L1 80, L2 72, L3 62, L4 52, H1 15, H2 10, H3 7, H4 5, H5 3):
+  nhiều kết nối nhỏ, clear chặng nhiều hơn.
+- Xu: 0,2x chiếm đa số (0.2:100, 0.5:4, 1:1.5, 2:.5 …), đuôi ≥ 20x dày hơn (100:.0091 … 1000:.00018, 25000:1e-6).
+- Treasure: coin 92, magnet .4, clover .6, golden .1, star .25, global .35. Hệ số Clover/Golden {2:20, 3:20, 4:15, 5:15, 10:17, 20:13}.
+  Global {2..10} như mặc định.
+- Rương: cấp {95, 4, 1}, nâng cấp 2%, số quà Đồng {1:80, 2:15, 3:5}, Bạc {2:85, 3:15}.
+- Sự kiện Wild 35% (hệ số 45 / xu 45 / power 10). Enhance {2:60, 3:25, 4:10, 5:4, 10:1}. Hệ số Wild {2:70, 3:20, 4:7, 5:3}.
+- Code (không đổi luật): `tier_weights` ghi đè được thêm sự kiện Wild, hệ số Wild, Enhance, Power, rương, Last hit, boss rơi đồ,
+  vũ khí, Cung tên, ô bảo đảm (19 tham số).
+- Còn mỏng: p60 44,1 (ngưỡng 44,5). Tỷ trọng Treasure không giảm (55,5%) vì đuôi chủ yếu đến từ Treasure; số tiền mỗi lần
+  Treasure thì đã giảm 42%.
+
 ---
 
 ## 1. Mục tiêu (designer, 2026-10-07)
@@ -271,5 +301,6 @@ Chi tiết từng lượt: `tuning/results/findings_20261007.md`. Các file over
 - `_reel_specs`: `{"BON_S1": {"wild": 5.8, "weapon": 1.15}}` dựng lại reel trong bộ nhớ từ `gen_reels.REEL_SPECS`.
 - `tier_weights`: như trong config, key số dạng chuỗi.
 - Harness gọi thẳng `run_bonus(tier, trigger)`, tức đo mean **của riêng tier**, không qua tỷ lệ Scatter của buy3.
-- Seed cố định theo chỉ số phiên: hai lượt cùng N là so cặp với nhau, nên bớt nhiễu.
+- Seed ổn định theo (tier, chỉ số phiên), sửa ngày 2026-10-08: trước đó dùng `hash(tier)`, vốn ngẫu nhiên mỗi lần chạy, nên
+  các lượt cũ (t1–t17, b1–b6, p0) **không** tái lập được và dao động khoảng ±10% giữa các lượt là nhiễu thật. Từ p1 trở đi, hai lượt cùng N, cùng tier là so cặp: đổi một tham số thì khác biệt là do tham số đó.
 - Windows: các script dùng multiprocessing (8 tiến trình) và có `if __name__ == "__main__"`.

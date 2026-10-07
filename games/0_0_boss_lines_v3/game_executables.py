@@ -69,7 +69,7 @@ class GameExecutables(GameCalculations):
     def _roll_chest(self, stage) -> str:
         order = self.config.chest_order
         base = order.index(self.config.stage_min_chest[stage])
-        k = get_random_outcome({i: w for i, w in enumerate(self.config.chest_tier_step_weights)})
+        k = get_random_outcome({i: w for i, w in enumerate(self.weights("chest_tier_step_weights"))})
         return order[min(base + k, len(order) - 1)]
 
     def spawn_stage(self, stage) -> None:
@@ -130,18 +130,18 @@ class GameExecutables(GameCalculations):
             if b["hp"] <= 0:
                 self._kill(b, "damage")
             elif last_hit:
-                chance = cfg.last_hit_base + cfg.last_hit_scale * (1 - b["hp"] / b["hp_max"])
+                chance = self.weights("last_hit_base") + self.weights("last_hit_scale") * (1 - b["hp"] / b["hp_max"])
                 if self.is_final_bonus_spin():
-                    chance *= cfg.last_hit_final_spin_mult
+                    chance *= self.weights("last_hit_final_spin_mult")
                 if random.random() < chance:
                     self._kill(b, "lastHit")
             self._boss_drop(b)
         boss_state_event(self)
 
     def _boss_drop(self, b) -> None:
-        if random.random() >= self.config.boss_drop_chance:
+        if random.random() >= self.weights("boss_drop_chance"):
             return
-        kind = get_random_outcome(self.config.boss_drop_weights)
+        kind = get_random_outcome(self.weights("boss_drop_weights"))
         if kind == "power":
             p = self.pick_power()
             if p is not None:
@@ -181,7 +181,7 @@ class GameExecutables(GameCalculations):
     # =========================================================================
     def pick_power(self):
         """Random power whose reserve is below the cap (None if all are full)."""
-        open_ = {p: w for p, w in self.config.power_pick_weights.items()
+        open_ = {p: w for p, w in self.weights("power_pick_weights").items()
                  if self.reserve[p] < self.config.power_reserve_cap}
         return get_random_outcome(open_) if open_ else None
 
@@ -193,7 +193,7 @@ class GameExecutables(GameCalculations):
         if not names:
             return
         name = random.choice(names)
-        f = get_random_outcome(self.config.enhance_factor_weights)
+        f = get_random_outcome(self.weights("enhance_factor_weights"))
         cells = [(c, r) for c, r in self.all_cells() if self.board[c][r].name == name]
         for c, r in cells:
             self.enhance[c][r] += f
@@ -205,7 +205,7 @@ class GameExecutables(GameCalculations):
         if not names:
             return
         name = random.choice(names)
-        target = get_random_outcome(self.config.upgrade_target_weights)
+        target = get_random_outcome(self.weights("upgrade_target_weights"))
         cells = [(c, r) for c, r in self.all_cells() if self.board[c][r].name == name]
         for c, r in cells:
             self.board[c][r] = self.make_symbol(target)  # Enhance stays with the cell
@@ -215,7 +215,7 @@ class GameExecutables(GameCalculations):
         cand = [(c, r) for c, r in self.all_cells()
                 if not self.is_wild(self.board[c][r]) and not self.is_weapon(self.board[c][r])
                 and (self.in_bonus or not self.is_scatter(self.board[c][r]))]
-        n = min(len(cand), random.randint(*self.config.transform_count_range))
+        n = min(len(cand), random.randint(*self.weights("transform_count_range")))
         cells = random.sample(cand, n)
         for c, r in cells:
             self.board[c][r] = self.make_symbol("W")
@@ -264,8 +264,9 @@ class GameExecutables(GameCalculations):
     # Wild events (step 4)
     # =========================================================================
     def weights(self, name: str) -> dict:
-        """Weight table `name`, overridden per Bonus tier (and for the Treasure hunt
-        feature spin, key "treasure_hunt") by config.tier_weights."""
+        """Tunable config value `name` (weight table or scalar), overridden per Bonus
+        tier (and for the Treasure hunt feature spin, key "treasure_hunt") by
+        config.tier_weights."""
         key = self.bonus_tier if self.in_bonus else ("treasure_hunt" if self.treasure_hunt else None)
         table = self.config.tier_weights.get(key, {}).get(name) if key else None
         return table if table is not None else getattr(self.config, name)
@@ -290,11 +291,11 @@ class GameExecutables(GameCalculations):
         connected = {(p["reel"], p["row"]) for w in wins for p in w["positions"]
                      if self.is_wild(self.board[p["reel"]][p["row"]])}
         acted = False
-        chance = 1.0 if (self.heroic or getattr(self, "force_wincap", False)) else self.config.wild_event_chance
+        chance = 1.0 if (self.heroic or getattr(self, "force_wincap", False)) else self.weights("wild_event_chance")
         for cell in [x for x in self.all_cells() if x in connected]:
             if random.random() >= chance:
                 continue
-            weights = dict(self.config.wild_event_weights)
+            weights = dict(self.weights("wild_event_weights"))
             if getattr(self, "force_wincap", False):
                 weights = {"coin": 1}
             if self.pick_power() is None:
@@ -303,7 +304,7 @@ class GameExecutables(GameCalculations):
             acted = True
             c, r = cell
             if kind == "multiplier":
-                f = get_random_outcome(self.config.wild_mult_weights)
+                f = get_random_outcome(self.weights("wild_mult_weights"))
                 self.wild_mult[cell] = f
                 emit(self, "wildEvent", event="multiplier", position=pos(self, c, r), factor=f)
             elif kind == "coin":
@@ -430,7 +431,7 @@ class GameExecutables(GameCalculations):
         return []
 
     def arrow_damage(self, b) -> int:
-        k = random.choice(self.config.arrow_k_choices)
+        k = random.choice(self.weights("arrow_k_choices"))
         dmg = self.config.arrow_base + b["hp_max"] * k
         if self.stage == ENDLESS:
             dmg /= self.config.arrow_endless_divisor
@@ -494,13 +495,13 @@ class GameExecutables(GameCalculations):
         tier = b["chest"]
         upgraded = None
         order = cfg.chest_order
-        if random.random() < cfg.chest_upgrade_chance and order.index(tier) < len(order) - 1:
+        if random.random() < self.weights("chest_upgrade_chance") and order.index(tier) < len(order) - 1:
             upgraded = random.choice(order[order.index(tier) + 1:])
             tier = upgraded
-        n = get_random_outcome(cfg.chest_gift_count_weights[tier])
+        n = get_random_outcome(self.weights("chest_gift_count_weights")[tier])
         kinds = []
         for _ in range(n):
-            if self.in_bonus and random.random() < cfg.chest_gift_power_chance[tier]:
+            if self.in_bonus and random.random() < self.weights("chest_gift_power_chance")[tier]:
                 kinds.append("power")
             else:
                 kinds.append("coin")
