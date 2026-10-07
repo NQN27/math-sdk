@@ -168,7 +168,19 @@ Treasure chặng 3, cộng phần trả bù). p60–75 nhận 859x, p75–90 nh�
     chặng 5/Endless trả tối thiểu 600x, làm vỡ yêu cầu 60% phiên ≤ 746x. Designer cần chọn ưu tiên, hoặc nới một số cố định
     (xu tối thiểu chặng 5/Endless trong Epic, HP boss Epic, hay bảo đảm 2 vũ khí).
 
-**Phase 4: base / ante / Feature, optimizer (p3)**
+**Thử nới số cố định cho Epic** (10.000 phiên, chỉ thử nghiệm; override trong `_scratch/ov/x_mid*.json`):
+
+| Phương án (từ p3) | Mean | p60 | p75 | Dòng + xu Wild | Clear/phiên | Spin không kết nối |
+|---|---|---|---|---|---|---|
+| p3 | 1.494 | 660 | 1.081 | 3,0% | 1,18 | 43% |
+| shape trung gian (nhiều kết nối hơn) | 1.771 | 803 ✗ | 1.368 ✗ | 3,1% | 1,33 | 34% |
+| + xu tối thiểu chặng 5/Endless 20x thành 5x | 1.586 | 801 ✗ | 1.356 ✗ | 3,4% | 1,33 | 34% |
+| + Epic bảo đảm 1 vũ khí (thay 2) | 1.168 | 600 | 644 ✗ | 3,2% | 0,77 | 39% |
+
+- Tỷ trọng dòng + xu Wild ở Epic **kẹt quanh 3%** trong mọi phương án: paytable cố định nên mỗi phiên chỉ nhận vài chục x từ
+  dòng, so với mean 1.492x. p0 đạt 11,8% vì dòng được nhân lớn (Global, Enhance, hệ số Wild) và Epic đi sâu hơn (2,4 clear).
+  Muốn tăng tỷ trọng này thì phải tăng hệ số nhân dòng ở Epic, và tiền đó phải lấy bớt từ đuôi Treasure/Golden.
+- Nới xu tối thiểu chỉ hạ mean, không cứu được p60. Bớt vũ khí làm Epic chậm hẳn (0,77 clear), 73% phiên phải trả bù.
 - Bonus: tăng đuôi xu ≥ 100x thêm 25% để mean 86,9 thành 88,3 (phân vị giữ nguyên), kéo buy3 thô lên khoảng 96,1%.
 - Feature (20.000 phiên mỗi loại): Heroic 683,2 (median 117,5, Max Win 3/20.000); Treasure hunt 274,0 (median 173, Max Win
   2/20.000). **p_heroic = 0,512** (`feature_heroic_chance` trong p3). `feature_maxwin_rate` trong config 3,5e-4 thành 2,0e-4.
