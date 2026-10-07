@@ -153,6 +153,18 @@ class GameState(GameStateOverride):
         if self.treasure_hunt:
             self.maybe_enter_bonus(cond)
 
+    def bonus_min_win_topup(self, tier: str) -> None:
+        """Designer 2026-10-08: a tier's Bonus pays at least bonus_min_total_win[tier]
+        (Epic 600x). The shortfall is paid at Bonus end as its own event."""
+        floor = self.config.bonus_min_total_win.get(tier, 0)
+        won = self.win_manager.freegame_wins
+        if not floor or self.wincap_triggered or won >= floor:
+            return
+        self.win_manager.reset_spin_win()
+        paid = self.award(floor - won)
+        emit(self, "bonusMinWin", tier=tier, floor=floor, topUp=round(paid, 2))
+        self.win_manager.update_gametype_wins(self.gametype)
+
     # ---------------------------------------------------------------------------
     def run_bonus(self, tier: str, trigger_cells=()) -> None:
         cfg = self.config
@@ -187,6 +199,7 @@ class GameState(GameStateOverride):
             self.play_one_spin(cfg.bonus_stage_reel[self.stage],
                                min_weapons=cfg.bonus_min_weapons.get(tier, 0))
             self.win_manager.update_gametype_wins(self.gametype)
+        self.bonus_min_win_topup(tier)
         emit(self, "bonusEnd", tier=tier, spins=spin_no,
              totalWin=round(self.win_manager.running_bet_win, 2))
         if not self.wincap_triggered:

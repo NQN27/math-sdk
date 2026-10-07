@@ -14,7 +14,26 @@ from optimization_program.optimization_config import (
 )
 
 TARGET = 0.967  # 96.7% RTP for every bet mode (designer, 2026-10-07)
-WINCAP_RTP = 0.001
+
+
+def wincap_rtp(cfg):
+    """RTP (fraction of cost) each mode spends on 25,000x wins, from the tier mix and
+    the per-tier Max Win rates (designer 2026-10-08). A flat 0.001 would let the
+    optimizer push Epic's Max Win rate far below its 1% target."""
+    cap = cfg.wincap
+    p_mix = {}
+    for mode, mix in cfg.tier_mix.items():
+        tot = sum(mix.values())
+        p_mix[mode] = sum(w / tot * cfg.tier_maxwin_rate[cfg.scatter_to_tier[n]] for n, w in mix.items())
+    cost = {bm.get_name(): bm.get_cost() for bm in cfg.bet_modes}
+    out = {
+        "buy3": p_mix["buy3"] * cap / cost["buy3"],
+        "buy4": p_mix["buy4"] * cap / cost["buy4"],
+        "base": p_mix["buy3"] * cap / 200 / cost["base"],    # Bonus 1 in 200 base spins
+        "ante": p_mix["buy3"] * cap / 40 / cost["ante"],     # Bonus 1 in 40 ante spins
+        "feature": cfg.feature_maxwin_rate * cap / cost["feature"],
+    }
+    return {k: round(v, 5) for k, v in out.items()}
 
 
 def _params(test_spins):
@@ -28,6 +47,8 @@ class OptimizationSetup:
     def __init__(self, game_config):
         self.game_config = game_config
         caps = {bm.get_name(): bm.get_wincap() for bm in game_config.bet_modes}
+        wc = wincap_rtp(game_config)
+        self.wincap_rtp = wc
         opt = {}
         # Proposal: Ante spin = 5x the rate of 3+ Scatter -> 1/5 of base's hit rate.
         # A triggered Bonus pays the buy3 tier mix mean (96.7x base bets). rtp is a
@@ -38,15 +59,16 @@ class OptimizationSetup:
         bonus_mean = 96.7
         for mode in ("base", "ante"):
             cost = {bm.get_name(): bm.get_cost() for bm in game_config.bet_modes}[mode]
-            bonus_rtp = round(bonus_mean / (bonus_hr[mode] * cost), 5)
+            # the Bonus share includes its Max Win part, which lives in the wincap fence
+            bonus_rtp = round(bonus_mean / (bonus_hr[mode] * cost) - wc[mode], 5)
             opt[mode] = {
                 "conditions": {
-                    "wincap": ConstructConditions(rtp=WINCAP_RTP, av_win=caps[mode],
+                    "wincap": ConstructConditions(rtp=wc[mode], av_win=caps[mode],
                                                   search_conditions=caps[mode]).return_dict(),
                     "0": ConstructConditions(rtp=0, av_win=0, search_conditions=0).return_dict(),
                     "freegame": ConstructConditions(rtp=bonus_rtp, hr=bonus_hr[mode],
                                                     search_conditions={"symbol": "scatter"}).return_dict(),
-                    "basegame": ConstructConditions(hr=3.5, rtp=TARGET - bonus_rtp - WINCAP_RTP).return_dict(),
+                    "basegame": ConstructConditions(hr=3.5, rtp=round(TARGET - bonus_rtp - wc[mode], 5)).return_dict(),
                 },
                 "scaling": ConstructScaling([]).return_dict(),
                 "parameters": _params([50, 100, 200]),
@@ -55,10 +77,10 @@ class OptimizationSetup:
             }
         opt["feature"] = {
             "conditions": {
-                "wincap": ConstructConditions(rtp=WINCAP_RTP, av_win=caps["feature"],
+                "wincap": ConstructConditions(rtp=wc["feature"], av_win=caps["feature"],
                                               search_conditions=caps["feature"]).return_dict(),
                 "0": ConstructConditions(rtp=0, av_win=0, search_conditions=0).return_dict(),
-                "basegame": ConstructConditions(rtp=TARGET - WINCAP_RTP, hr="x").return_dict(),
+                "basegame": ConstructConditions(rtp=round(TARGET - wc["feature"], 5), hr="x").return_dict(),
             },
             "scaling": ConstructScaling([]).return_dict(),
             "parameters": _params([10, 20, 50]),
@@ -68,9 +90,9 @@ class OptimizationSetup:
         for mode in ("buy3", "buy4"):
             opt[mode] = {
                 "conditions": {
-                    "wincap": ConstructConditions(rtp=WINCAP_RTP, av_win=caps[mode],
+                    "wincap": ConstructConditions(rtp=wc[mode], av_win=caps[mode],
                                                   search_conditions=caps[mode]).return_dict(),
-                    "freegame": ConstructConditions(rtp=TARGET - WINCAP_RTP, hr="x").return_dict(),
+                    "freegame": ConstructConditions(rtp=round(TARGET - wc[mode], 5), hr="x").return_dict(),
                 },
                 "scaling": ConstructScaling([]).return_dict(),
                 "parameters": _params([10, 20, 50]),

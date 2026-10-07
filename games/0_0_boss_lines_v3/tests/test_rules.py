@@ -454,3 +454,54 @@ def test_award_caps_at_wincap(gs, cfg):
     paid = gs.award(500)
     assert paid == pytest.approx(10) and gs.wincap_triggered
     assert gs.win_manager.running_bet_win == pytest.approx(cfg.wincap)
+
+
+# ---- Treasure hunt coin minimum (designer 2026-10-08: coins >= 1x) -------------
+def test_treasure_hunt_min_coin_only_outside_bonus(gs, cfg):
+    gs.treasure_hunt = True
+    gs.stage = None
+    assert gs.current_min_coin() == cfg.treasure_hunt_min_coin == 1
+    gs.in_bonus, gs.stage = True, 5  # a Bonus entered from Treasure hunt keeps stage minimums
+    assert gs.current_min_coin() == cfg.stage_min_coin[5]
+
+
+def test_treasure_hunt_spin_coins_at_least_1x(gs, cfg):
+    saved = cfg.feature_heroic_chance
+    cfg.feature_heroic_chance = 0.0
+    try:
+        gs.betmode, gs.criteria = "feature", "basegame"
+        seen = 0
+        for i in range(30):
+            random.seed(100 + i)
+            gs.reset_book()
+            gs.run_feature_spin(gs.get_current_distribution_conditions())
+            for e in gs.book.events:
+                if e["type"] == "bonusStart":
+                    break
+                if e["type"] == "treasureSymbols":
+                    for c in e["cells"]:
+                        if c["kind"] in ("coin", "star"):
+                            assert c["value"] >= 1
+                            seen += 1
+        assert seen > 0
+    finally:
+        cfg.feature_heroic_chance = saved
+
+
+def test_bonus_min_total_win_topup(gs, cfg):
+    saved = dict(cfg.bonus_min_total_win)
+    cfg.bonus_min_total_win["bonus"] = 5000.0
+    try:
+        gs.betmode, gs.criteria = "buy3", "freegame"
+        for i in range(5):
+            random.seed(200 + i)
+            gs.reset_book()
+            gs.run_bonus("bonus", {(0, 0), (1, 0), (2, 0)})
+            top = [e for e in gs.book.events if e["type"] == "bonusMinWin"]
+            won = gs.win_manager.freegame_wins
+            assert gs.wincap_triggered or won >= 5000.0 - 1e-9
+            if top:  # topped up exactly to the floor
+                assert won == pytest.approx(5000.0) and top[0]["topUp"] > 0
+    finally:
+        cfg.bonus_min_total_win.clear()
+        cfg.bonus_min_total_win.update(saved)

@@ -75,6 +75,8 @@ def main():
     base = os.path.join(H.HERE, "results", f"{tag}_{mode}_{time.strftime('%Y%m%d_%H%M%S')}")
     with open(base + ".csv", "w") as f:
         f.write("\n".join(f"{r['win']:.2f}" for r in rows))
+    with open(base + "_tiers.csv", "w") as f:  # Bonus tier this spin would trigger ("-" = none)
+        f.write("\n".join(r["tier"] or "-" for r in rows))
     json.dump(s, open(base + ".json", "w"), indent=1)
     print(f"[{tag}] {mode} n={N} base mean={s['mean_base_win']:.4f} (no-trigger spins {s['mean_base_win_no_trigger']:.4f}) "
           f"median={s['median']:.2f} sd={s['sd']:.2f} hit={100 * s['hit_rate']:.1f}% "

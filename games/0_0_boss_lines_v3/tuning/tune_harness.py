@@ -77,11 +77,56 @@ def _one(gs, cfg, tier, i):
     gs.run_bonus(tier, trigger)
 
 
+def _diag_new():
+    return {"conn_hist": {}, "conn_zero": {}, "spins": 0, "zero_spins": 0, "zero_streak_hist": {},
+            "stage_clears_hist": {}, "treasure_kinds": {}, "clover_factor": {}, "golden_factor": {},
+            "global_factor": {}, "treasure_paid": [], "topups": 0, "topup_paid": 0.0}
+
+
+def _bump(d, k, v=1):
+    d[str(k)] = d.get(str(k), 0) + v
+
+
+def _diag_session(diag, ev):
+    """Per-spin connection counts, dead spins, stage clears, Treasure symbol mix."""
+    conn, clears, streak, worst = 0, 0, 0, 0
+    for e in ev:
+        t = e["type"]
+        if t == "destroy" and e.get("cause") == "connect":
+            conn += 1
+        elif t == "spinEnd":
+            diag["spins"] += 1
+            _bump(diag["conn_hist"], conn)
+            zero = e["spinWin"] == 0
+            if zero:
+                diag["zero_spins"] += 1
+                _bump(diag["conn_zero"], conn)
+                streak += 1
+                worst = max(worst, streak)
+            else:
+                streak = 0
+            clears += bool(e["stageCleared"])
+            conn = 0
+        elif t == "treasureSymbols":
+            for c in e["cells"]:
+                _bump(diag["treasure_kinds"], c["kind"])
+                if c["kind"] in ("clover", "golden", "global"):
+                    _bump(diag[c["kind"] + "_factor"], c["value"])
+        elif t == "treasureEnd":
+            diag["treasure_paid"].append(e["paid"])
+        elif t == "bonusMinWin":
+            diag["topups"] += 1
+            diag["topup_paid"] += e["topUp"]
+    _bump(diag["stage_clears_hist"], clears)
+    _bump(diag["zero_streak_hist"], worst)
+
+
 def worker(args):
     tier, start, n, overrides = args
     overrides = json.loads(json.dumps(overrides))
     gs, cfg = _setup(overrides)
     out = []
+    diag = _diag_new()
     for i in range(start, start + n):
         _one(gs, cfg, tier, i)
         ev = gs.book.events
@@ -105,7 +150,28 @@ def worker(args):
         src["treasure"] = max(0.0, gs.win_manager.running_bet_win - src["lines"] - src["wildcoin"] - src["chest"])
         out.append({"win": gs.win_manager.running_bet_win, "maxwin": gs.wincap_triggered,
                     "src": src, "stage": stage, "spins": spins, "treasures": treasures})
-    return out
+        _diag_session(diag, ev)
+    return out, diag
+
+
+def _diag_merge(parts):
+    tot = _diag_new()
+    for d in parts:
+        for k, v in d.items():
+            if isinstance(v, dict):
+                for kk, vv in v.items():
+                    tot[k][kk] = tot[k].get(kk, 0) + vv
+            elif isinstance(v, list):
+                tot[k].extend(v)
+            else:
+                tot[k] += v
+    tp = tot.pop("treasure_paid")
+    tot["treasure_count"] = len(tp)
+    tot["treasure_paid_mean"] = sum(tp) / len(tp) if tp else 0.0
+    for k in ("conn_hist", "conn_zero", "zero_streak_hist", "stage_clears_hist", "clover_factor",
+              "golden_factor", "global_factor"):
+        tot[k] = dict(sorted(tot[k].items(), key=lambda kv: float(kv[0])))
+    return tot
 
 
 def main():
@@ -117,7 +183,8 @@ def main():
     t0 = time.time()
     with Pool(procs) as pool:
         parts = pool.map(worker, [(tier, k * chunk, chunk, overrides) for k in range(procs)])
-    rows = [r for p in parts for r in p]
+    rows = [r for p, _ in parts for r in p]
+    diag = _diag_merge([d for _, d in parts])
     wins = sorted(r["win"] for r in rows)
     N = len(wins)
 
@@ -139,6 +206,7 @@ def main():
         "spins_mean": statistics.mean(r["spins"] for r in rows),
         "treasures_mean": statistics.mean(r["treasures"] for r in rows),
         "seconds": round(time.time() - t0, 1),
+        "diag": diag,
     }
     os.makedirs(os.path.join(HERE, "results"), exist_ok=True)
     stamp = time.strftime("%Y%m%d_%H%M%S")

@@ -7,6 +7,49 @@
 
 ---
 
+## 0. Spec phân bố mới (designer, 2026-10-08) và Phase 0
+
+**Yêu cầu** (m = mean mục tiêu của tier; cách hiểu đã chốt với designer):
+- Giá trị **p5…p60 nằm trong [0,1 m; 0,5 m]**, **p60…p75 nằm trong [0,5 m; 0,9 m]**, áp dụng cho Bonus/Super/Epic.
+- Bonus: giảm median.
+- Epic: **mọi phiên ≥ 600x** (luật trả bù cuối Bonus, `bonus_min_total_win = {"epic": 600}`, event
+  `bonusMinWin`), **Max Win ≥ 1%** phiên Epic, giảm median, tăng mạnh từ p95 trở lên.
+- Super: **Max Win 0,1%** phiên.
+- Tăng tiền từ **dòng** và **xu Wild**. Số kết nối mỗi spin phân bố kiểu log: chuỗi dài càng hiếm, nhiều kết nối nhỏ
+  trả ít nhưng liên tục.
+- Clear chặng nhiều hơn, Treasure trả ít hơn, Clover ra ít hơn nhưng hệ số > 2x nhiều hơn.
+- Không giới hạn riêng hệ số Clover/Global… của Epic.
+- Chỉ số mới: RTP của 5/20/100/1000 phiên ngẫu nhiên, lặp 100 lần, lấy trung vị, tính theo từng tier
+  (giá quy đổi = m / 0,967) và theo từng mode mua.
+- Treasure hunt: xu ≥ 1x (đã đúng; sửa thêm lỗi: Bonus vào từ Treasure hunt từng dùng xu tối thiểu 1x thay vì theo chặng).
+
+**Phase 0 (đo và sửa cấu trúc, chưa chỉnh weight):**
+- `tuning/spec_check.py TAG`: chấm PASS/FAIL từng yêu cầu, in nguồn tiền, số clear chặng, Clover, phân bố số kết nối,
+  spin trắng, trả bù, và RTP lấy mẫu.
+- Optimizer: ngân sách Max Win theo từng mode tính từ `tier_mix` × `tier_maxwin_rate` (Super 0,1%, Epic 1%):
+  buy3 1,308% · buy4 11,333% · base 0,654% · ante 1,09% · Feature 1,75% (tạm, đo từ b6). Mức cũ cố định 0,1% sẽ làm
+  optimizer kéo Max Win của Epic xuống.
+
+**Baseline p0** (= b6 + sàn 600x Epic; Bonus 20.000, Super 50.000, Epic 10.000 phiên), `tuning/results/p0_*`:
+
+| | Bonus | Super | Epic |
+|---|---|---|---|
+| Mean (mục tiêu) | 93,2 (88,9) | 259,9 (240) | 1.654,5 (1.492,5) |
+| p5 / p60 / p75 (giới hạn) | 3,3 / 68,7 / 101,8 (≥ 8,9 / ≤ 44,5 / 44,5–80) | 6,3 / 150,9 / 240,9 (≥ 24 / ≤ 120 / 120–216) | 600 / 1.902 / 2.256 (≥ 600 / ≤ 746 / 746–1.343) |
+| Max Win (mục tiêu) | 0,01% | 0,004% (0,1%) | 0,11% (≥ 1%) |
+| Dòng + xu Wild / rương / Treasure (% mean) | 18,1 / 29,3 / 52,6 | 13,8 / 30,8 / 55,4 | 11,9 / 35,1 / 53,1 |
+| Clear chặng / phiên | 0,58 | 1,00 | 2,41 |
+| Clover: % ký hiệu Treasure, % hệ số > 2 | 1,96%, 19,9% | 1,10%, 19,9% | 0,10%, 10,1% |
+| Spin trắng | 28,0% | 22,1% | 9,4% |
+| Trả bù 600x | | | 18,7% phiên, 37,6x/phiên |
+
+- Số kết nối mỗi spin đã giảm dần theo độ dài (Bonus: 0: 28,8% · 1: 32,5% · 2: 19,1% · 3: 10,0% · 4: 5,0% …),
+  spin trắng chỉ xảy ra khi không có kết nối nào.
+- Bỏ giới hạn hệ số của Epic (p0u): 1.654,5 thành 1.647,5, không đáng kể vì Treasure Epic ra xu 98,8%.
+- RTP lấy mẫu (trung vị 100 lần): xem `tuning/results/p0_speccheck.json`.
+
+---
+
 ## 1. Mục tiêu (designer, 2026-10-07)
 
 | Mục | Giá trị |

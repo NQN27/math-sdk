@@ -227,6 +227,14 @@ class GameConfig(Config):
             "epic": {"spins": 8, "start_stage": 3},
         }
         self.scatter_to_tier = {3: "bonus", 4: "super", 5: "epic"}
+        # Scatter-count mix (%) of a forced Bonus: buy3 (also base/ante freegame fence) and buy4.
+        self.tier_mix = {"buy3": {3: 95.67, 4: 4.23, 5: 0.1}, "buy4": {4: 96, 5: 4}}
+        # Max Win (25,000x) rate per tier session (designer 2026-10-08: Super 0.1%, Epic >= 1%).
+        # Bonus has no target; 0 here. Feature: placeholder from b6 measurement (~3.5e-4).
+        self.tier_maxwin_rate = {"bonus": 0.0, "super": 0.001, "epic": 0.01}
+        self.feature_maxwin_rate = 3.5e-4
+        # Designer 2026-10-08: minimum total Bonus win per tier, topped up at Bonus end.
+        self.bonus_min_total_win = {"epic": 600.0}
         # Weapons guaranteed on each free spin's opening board (designer 2026-10-07;
         # was 3 Wild-or-weapon for both, which drove Super to ~1068x vs 240x).
         self.bonus_min_weapons = {"super": 1, "epic": 2}
@@ -272,7 +280,7 @@ class GameConfig(Config):
                                  conditions=cond(reel, force_wincap=True)),
                     Distribution(criteria="freegame", quota=0.1,
                                  conditions=cond(reel, force_freegame=True,
-                                                 scatter_triggers={3: 95.67, 4: 4.23, 5: 0.1})),
+                                                 scatter_triggers=dict(self.tier_mix["buy3"]))),
                     Distribution(criteria="0", quota=0.4, win_criteria=0.0, conditions=cond(reel)),
                     Distribution(criteria="basegame", quota=0.5, conditions=cond(reel)),
                 ],
@@ -290,7 +298,7 @@ class GameConfig(Config):
         # Tier means (designer 2026-10-07): Bonus 88.9x, Super 240x, Epic 1492.5x. Mix derived for 96.7% RTP:
         # buy3 = Bonus 95.67 / Super 4.23 / Epic 0.1 (= 96.70x), buy4 = Super 96 / Epic 4 (= 290.1x).
         self.tier_mean_targets = {"bonus": 88.9, "super": 240.0, "epic": 1492.5}
-        for name, cost, triggers in (("buy3", 100.0, {3: 95.67, 4: 4.23, 5: 0.1}), ("buy4", 300.0, {4: 96, 5: 4})):
+        for name, cost, triggers in (("buy3", 100.0, self.tier_mix["buy3"]), ("buy4", 300.0, self.tier_mix["buy4"])):
             self.bet_modes.append(BetMode(
                 name=name, cost=cost, rtp=self.rtp, max_win=maxwin,
                 auto_close_disabled=False, is_feature=False, is_buybonus=True,

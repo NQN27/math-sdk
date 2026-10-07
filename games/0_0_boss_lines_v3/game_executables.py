@@ -282,7 +282,7 @@ class GameExecutables(GameCalculations):
         return get_random_outcome(pool)
 
     def current_min_coin(self) -> float:
-        if self.treasure_hunt:
+        if self.treasure_hunt and not self.in_bonus:  # a Bonus entered from Treasure hunt uses stage minimums
             return self.config.treasure_hunt_min_coin
         return self.config.stage_min_coin.get(self.stage, 0.2)
 
