@@ -342,18 +342,18 @@
    }
   },
   "epic": {
-   "wild_event_chance": 0.35,
+   "wild_event_chance": 0.6,
    "wild_event_weights": {
-    "multiplier": 50,
-    "coin": 50,
-    "power": 0
+    "multiplier": 40,
+    "coin": 40,
+    "power": 20
    },
    "enhance_factor_weights": {
-    "2": 60,
+    "2": 30,
     "3": 25,
-    "4": 10,
-    "5": 4,
-    "10": 1
+    "4": 20,
+    "5": 15,
+    "10": 10
    },
    "wild_mult_weights": {
     "2": 70,
@@ -402,10 +402,10 @@
     }
    },
    "chest_gift_power_chance": {
-    "dong": 0.01,
-    "bac": 0.02,
-    "vang": 0.03,
-    "kimcuong": 0.04
+    "dong": 0.1,
+    "bac": 0.2,
+    "vang": 0.3,
+    "kimcuong": 0.4
    },
    "coin_value_weights": {
     "0.2": 0,
@@ -436,11 +436,18 @@
    "treasure_kind_weights": {
     "coin": 98,
     "magnet": 0.1,
-    "clover": 0.2,
-    "golden": 0.27,
+    "clover": 0.08,
+    "golden": 0.31,
     "star": 0.05,
     "global": 0.1,
     "scatter": 1
+   },
+   "power_pick_weights": {
+    "enhance": 1,
+    "upgrade": 0,
+    "transform": 0,
+    "replace": 0,
+    "destroy": 0
    }
   },
   "super": {

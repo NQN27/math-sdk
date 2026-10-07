@@ -61,6 +61,32 @@ def fmt_rtp(r):
     return "  ".join(f"N={n}: {100 * m:6.1f}% (p10 {100 * lo:5.1f}, p90 {100 * hi:6.1f})" for n, (m, lo, hi) in r.items())
 
 
+def side_metrics(js, n):
+    """Designer's direction asks (2026-10-08), measurable per run."""
+    src = js["source_mean"]
+    tot = sum(src.values()) or 1
+    d = js.get("diag") or {}
+    if not d:
+        return None
+    tk = d["treasure_kinds"]
+    tks = sum(tk.values()) or 1
+    clov = d["clover_factor"]
+    cl_n = sum(clov.values()) or 1
+    return {
+        "lines+wildcoin %": 100 * (src["lines"] + src["wildcoin"]) / tot,
+        "stage clears/session": sum(float(k) * v for k, v in d["stage_clears_hist"].items()) / n,
+        "Clover % of Treasure symbols": 100 * tk.get("clover", 0) / tks,
+        "Clover factor > 2 %": 100 * sum(v for k, v in clov.items() if float(k) > 2) / cl_n,
+        "spins with 0 connections %": 100 * d["conn_hist"].get("0", 0) / (d["spins"] or 1),
+        "Treasure paid per Treasure": d["treasure_paid_mean"],
+    }
+
+
+# direction each side metric should move vs the p0 baseline (+1 up, -1 down)
+SIDE_DIR = {"lines+wildcoin %": 1, "stage clears/session": 1, "Clover % of Treasure symbols": -1,
+            "Clover factor > 2 %": 1, "spins with 0 connections %": -1, "Treasure paid per Treasure": -1}
+
+
 def rule_checks(ov):
     """Proposal rules the weights must respect (Kịch bản 1, chests):
     Đồng >= 1 gift, Bạc >= 2 gifts, Vàng/Kim cương exactly 3 gifts; the higher
@@ -156,6 +182,15 @@ def main():
                           f"{d['topup_paid'] / n:.1f}x per session")
                 rep.update(source_share=share, mean_clears=mean_clears, clover_share=tk.get("clover", 0) / tks,
                            diag=d)
+                _, bj = newest("p0", tier)
+                cur = side_metrics(js, n)
+                base = side_metrics(bj, bj["n"]) if bj else None
+                if cur and base:
+                    print("   vs p0 (designer's direction asks):")
+                    for k, sgn in SIDE_DIR.items():
+                        ok = (cur[k] - base[k]) * sgn > 0
+                        print(f"   {mark(ok)}  {k:30s} {base[k]:8.2f} -> {cur[k]:8.2f} (want {'up' if sgn > 0 else 'down'})")
+                    rep["side_vs_p0"] = {k: [base[k], cur[k]] for k in SIDE_DIR}
         report["tiers"][tier] = rep
 
     # ---- RTP of N random sessions (median of `reps` repeats) ----

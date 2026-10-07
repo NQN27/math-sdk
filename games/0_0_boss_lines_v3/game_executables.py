@@ -182,7 +182,7 @@ class GameExecutables(GameCalculations):
     def pick_power(self):
         """Random power whose reserve is below the cap (None if all are full)."""
         open_ = {p: w for p, w in self.weights("power_pick_weights").items()
-                 if self.reserve[p] < self.config.power_reserve_cap}
+                 if w > 0 and self.reserve[p] < self.config.power_reserve_cap}
         return get_random_outcome(open_) if open_ else None
 
     def _basic_names_on_board(self):
