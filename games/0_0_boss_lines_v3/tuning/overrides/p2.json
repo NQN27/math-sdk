@@ -138,7 +138,7 @@
    "weapon": 1.8
   },
   "SUP_S2": {
-   "wild": 2.1,
+   "wild": 1.9,
    "weapon": 0.1,
    "shape": {
     "L1": 70,
@@ -339,7 +339,7 @@
     "coin": 92,
     "magnet": 0.15,
     "clover": 0.3,
-    "golden": 0.14,
+    "golden": 0.12,
     "star": 0.1,
     "global": 0.25,
     "scatter": 1
@@ -394,8 +394,8 @@
      "2": 10
     },
     "bac": {
-     "1": 60,
-     "2": 40
+     "2": 95,
+     "3": 5
     },
     "vang": {
      "3": 1
@@ -430,10 +430,10 @@
     0.5
    ],
    "chest_gift_power_chance": {
-    "dong": 0.05,
+    "dong": 0.03,
     "bac": 0.05,
-    "vang": 0.05,
-    "kimcuong": 0.05
+    "vang": 0.08,
+    "kimcuong": 0.12
    }
   },
   "treasure_hunt": {

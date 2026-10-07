@@ -61,6 +61,28 @@ def fmt_rtp(r):
     return "  ".join(f"N={n}: {100 * m:6.1f}% (p10 {100 * lo:5.1f}, p90 {100 * hi:6.1f})" for n, (m, lo, hi) in r.items())
 
 
+def rule_checks(ov):
+    """Proposal rules the weights must respect (Kịch bản 1, chests):
+    Đồng >= 1 gift, Bạc >= 2 gifts, Vàng/Kim cương exactly 3 gifts; the higher
+    the chest, the LOWER the chance a gift is a coin (power chance strictly up)."""
+    sys.path[:0] = [os.path.dirname(HERE), os.path.dirname(os.path.dirname(os.path.dirname(HERE)))]
+    from game_config import GameConfig
+    cfg = GameConfig()
+    out = []
+    tables = {"(default)": {}} | {k: v for k, v in (ov or {}).get("tier_weights", {}).items()}
+    for who, tw in tables.items():
+        counts = tw.get("chest_gift_count_weights") or ov.get("chest_gift_count_weights") or cfg.chest_gift_count_weights
+        powc = tw.get("chest_gift_power_chance") or ov.get("chest_gift_power_chance") or cfg.chest_gift_power_chance
+        mins = {"dong": 1, "bac": 2, "vang": 3, "kimcuong": 3}
+        for tier, lo in mins.items():
+            ks = [int(float(k)) for k, w in counts[tier].items() if w > 0]
+            ok = min(ks) >= lo and max(ks) <= 3 and (tier not in ("vang", "kimcuong") or ks == [3])
+            out.append((f"{who} {tier} gifts", ok, f"{sorted(ks)} (min {lo}, max 3)"))
+        seq = [powc[k] for k in ("dong", "bac", "vang", "kimcuong")]
+        out.append((f"{who} power chance rises with chest", all(x < y for x, y in zip(seq, seq[1:])), str(seq)))
+    return out
+
+
 def main():
     tag = sys.argv[1]
     reps = int(sys.argv[sys.argv.index("--reps") + 1]) if "--reps" in sys.argv else 100
@@ -68,6 +90,12 @@ def main():
     report = {"tag": tag, "tiers": {}, "rtp_samples": {}}
     data = {}
     print(f"=== spec check: {tag} ===")
+    ov_path = os.path.join(HERE, "overrides", f"{tag}.json")
+    if os.path.exists(ov_path):
+        bad = [r for r in rule_checks(json.load(open(ov_path))) if not r[1]]
+        print("rules (chest gifts / coin chance by chest tier): " + ("PASS" if not bad else "FAIL"))
+        for name, ok, info in bad:
+            print(f"   FAIL  {name:40s} {info}")
     for tier, m in TIERS.items():
         ws, js = newest(tag, tier)
         if ws is None:
