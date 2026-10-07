@@ -92,9 +92,9 @@ def _segments(events):
     return out
 
 
-def _wild_weapon_count(reveal, cfg):
+def _wild_weapon_count(reveal, cfg, weapons_only=False):
     names = [s["name"] for col in reveal["board"] for s in col[1:-1]]  # strip padding rows
-    return sum(n == "W" or n in cfg.weapon_symbols for n in names)
+    return sum((n == "W" and not weapons_only) or n in cfg.weapon_symbols for n in names)
 
 
 @pytest.fixture
@@ -134,7 +134,7 @@ def test_mode_guarantees_and_bookkeeping(gs, tame, mode):
             reveal = seg["events"][0]
             tier, feat = seg["ctx"]["tier"], seg["ctx"]["feature"]
             if tier in ("super", "epic") and not seg["ctx"].get("opening", False):
-                assert _wild_weapon_count(reveal, cfg) >= cfg.super_min_wild_or_weapon
+                assert _wild_weapon_count(reveal, cfg, weapons_only=True) >= cfg.bonus_min_weapons[tier]
             if feat == "heroic" and tier is None:
                 assert _wild_weapon_count(reveal, cfg) >= cfg.heroic_min_wild_or_weapon
             opening = seg["ctx"].get("opening", False)

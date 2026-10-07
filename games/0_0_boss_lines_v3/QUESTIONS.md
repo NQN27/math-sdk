@@ -61,7 +61,9 @@ nguyên. Các cơ chế của v2 không có trong spec (HP người chơi, spin 
 ## B3. Quyết định ngày 2026-10-07 (sau lượt tune t3–t5)
 - **Bỏ hoàn toàn Hold and Spin** khỏi mọi mode. Lý do đo được: ở Epic, Hold and Spin giữ trung bình 27,8/30 ô,
   sàn Epic 4.678x (weight tối thiểu) so với mục tiêu 1.492,5x.
-- Super/Epic **bảo đảm 1 ô** Wild/vũ khí mỗi spin (spec cũ 3). Với 3 ô Super ≈ 1.068x, với 1 ô ≈ 297x (mục tiêu 240x).
+- Super/Epic bảo đảm **vũ khí** (không tính Wild) trên bảng đầu mỗi free spin: **Super 1 vũ khí, Epic 2 vũ khí**
+  (spec cũ: 3 ô Wild/vũ khí). Heroic giữ 5 ô Wild/vũ khí.
+- Weight được tách theo tier Bonus (`tier_weights`: xu, loại Treasure, hệ số Clover/Golden/Global). Chỉ là weight, không đổi luật.
 - Số đo: `_scratch/results/findings_20261007_t3-t6.md`.
 
 ## C. Còn mở

@@ -263,6 +263,14 @@ class GameExecutables(GameCalculations):
     # =========================================================================
     # Wild events (step 4)
     # =========================================================================
+    def weights(self, name: str) -> dict:
+        """Weight table `name`, overridden per Bonus tier by config.tier_weights."""
+        if self.in_bonus:
+            table = self.config.tier_weights.get(self.bonus_tier, {}).get(name)
+            if table is not None:
+                return table
+        return getattr(self.config, name)
+
     def draw_coin(self, min_value: float, min_tier: str = None) -> float:
         """Coin value >= min_value (and >= min_tier's lowest value)."""
         if getattr(self, "force_wincap", False):
@@ -271,7 +279,7 @@ class GameExecutables(GameCalculations):
             min_value = max(min_value, self.config.epic_min_coin)  # N6
         if min_tier is not None:
             min_value = max(min_value, self.config.coin_tiers[min_tier][0])
-        pool = {v: w for v, w in self.config.coin_value_weights.items() if v >= min_value}
+        pool = {v: w for v, w in self.weights("coin_value_weights").items() if v >= min_value}
         return get_random_outcome(pool)
 
     def current_min_coin(self) -> float:
@@ -541,11 +549,11 @@ class GameExecutables(GameCalculations):
         elif kind == "magnet":
             v = 0.0
         elif kind == "clover":
-            v = get_random_outcome(cfg.clover_factor_weights)
+            v = get_random_outcome(self.weights("clover_factor_weights"))
         elif kind == "golden":
-            v = get_random_outcome(cfg.golden_factor_weights)
+            v = get_random_outcome(self.weights("golden_factor_weights"))
         elif kind == "global":
-            v = get_random_outcome(cfg.global_factor_weights)
+            v = get_random_outcome(self.weights("global_factor_weights"))
         else:
             v = 0
         sym = self.make_symbol(names[kind])
@@ -592,7 +600,7 @@ class GameExecutables(GameCalculations):
             # (1)/(2) symbols appear on empty lit cells
             new = []
             for c, r in [x for x in cells if self.board[x[0]][x[1]] is None]:
-                weights = dict(cfg.treasure_kind_weights)
+                weights = dict(self.weights("treasure_kind_weights"))
                 if self.no_scatter_spin or (cfg.treasure_scatter_capped and not self.scatter_allowed(c, r)):
                     weights.pop("scatter", None)
                 if sum(1 for x in cells if kinds.get(x) == "coin") < cfg.magnet_min_coins:

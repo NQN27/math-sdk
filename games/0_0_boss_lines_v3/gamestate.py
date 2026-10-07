@@ -40,23 +40,34 @@ class GameState(GameStateOverride):
         raise NotImplementedError("Bonus runs from run_bonus(), not the SDK free-spin loop.")
 
     # ---------------------------------------------------------------------------
-    def _guarantee_wild_or_weapon(self, minimum: int) -> None:
-        have = sum(1 for c, r in self.all_cells()
-                   if self.is_wild(self.board[c][r]) or self.is_weapon(self.board[c][r]))
+    def _guarantee_wild_or_weapon(self, minimum: int, weapons_only: bool = False) -> None:
+        """Turn basic cells into Wild/weapons until the board has `minimum` of them.
+        weapons_only: only weapons count and are placed (Super/Epic, designer 2026-10-07)."""
+        def counts(s):
+            return self.is_weapon(s) or (not weapons_only and self.is_wild(s))
+        have = sum(1 for c, r in self.all_cells() if counts(self.board[c][r]))
         if have >= minimum:
             return
         cand = [(c, r) for c, r in self.all_cells() if self.is_basic(self.board[c][r])]
-        for c, r in random.sample(cand, min(len(cand), minimum - have)):
+        random.shuffle(cand)
+        for c, r in cand:
+            if have >= minimum:
+                break
             weights = {k: w for k, w in self.config.guarantee_symbol_weights.items()
-                       if k == "W" or self.weapon_allowed(k, c)}
+                       if (k == "W" and not weapons_only) or (k != "W" and self.weapon_allowed(k, c))}
+            if not weights:  # no weapon may appear here (e.g. Arrow over a dead boss's column)
+                continue
             self.board[c][r] = self.make_symbol(get_random_outcome(weights))
+            have += 1
 
-    def play_one_spin(self, reel, force_scatters=None, min_wild_weapon=0) -> None:
+    def play_one_spin(self, reel, force_scatters=None, min_wild_weapon=0, min_weapons=0) -> None:
         """Opening board -> steps (1)-(9) -> Treasure. (Hold and Spin removed by the designer 2026-10-07.)"""
         self.begin_spin()
         self.draw_board(reel, force_scatters)
         if min_wild_weapon:
             self._guarantee_wild_or_weapon(min_wild_weapon)
+        if min_weapons:
+            self._guarantee_wild_or_weapon(min_weapons, weapons_only=True)
         reveal_event(self)
         self.resolve_actions()
         if not self.wincap_triggered:
@@ -174,7 +185,7 @@ class GameState(GameStateOverride):
             emit(self, "freeSpinStart", spin=spin_no, freeSpinsLeft=self.free_spins_left,
                  stage=self.stage_label(), globalMult=self.global_factor())
             self.play_one_spin(cfg.bonus_stage_reel[self.stage],
-                               min_wild_weapon=cfg.super_min_wild_or_weapon if tier in ("super", "epic") else 0)
+                               min_weapons=cfg.bonus_min_weapons.get(tier, 0))
             self.win_manager.update_gametype_wins(self.gametype)
         emit(self, "bonusEnd", tier=tier, spins=spin_no,
              totalWin=round(self.win_manager.running_bet_win, 2))

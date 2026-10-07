@@ -213,6 +213,10 @@ class GameConfig(Config):
         self.treasure_skips_scatter_cells = True  # Q28 (answered) / N7
         self.epic_min_coin = 5  # N6: no Dong coins during Epic free spins
         self.epic_opening_treasure_stage = 2  # N5: Epic starts with a Treasure "as if stage 2 was cleared"
+        # Per-Bonus-tier replacements for the weight tables above (coin_value_weights,
+        # treasure_kind_weights, clover/golden/global_factor_weights), e.g.
+        # {"epic": {"treasure_kind_weights": {...}}}. Tuning only; no rule change.
+        self.tier_weights = {}
         self.win_levels = [(20, "nice"), (50, "big"), (100, "super"), (500, "mega"), (25000, "maxwin")]
 
         # ---- Bonus ------------------------------------------------------------------
@@ -222,10 +226,10 @@ class GameConfig(Config):
             "epic": {"spins": 8, "start_stage": 3},
         }
         self.scatter_to_tier = {3: "bonus", 4: "super", 5: "epic"}
-        # Super/Epic: Wild-or-weapon cells guaranteed on each free spin's opening board
-        # (spec said 3; designer 2026-10-07: 1, since 3 drove Super to ~1068x vs 240x).
-        self.super_min_wild_or_weapon = 1
-        # Which symbol fills a guaranteed Wild-or-weapon slot (Super/Epic/Heroic); placeholder.
+        # Weapons guaranteed on each free spin's opening board (designer 2026-10-07;
+        # was 3 Wild-or-weapon for both, which drove Super to ~1068x vs 240x).
+        self.bonus_min_weapons = {"super": 1, "epic": 2}
+        # Which symbol fills a guaranteed slot (Heroic: any; Super/Epic: weapons only); placeholder.
         self.guarantee_symbol_weights = {"W": 70, "AR": 10, "BM": 8, "SW": 8, "LT": 4}
         self.heroic_min_wild_or_weapon = 5
         self.base_global_into_bonus = False  # Q25
