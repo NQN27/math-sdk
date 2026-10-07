@@ -181,6 +181,27 @@ Treasure chặng 3, cộng phần trả bù). p60–75 nhận 859x, p75–90 nh�
   dòng, so với mean 1.492x. p0 đạt 11,8% vì dòng được nhân lớn (Global, Enhance, hệ số Wild) và Epic đi sâu hơn (2,4 clear).
   Muốn tăng tỷ trọng này thì phải tăng hệ số nhân dòng ở Epic, và tiền đó phải lấy bớt từ đuôi Treasure/Golden.
 - Nới xu tối thiểu chỉ hạ mean, không cứu được p60. Bớt vũ khí làm Epic chậm hẳn (0,77 clear), 73% phiên phải trả bù.
+
+**Phase 3c: Epic tăng hệ số nhân dòng (bản Epic hiện tại trong p3; 20.000 phiên)**
+- Đổi so với Phase 3b: Global trong Treasure .1 thành **.4** (bảng Global {2..10} như Bonus), **Golden .31 thành .03**, Enhance
+  {15:30, 20:25, 25:20, 50:25}, hệ số Wild {2:30, 3:25, 4:20, 5:15, 10:10}, xu **25000: 4,9e-3**. Hệ số nhân dòng lớn hơn,
+  tiền đuôi chuyển từ Golden sang Global/Max Win.
+- Kết quả: mean 1.503,3 (+0,7%), p60 713, p75 1.119, Max Win 1,10%, trả bù 53,3% phiên (117,5x/phiên).
+  **Dòng + xu Wild 3,0% thành 12,9%** (p0: 11,8%, đạt). Phát hiện ở bảng trên ("kẹt quanh 3%") chỉ đúng khi giữ hệ số nhân thấp.
+- Còn trượt 3 hướng yêu cầu: clear chặng 1,18 (p0 2,41), spin không kết nối 43% (p0 19%), Treasure trả mỗi lần 327 (p0 247).
+  Trong 327 có khoảng 130x là xu Maxwin (1,1% × 25.000 / 2,13 Treasure mỗi phiên); bỏ phần đó thì còn khoảng 197, thấp hơn p0.
+- Thử thêm kết nối chỉ ở chặng đầu của Epic (20.000 phiên):
+
+  | Phương án | Mean | p60 | Spin không kết nối | Dòng + xu Wild |
+  |---|---|---|---|---|
+  | p3 | 1.503 | 713 | 43% | 12,9% |
+  | `EPI_S3` shape trung gian | 1.644 | 783 ✗ | 37% | 13,1% |
+  | `EPI_S3` + `EPI_S4` shape trung gian | 1.805 | 863 ✗ | 35% | 14,3% |
+
+  Clear chặng 3 nhanh hơn kéo theo Treasure chặng 4 và rương Vàng (3 xu ≥ 20x), đẩy khoảng giữa lên. Vậy "ít spin
+  không kết nối" ở Epic xung đột trực tiếp với "60% phiên ≤ 746x". Cần designer chọn ưu tiên.
+
+**Phase 4: base / ante / Feature, optimizer (p3)**
 - Bonus: tăng đuôi xu ≥ 100x thêm 25% để mean 86,9 thành 88,3 (phân vị giữ nguyên), kéo buy3 thô lên khoảng 96,1%.
 - Feature (20.000 phiên mỗi loại): Heroic 683,2 (median 117,5, Max Win 3/20.000); Treasure hunt 274,0 (median 173, Max Win
   2/20.000). **p_heroic = 0,512** (`feature_heroic_chance` trong p3). `feature_maxwin_rate` trong config 3,5e-4 thành 2,0e-4.
