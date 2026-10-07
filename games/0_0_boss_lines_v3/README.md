@@ -43,6 +43,9 @@ Nguồn luật: `Proposal_KichBan1_2026-10-06.md`. Paylines và sơ đồ thứ 
 - Bonus tự kết thúc: mỗi spin Bonus cộng trung bình 0.34 spin (phải < 1).
 - `reject_wincap_outside_wincap_fence` đang tắt (bật sau lần tune đầu).
 
+## Tune
+Xem **`TUNING_NOTES.md`**: mục tiêu, trạng thái t17, phân bố, đòn bẩy, việc còn lại. Công cụ ở `tuning/`.
+
 ## Lệnh
 - Test: `python -m pytest tests -q` (61 test).
 - Sinh reel: `python gen_reels.py`.
