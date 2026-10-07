@@ -255,9 +255,15 @@ class GameConfig(Config):
         self.reject_wincap_outside_wincap_fence = False
 
         # ---- Reels ------------------------------------------------------------------
-        reel_files = ["BR0", "ANTE", "HERO", "BON_S1", "BON_S2", "BON_S3", "BON_S4", "BON_S5", "BON_E"]
+        reel_files = ["BR0", "ANTE", "HERO", "BON_S1", "BON_S2", "BON_S3", "BON_S4", "BON_S5", "BON_E",
+                      "SUP_S2", "SUP_S3", "SUP_S4", "SUP_S5", "SUP_E", "EPI_S3", "EPI_S4", "EPI_S5", "EPI_E"]
         self.reels = {name: self.read_reels_csv(os.path.join(self.reels_path, f"{name}.csv")) for name in reel_files}
         self.bonus_stage_reel = {1: "BON_S1", 2: "BON_S2", 3: "BON_S3", 4: "BON_S4", 5: "BON_S5", ENDLESS: "BON_E"}
+        # Super / Epic use their own stage reels (tuning only, 2026-10-08); Bonus uses bonus_stage_reel.
+        self.tier_stage_reel = {
+            "super": {2: "SUP_S2", 3: "SUP_S3", 4: "SUP_S4", 5: "SUP_S5", ENDLESS: "SUP_E"},
+            "epic": {3: "EPI_S3", 4: "EPI_S4", 5: "EPI_S5", ENDLESS: "EPI_E"},
+        }
         self.padding_reels[self.basegame_type] = self.reels["BR0"]
         self.padding_reels[self.freegame_type] = self.reels["BON_S1"]
         self.anticipation_triggers = {self.basegame_type: 2, self.freegame_type: 2}

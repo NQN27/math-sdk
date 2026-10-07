@@ -97,7 +97,7 @@ class GameState(GameStateOverride):
         does not apply here)."""
         self.win_manager.reset_spin_win()
         self.begin_spin()
-        self.draw_board(self.config.bonus_stage_reel[self.stage])
+        self.draw_board(self.stage_reel())
         reveal_event(self)
         self.epic_opening = True
         emit(self, "epicOpeningTreasure")
@@ -165,6 +165,10 @@ class GameState(GameStateOverride):
         emit(self, "bonusMinWin", tier=tier, floor=floor, topUp=round(paid, 2))
         self.win_manager.update_gametype_wins(self.gametype)
 
+    def stage_reel(self) -> str:
+        """Reel for the current Bonus stage: the tier's own reels if it has them."""
+        return self.config.tier_stage_reel.get(self.bonus_tier, {}).get(self.stage) or self.config.bonus_stage_reel[self.stage]
+
     # ---------------------------------------------------------------------------
     def run_bonus(self, tier: str, trigger_cells=()) -> None:
         cfg = self.config
@@ -196,7 +200,7 @@ class GameState(GameStateOverride):
                 self.spawn_stage(nxt)
             emit(self, "freeSpinStart", spin=spin_no, freeSpinsLeft=self.free_spins_left,
                  stage=self.stage_label(), globalMult=self.global_factor())
-            self.play_one_spin(cfg.bonus_stage_reel[self.stage],
+            self.play_one_spin(self.stage_reel(),
                                min_weapons=cfg.bonus_min_weapons.get(tier, 0))
             self.win_manager.update_gametype_wins(self.gametype)
         self.bonus_min_win_topup(tier)

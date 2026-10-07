@@ -78,6 +78,38 @@ Thay đổi (chỉ riêng Bonus: `tier_weights.bonus` và reel chặng 1, Super/
 - Còn mỏng: p60 44,1 (ngưỡng 44,5). Tỷ trọng Treasure không giảm (55,5%) vì đuôi chủ yếu đến từ Treasure; số tiền mỗi lần
   Treasure thì đã giảm 42%.
 
+**Phase 2: Super (p2, `tuning/overrides/p2.json` = p1 + Super; 50.000 phiên, đạt đủ 5 yêu cầu)**
+
+| | p0 | **p2** | Yêu cầu |
+|---|---|---|---|
+| Mean | 259,9 | **237,1** (−1,2%) | 240 ± 3% |
+| p5 / p25 / median / p60 / p75 | 6,3 / 74,0 / 120,7 / 150,9 / 240,9 | **38,5 / 60,1 / 87,7 / 112,0 / 168,8** | p5 ≥ 24 · p60 ≤ 120 · p75 120–216 |
+| p90 / p95 / p99 | 480 / 778 / 2.644 | 415 / 722 / 2.181 | |
+| Max Win | 0,004% | **0,092%** (46/50.000) | ~0,1% |
+| Dòng + xu Wild / rương / Treasure (%) | 13,8 / 30,8 / 55,4 | 14,4 / 30,9 / 54,7 | |
+| Treasure trả TB mỗi lần | 143,6 | 102,9 | giảm |
+| Clear chặng / phiên | 1,00 | 1,22 | tăng |
+| Clover: % ký hiệu, % hệ số > 2 | 1,10%, 19,9% | 0,31%, 89,9% | ít hơn, lớn hơn |
+| Spin trắng | 22,1% | 16,6% | |
+| RTP lấy mẫu N = 5/20/100/1000 | | 58 / 72 / 83 / 96% | |
+
+- **Code:** Super và Epic có reel riêng (`SUP_S2…SUP_E`, `EPI_S3…EPI_E`, `config.tier_stage_reel`), để chỉnh từng tier mà
+  không đụng tier khác. Lúc bắt đầu, các reel này chép giá trị của reel `BON_*` tương ứng.
+- **Bài học:** ở Super, **Power quyết định tốc độ qua chặng** (Power từ quà rương và sự kiện Wild). Giảm Power đưa số clear
+  từ 1,37 xuống 1,21, mean từ khoảng 460x xuống 302x. Loại vũ khí được bảo đảm gần như không ảnh hưởng. Golden/Clover
+  ra thường thì đẩy cả khoảng giữa; muốn tiền ra đuôi thì cho Golden rất hiếm và chỉ hệ số 10x/20x.
+- **Thay đổi Super:**
+  - Reel `SUP_S2`: wild 2,1, weapon 0,1, shape nghiêng về biểu tượng thấp (70/62/54/46/18/13/9/6/4). `SUP_S3` 1,2/0,05.
+    `SUP_S4/S5/E` 0,8/0.
+  - Quà rương ra Power 5% (mọi cấp). Sự kiện Wild 35%, hệ số 50 / xu 50 / Power 0.
+  - Rương: cấp {97, 2.5, 0.5}, nâng cấp 1%, số quà Đồng {1:90, 2:10}, Bạc {1:60, 2:40}.
+  - Xu (tối thiểu 1x ở chặng 2–3): 1:100, 2:2, 3:1, 4:.5, 5:1 …, 100:.0044 … 1000:6.2e-5, **25000: 4e-5** (cho Max Win 0,1%).
+  - Treasure: coin 92, magnet .15, clover .3, **golden .14 (chỉ hệ số 10x/20x)**, star .1, global .25.
+    Clover {2:10, 3:10, 4:10, 5:20, 10:30, 20:20}. Global {2:70, 3:20, 4:7, 5:3}.
+  - Enhance và hệ số Wild giống Bonus.
+- **Còn yếu:** tỷ trọng dòng + xu Wild gần như không tăng (13,8 thành 14,4%). Thêm Wild ở chặng 2 thì Super đi sâu hơn và
+  khoảng giữa tăng; cần thêm cách khác nếu designer muốn tỷ trọng dòng cao hơn.
+
 ---
 
 ## 1. Mục tiêu (designer, 2026-10-07)

@@ -287,7 +287,8 @@ def test_heroic_reel_has_no_scatter(cfg):
 
 
 def test_stage_reels_drop_removed_lows(cfg):
-    for stage, reel in cfg.bonus_stage_reel.items():
+    maps = [cfg.bonus_stage_reel] + list(cfg.tier_stage_reel.values())
+    for stage, reel in [x for m in maps for x in m.items()]:
         removed = cfg.low_symbols[: cfg.stage_removed_lows[stage]]
         syms = {s for col in cfg.reels[reel] for s in col}
         assert not (syms & set(removed)), (stage, reel)

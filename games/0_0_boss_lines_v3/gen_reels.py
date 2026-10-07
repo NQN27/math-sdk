@@ -44,6 +44,16 @@ REEL_SPECS = {
     "BON_S4": dict(removed=3, wild=4.5, sc=0.34, weapon=2.0),
     "BON_S5": dict(removed=4, wild=4.0, sc=0.34, weapon=2.0),
     "BON_E": dict(removed=4, wild=4.0, sc=0.34, weapon=2.5),
+    # Super / Epic get their own stage reels so each tier tunes independently (2026-10-08)
+    "SUP_S2": dict(removed=1, wild=5.5, sc=0.34, weapon=2.0),
+    "SUP_S3": dict(removed=2, wild=5.0, sc=0.34, weapon=2.0),
+    "SUP_S4": dict(removed=3, wild=4.5, sc=0.34, weapon=2.0),
+    "SUP_S5": dict(removed=4, wild=4.0, sc=0.34, weapon=2.0),
+    "SUP_E": dict(removed=4, wild=4.0, sc=0.34, weapon=2.5),
+    "EPI_S3": dict(removed=2, wild=5.0, sc=0.34, weapon=2.0),
+    "EPI_S4": dict(removed=3, wild=4.5, sc=0.34, weapon=2.0),
+    "EPI_S5": dict(removed=4, wild=4.0, sc=0.34, weapon=2.0),
+    "EPI_E": dict(removed=4, wild=4.0, sc=0.34, weapon=2.5),
 }
 
 
