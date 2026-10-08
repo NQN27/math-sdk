@@ -3,7 +3,7 @@
 Đọc file này trước khi tune tiếp.
 
 **Cập nhật 2026-10-09: ứng viên hiện tại là `tuning/overrides/p6.json`** (p3 + Clover 2,5% ký hiệu Treasure với hệ số
-2x 70 / 3x 15 / 4x 8 / phần còn lại 7, + Max Win đa nguồn). Bảng chấm `tuning/results/p6_speccheck.txt`. Chi tiết ở mục
+2x 70 / 3x 15 / 4x 8 / phần còn lại 7, + Max Win đa nguồn). Bảng chấm `tuning/results/p6_speccheck.txt`. Các bước thử p5a–p5m, p6a–p6j nằm trong `_scratch/` (không commit). Chi tiết ở mục
 "Phase 5–6" cuối §0. Bảng dưới đây là p3 (giữ để so sánh).
 
 ~~Trạng thái (2026-10-08): ứng viên hiện tại là `tuning/overrides/p3.json`~~ (= b6 + Phase 1–4). Chưa ghi vào
@@ -238,7 +238,7 @@ base/ante dùng tần suất vào Bonus và mean tự nhiên (chưa qua optimize
   `tuning/maxwin_sources.py` và harness (diag `maxwin_src`) phân loại nguồn của mỗi lần Max Win.
 - **Epic (p5m, 20.000 phiên):** mean 1.535,5 (+2,9%), p60 660, p75 1.008, Max Win 1,045%, **xu 25.000x 35%** (còn lại:
   Treasure với Golden/Clover/Global 158, dòng 4, cộng dồn 2). Thay đổi: xu 25000 4,9e-3 → 2,7e-3; Golden chỉ 20x, 0,13;
-  Global 0,15 với {5:30, 8:40, 10:30}; Enhance {5:20, 10:30, 15:25, 20:15, 25:10}; Power từ rương 10/20/30/40%; rương cấp
+  Global 0,10 với {5:30, 8:40, 10:30}; Enhance {5:20, 10:30, 15:25, 20:15, 25:10}; Power từ rương Đồng/Bạc/Vàng/Kim cương 10/20/45/60% (chỉ Enhance); rương cấp
   {99, .8, .2}, nâng cấp 0,5%; xu 6–15x giảm một nửa.
 - **Super (p6j, 50.000 phiên):** mean 245,6 (+2,3%), p60 103,6, p75 162,2, Max Win 0,076%, **xu 25.000x 32%** (còn lại: rương 6,
   Treasure với Golden/Clover/Global 20). Thay đổi: xu 25000 4e-5 → 0,8e-5; đuôi xu 20–1.000x × 0,5; Golden chỉ 20x, 0,11;
