@@ -83,8 +83,10 @@ def side_metrics(js, n):
 
 
 # direction each side metric should move vs the p0 baseline (+1 up, -1 down)
-SIDE_DIR = {"lines+wildcoin %": 1, "stage clears/session": 1, "Clover % of Treasure symbols": -1,
-            "Clover factor > 2 %": 1, "spins with 0 connections %": -1, "Treasure paid per Treasure": -1}
+# Clover is no longer a direction ask: designer 2026-10-09 set it to 2.5% of Treasure symbols
+# with factors 2x 70 / 3x 15 / 4x 8 / rest 7 (checked separately below).
+SIDE_DIR = {"lines+wildcoin %": 1, "stage clears/session": 1, "spins with 0 connections %": -1,
+            "Treasure paid per Treasure": -1}
 
 
 def rule_checks(ov):
@@ -177,6 +179,18 @@ def main():
                 print(f"   dead spins {100 * d['zero_spins'] / spins:.1f}% (all at 0 connections: "
                       f"{d['conn_zero'] == {'0': d['zero_spins']} or d['zero_spins'] == 0}); "
                       f"longest dead streak per session {d['zero_streak_hist']}")
+                cl_share = 100 * tk.get("clover", 0) / tks
+                cl2 = 100 * clov.get("2", 0) / cl_n
+                print(f"   {mark(2.2 <= cl_share <= 2.8 and 65 <= cl2 <= 75)}  Clover ~2.5% of Treasure symbols, ~70% 2x"
+                      f"   ({cl_share:.2f}%, 2x {cl2:.0f}%)")
+                ms = d.get("maxwin_src") or {}
+                if ms:
+                    tot_mw = sum(ms.values())
+                    coin = ms.get("xu 25.000x", 0)
+                    print(f"   Max Win sources ({tot_mw}): xu 25.000x {100 * coin / tot_mw:.0f}% | "
+                          + ", ".join(f"{k} {v}" for k, v in sorted(ms.items(), key=lambda kv: -kv[1]) if k != "xu 25.000x"))
+                    checks_mw = coin / tot_mw <= 0.40
+                    print(f"   {mark(checks_mw)}  Max Win from 25,000x coin <= 40%")
                 if d.get("topups"):
                     print(f"   min-win top-ups: {100 * d['topups'] / n:.1f}% of sessions, "
                           f"{d['topup_paid'] / n:.1f}x per session")

@@ -86,7 +86,7 @@ def _one(gs, cfg, tier, i):
 def _diag_new():
     return {"conn_hist": {}, "conn_zero": {}, "spins": 0, "zero_spins": 0, "zero_streak_hist": {},
             "stage_clears_hist": {}, "treasure_kinds": {}, "clover_factor": {}, "golden_factor": {},
-            "global_factor": {}, "treasure_paid": [], "topups": 0, "topup_paid": 0.0}
+            "global_factor": {}, "treasure_paid": [], "topups": 0, "topup_paid": 0.0, "maxwin_src": {}}
 
 
 def _bump(d, k, v=1):
@@ -157,6 +157,9 @@ def worker(args):
         out.append({"win": gs.win_manager.running_bet_win, "maxwin": gs.wincap_triggered,
                     "src": src, "stage": stage, "spins": spins, "treasures": treasures})
         _diag_session(diag, ev)
+        if gs.wincap_triggered:
+            from maxwin_sources import classify
+            _bump(diag["maxwin_src"], classify(ev, gs.win_manager.running_bet_win, cfg.wincap))
     return out, diag
 
 
@@ -175,8 +178,8 @@ def _diag_merge(parts):
     tot["treasure_count"] = len(tp)
     tot["treasure_paid_mean"] = sum(tp) / len(tp) if tp else 0.0
     for k in ("conn_hist", "conn_zero", "zero_streak_hist", "stage_clears_hist", "clover_factor",
-              "golden_factor", "global_factor"):
-        tot[k] = dict(sorted(tot[k].items(), key=lambda kv: float(kv[0])))
+              "golden_factor", "global_factor", "maxwin_src"):
+        tot[k] = dict(sorted(tot[k].items(), key=lambda kv: (float(kv[0]) if kv[0].replace(".", "", 1).isdigit() else -kv[1])))
     return tot
 
 

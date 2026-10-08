@@ -2,7 +2,11 @@
 
 Đọc file này trước khi tune tiếp.
 
-**Trạng thái (2026-10-08): ứng viên hiện tại là `tuning/overrides/p3.json`** (= b6 + Phase 1–4). Chưa ghi vào
+**Cập nhật 2026-10-09: ứng viên hiện tại là `tuning/overrides/p6.json`** (p3 + Clover 2,5% ký hiệu Treasure với hệ số
+2x 70 / 3x 15 / 4x 8 / phần còn lại 7, + Max Win đa nguồn). Bảng chấm `tuning/results/p6_speccheck.txt`. Chi tiết ở mục
+"Phase 5–6" cuối §0. Bảng dưới đây là p3 (giữ để so sánh).
+
+~~Trạng thái (2026-10-08): ứng viên hiện tại là `tuning/overrides/p3.json`~~ (= b6 + Phase 1–4). Chưa ghi vào
 `game_config.py`, chờ designer duyệt. Kết quả: `tuning/results/p3_*`, bảng chấm `tuning/results/p3_speccheck.txt`.
 
 | Tier | Mean (mục tiêu) | p5 | Median | p60 | p75 | p99 | Max Win | Spec phân vị |
@@ -224,6 +228,27 @@ RTP lấy mẫu (trung vị 100 lần; `p3_speccheck.txt`):
 | base / ante | 51% / 18% | 57% / 40% | 72% / 70% | 108% / 122% |
 
 base/ante dùng tần suất vào Bonus và mean tự nhiên (chưa qua optimizer), nên với N lớn RTP cao hơn 96,7%.
+
+
+**Phase 5–6 (2026-10-09): Clover 2,5% và Max Win đa nguồn → p6**
+- Designer: Clover = 2,5% ký hiệu Treasure ở mọi bảng (Bonus 2,41; Super 2,40; Epic 2,55; chung 2,48; Treasure hunt 2,22),
+  hệ số 2x 70 / 3x 15 / 4x 8 / 5x 4 / 10x 2 / 20x 1 (Super: 5x 7, bỏ 10x/20x). `spec_check` chấm Clover ~2,5%, ~70% 2x
+  thay cho hướng "Clover ít hơn" cũ.
+- Designer: Max Win đang gần như chỉ đến từ xu 25.000x (Epic 76%, Super 76%), dễ đoán. Mục tiêu: không nguồn nào > 40%.
+  `tuning/maxwin_sources.py` và harness (diag `maxwin_src`) phân loại nguồn của mỗi lần Max Win.
+- **Epic (p5m, 20.000 phiên):** mean 1.535,5 (+2,9%), p60 660, p75 1.008, Max Win 1,045%, **xu 25.000x 35%** (còn lại:
+  Treasure với Golden/Clover/Global 158, dòng 4, cộng dồn 2). Thay đổi: xu 25000 4,9e-3 → 2,7e-3; Golden chỉ 20x, 0,13;
+  Global 0,15 với {5:30, 8:40, 10:30}; Enhance {5:20, 10:30, 15:25, 20:15, 25:10}; Power từ rương 10/20/30/40%; rương cấp
+  {99, .8, .2}, nâng cấp 0,5%; xu 6–15x giảm một nửa.
+- **Super (p6j, 50.000 phiên):** mean 245,6 (+2,3%), p60 103,6, p75 162,2, Max Win 0,076%, **xu 25.000x 32%** (còn lại: rương 6,
+  Treasure với Golden/Clover/Global 20). Thay đổi: xu 25000 4e-5 → 0,8e-5; đuôi xu 20–1.000x × 0,5; Golden chỉ 20x, 0,11;
+  Global 0,08 chỉ 8x/10x; Nam châm/Star 0,05; xu 5x weight 3; rương cấp {99, .8, .2}, nâng cấp 0,5%.
+- Bài học: bảng xu chuẩn hóa theo tổng, giảm đuôi xu khác thì tỷ lệ xu 25.000x tự tăng; Golden/Global "hiếm nhưng lớn"
+  tạo đường Max Win mà ít đụng khoảng giữa; ở Super, Golden 20x ở chặng 2 tốn mean (Treasure ~90x → ~1.800x) mà ít khi đủ
+  Max Win, nên Super cần đường Max Win đắt hơn Epic.
+- Đánh đổi: tỷ trọng dòng + xu Wild ở Epic giảm còn 7,5% (tiền đuôi dồn vào Treasure). Super tăng lên 14,7%.
+- RTP lấy mẫu (trung vị 100 lần, N = 5/20/100/1000): Bonus 65/80/88/97%, Super 52/74/87/98%, Epic 73/84/101/99%,
+  buy3 58/80/86/95%, buy4 53/73/85/101%.
 
 ---
 
