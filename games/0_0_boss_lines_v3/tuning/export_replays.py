@@ -1,0 +1,58 @@
+"""Export real simulated sessions for the replay viewer (single process).
+
+usage: python tuning/export_replays.py overrides.json OUT.json [per_tier_pool]
+Simulates a pool of sessions per tier (Bonus / Super / Epic), picks ~12 spread
+over the payout distribution (plus the biggest and any Max Win), then re-runs
+those exact sessions (seeds are deterministic) and saves their events.
+"""
+import json
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import tune_harness as H  # noqa: E402
+
+PICK_PCT = [2, 10, 25, 40, 50, 60, 75, 85, 92, 97, 99.5]
+POOL = {"bonus": 400, "super": 300, "epic": 200}
+TARGET = {"bonus": 88.9, "super": 240.0, "epic": 1492.5}
+
+
+def main():
+    ov_path, out = sys.argv[1], sys.argv[2]
+    scale = float(sys.argv[3]) if len(sys.argv) > 3 else 1.0
+    ov = json.load(open(ov_path))
+    gs, cfg = H._setup(json.loads(json.dumps(ov)))
+    sessions = []
+    for tier, n in POOL.items():
+        n = int(n * scale)
+        wins = []
+        for i in range(n):
+            H._one(gs, cfg, tier, i)
+            wins.append((gs.win_manager.running_bet_win, i, gs.wincap_triggered))
+        ranked = sorted(wins)
+        picks = {}
+        for p in PICK_PCT:
+            k = min(n - 1, int(n * p / 100))
+            picks[ranked[k][1]] = p
+        picks[ranked[-1][1]] = 100
+        for w, i, mw in ranked:
+            if mw and len([x for x in picks.values() if x == "maxwin"]) < 1:
+                picks[i] = "maxwin"
+        rank_of = {i: r for r, (_, i, _) in enumerate(ranked)}
+        for i, label in sorted(picks.items(), key=lambda kv: rank_of[kv[0]]):
+            H._one(gs, cfg, tier, i)
+            ev = [{k: v for k, v in e.items() if k != "index"} for e in gs.book.events]
+            sessions.append({
+                "tier": tier, "seed": i, "win": round(gs.win_manager.running_bet_win, 2),
+                "maxwin": gs.wincap_triggered, "pct": round(100 * rank_of[i] / max(1, n - 1), 1),
+                "events": ev,
+            })
+        print(tier, "pool", n, "picked", len(picks), "median", ranked[n // 2][0])
+    meta = {"overrides": os.path.basename(ov_path), "targets": TARGET, "pool": {k: int(v * scale) for k, v in POOL.items()},
+            "boss_zones": cfg.boss_zones, "wincap": cfg.wincap}
+    json.dump({"meta": meta, "sessions": sessions}, open(out, "w"), separators=(",", ":"))
+    print("wrote", out, os.path.getsize(out) // 1024, "KB,", len(sessions), "sessions")
+
+
+if __name__ == "__main__":
+    main()

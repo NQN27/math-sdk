@@ -48,7 +48,8 @@ def main():
     mode, n = sys.argv[1], int(sys.argv[2])
     ov = json.load(open(sys.argv[3])) if len(sys.argv) > 3 and sys.argv[3] != "-" else {}
     tag = sys.argv[4] if len(sys.argv) > 4 else "base"
-    procs, chunk = 8, n // 8
+    procs = H.PROCS
+    chunk = n // procs
     t0 = time.time()
     with Pool(procs) as pool:
         rows = [r for p in pool.map(worker, [(mode, k * chunk, chunk, ov) for k in range(procs)]) for r in p]

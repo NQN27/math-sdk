@@ -18,9 +18,9 @@ BANDS = [(0, 5), (5, 25), (25, 60), (60, 75), (75, 90), (90, 99), (99, 100)]
 def main():
     tier, n = sys.argv[1], int(sys.argv[2])
     ov = json.load(open(sys.argv[3]))
-    chunk = n // 8
-    with Pool(8) as pool:
-        parts = pool.map(H.worker, [(tier, k * chunk, chunk, ov) for k in range(8)])
+    chunk = n // H.PROCS
+    with Pool(H.PROCS) as pool:
+        parts = pool.map(H.worker, [(tier, k * chunk, chunk, ov) for k in range(H.PROCS)])
     rows = sorted((r for p, _ in parts for r in p), key=lambda r: r["win"])
     N = len(rows)
     print(f"{tier} n={N} mean={sum(r['win'] for r in rows) / N:.1f}")

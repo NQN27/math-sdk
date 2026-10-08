@@ -20,6 +20,8 @@ from multiprocessing import Pool
 HERE = os.path.dirname(os.path.abspath(__file__))
 GAME = os.path.dirname(HERE)
 SDK = os.path.dirname(os.path.dirname(GAME))
+# worker processes (designer 2026-10-08: keep the machine usable; override with TUNE_PROCS)
+PROCS = int(os.environ.get("TUNE_PROCS", "2"))
 
 
 def _setup(overrides):
@@ -182,7 +184,7 @@ def main():
     tier, n = sys.argv[1], int(sys.argv[2])
     overrides = json.load(open(sys.argv[3])) if len(sys.argv) > 3 and sys.argv[3] != "-" else {}
     tag = sys.argv[4] if len(sys.argv) > 4 else "run"
-    procs = 8
+    procs = PROCS
     chunk = n // procs
     t0 = time.time()
     with Pool(procs) as pool:

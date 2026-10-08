@@ -55,7 +55,8 @@ def main():
     tier, n = sys.argv[1], int(sys.argv[2])
     ov = json.load(open(sys.argv[3]))
     tag = sys.argv[4] if len(sys.argv) > 4 else "split"
-    procs, chunk = 8, n // 8
+    procs = H.PROCS
+    chunk = n // procs
     with Pool(procs) as pool:
         parts = pool.map(worker, [(tier, k * chunk, chunk, ov) for k in range(procs)])
     N = chunk * procs
