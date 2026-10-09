@@ -9,7 +9,8 @@ Spec (designer 2026-10-08), m = target mean of the tier:
   * p5 .. p60 inside [0.1 m, 0.5 m]; p60 .. p75 inside [0.5 m, 0.9 m]
   * Epic: every session >= 600x; Max Win rate >= 1%
   * Super: Max Win rate ~0.1%
-  * Bonus: median lower than b6 (51.5)
+  * Bonus (2026-10-09, replaces the band rules above for Bonus): targets/bonus_curve_2026-10-09.csv,
+    p5..p99.5 within +-15%, mean 88.88 within +-1%, Max Win 0.005-0.008%
   * more pay from lines + Wild coins; fewer Treasure pays; more stage clears;
     Clover rarer but more often > 2x
   * RTP of 5/20/100/1000 random sessions, 100 repeats, median (per tier and per buy mode)
@@ -23,7 +24,9 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TARGET_RTP = 0.967
-TIERS = {"bonus": 88.9, "super": 240.0, "epic": 1492.5}
+TIERS = {"bonus": 88.88, "super": 240.0, "epic": 1492.5}
+BONUS_CURVE = os.path.join(HERE, "targets", "bonus_curve_2026-10-09.csv")
+BONUS_CURVE_MEAN = 88.88
 BUY = {"buy3": (100.0, {"bonus": 95.67, "super": 4.23, "epic": 0.1}),
        "buy4": (300.0, {"super": 96.0, "epic": 4.0})}
 FEATURE_COST, FEATURE_TARGET = 500.0, 483.5
@@ -114,6 +117,29 @@ def rule_checks(ov):
     return out
 
 
+def bonus_curve_checks(w, mean, mw, n):
+    """Designer 2026-10-09: Normal Bonus follows a target percentile curve.
+    mean tight (+-1%; the optimizer pins it exactly later), p5..p99.5 within +-15%,
+    p1..p4 and p99.8+ shown only, Max Win 0.005-0.008%."""
+    curve = [tuple(map(float, ln.split(","))) for ln in open(BONUS_CURVE)
+             if ln[0].isdigit()]
+    rows, bad = [], []
+    for q, v in curve:
+        got = w[min(n - 1, int(n * q / 100))]
+        ok = 5 <= q <= 99.5 and abs(got / v - 1) <= 0.15
+        rows.append((q, v, got))
+        if 5 <= q <= 99.5 and not ok:
+            bad.append(f"p{q:g}={got:.1f} vs {v:g} ({100 * (got / v - 1):+.0f}%)")
+    line = ("   curve (target -> actual): " + "  ".join(
+        f"p{q:g} {v:g}->{g:.1f}" for q, v, g in rows
+        if q in (1, 3, 5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 75, 80, 85, 90, 95, 97, 98, 99, 99.5, 99.8, 99.9)))
+    m = BONUS_CURVE_MEAN
+    return line, [("mean within +-1% (tight)", abs(mean / m - 1) <= 0.01, f"{mean:.2f} vs {m} ({100 * (mean / m - 1):+.1f}%)"),
+            ("curve p5..p99.5 within +-15%", not bad, f"{len(bad)} of {sum(5 <= q <= 99.5 for q, _ in curve)} off: "
+             + "; ".join(bad[:12]) + (" ..." if len(bad) > 12 else "")),
+            ("Max Win 0.005-0.008%", 0.00005 <= mw <= 0.00008, f"{100 * mw:.4f}% ({round(mw * n)}/{n})")]
+
+
 def main():
     tag = sys.argv[1]
     reps = int(sys.argv[sys.argv.index("--reps") + 1]) if "--reps" in sys.argv else 100
@@ -138,7 +164,11 @@ def main():
         mean = sum(w) / n
         mw = js["maxwin_count"] / n if js else sum(x >= 25000 for x in w) / n
         p = {k: pct(w, k) for k in (5, 25, 50, 60, 75, 90, 95, 99)}
-        checks = [
+        if tier == "bonus":  # designer 2026-10-09: curve replaces the band rules for Bonus
+            curve_line, checks = bonus_curve_checks(w, mean, mw, n)
+        else:
+            curve_line, checks = None, []
+        checks += [] if tier == "bonus" else [
             ("mean within +-3%", abs(mean / m - 1) <= 0.03, f"{mean:.1f} vs {m} ({100 * (mean / m - 1):+.1f}%)"),
             ("p5 >= 0.1m", p[5] >= 0.1 * m, f"p5={p[5]:.1f} (>= {0.1 * m:.1f})"),
             ("p60 <= 0.5m", p[60] <= 0.5 * m, f"p60={p[60]:.1f} (<= {0.5 * m:.1f})"),
@@ -149,8 +179,6 @@ def main():
                        ("Max Win >= 1%", mw >= 0.01, f"{100 * mw:.3f}% ({js and js['maxwin_count']}/{n})")]
         if tier == "super":
             checks += [("Max Win ~0.1% (0.07-0.13%)", 0.0007 <= mw <= 0.0013, f"{100 * mw:.3f}% ({js and js['maxwin_count']}/{n})")]
-        if tier == "bonus":
-            checks += [("median < 51.5 (b6)", p[50] < 51.5, f"median={p[50]:.1f}")]
         sd = S.pstdev(w)
         top = {k: sum(w[n - max(1, n * k // 100):]) / (mean * n) for k in (1, 5, 10)}
         print(f"\n[{tier}] n={n} mean={mean:.1f} median={p[50]:.1f} sd={sd:.0f} MaxWin={100 * mw:.3f}%")
@@ -158,6 +186,8 @@ def main():
               + " / ".join(f"{100 * v:.1f}%" for v in top.values()))
         print("   pct " + " ".join(f"p{k}={v:.1f}" for k, v in p.items()) + f"  (as x mean: "
               + " ".join(f"p{k}={v / m:.2f}" for k, v in p.items()) + ")")
+        if curve_line:
+            print(curve_line)
         for name, ok, info in checks:
             print(f"   {mark(ok)}  {name:28s} {info}")
         rep = {"n": n, "mean": mean, "median": p[50], "maxwin_rate": mw, "pct": p, "sd": sd, "cv": sd / mean, "top_share": top,
