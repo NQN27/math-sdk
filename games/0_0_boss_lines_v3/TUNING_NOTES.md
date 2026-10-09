@@ -2,7 +2,7 @@
 
 Đọc file này trước khi tune tiếp.
 
-**Cập nhật 2026-10-09: ứng viên hiện tại là `tuning/overrides/p6.json`** (p3 + Clover 2,5% ký hiệu Treasure với hệ số
+**Cập nhật 2026-10-09 (tối): ứng viên hiện tại là `tuning/overrides/p7.json`** (p6 + biến động Bonus/Super, xem "Phase 7"). Trước đó: `p6.json` (p3 + Clover 2,5% ký hiệu Treasure với hệ số
 2x 70 / 3x 15 / 4x 8 / phần còn lại 7, + Max Win đa nguồn). Bảng chấm `tuning/results/p6_speccheck.txt`. Các bước thử p5a–p5m, p6a–p6j nằm trong `_scratch/` (không commit). Chi tiết ở mục
 "Phase 5–6" cuối §0. Bảng dưới đây là p3 (giữ để so sánh).
 
@@ -249,6 +249,19 @@ base/ante dùng tần suất vào Bonus và mean tự nhiên (chưa qua optimize
 - Đánh đổi: tỷ trọng dòng + xu Wild ở Epic giảm còn 7,5% (tiền đuôi dồn vào Treasure). Super tăng lên 14,7%.
 - RTP lấy mẫu (trung vị 100 lần, N = 5/20/100/1000): Bonus 65/80/88/97%, Super 52/74/87/98%, Epic 73/84/101/99%,
   buy3 58/80/86/95%, buy4 53/73/85/101%.
+
+
+**Phase 7 (2026-10-09): tăng biến động một chút → p7 (= p6 + Bonus/Super mới, Epic giữ p6)**
+- Thước đo: CV = SD/mean, tỷ lệ tiền của top 1/5/10% phiên, p99/mean (spec_check in thêm), RTP lấy mẫu p10..p90.
+- Bonus (p7c): xu 2–15x ×0,6, xu 100–1.000x ×1,1, Golden {2:18,3:17,4:15,5:15,10:20,20:15}. Mean 90,9 (+2,2%),
+  CV 4,27 → 4,62, top 1% 24,4 → 25,7%, p99 9,55 → 9,80 lần mean, Max Win 0,013%. Mọi spec đạt.
+- Super (p7c): Golden 0,115, xu 2–5x ×0,65, 6–15x ×0,8. Mean 243,1 (+1,3%), CV 4,24 → 4,26 (gần như không đổi), Max Win
+  0,074%, xu 25.000x 32%. Golden 0,125 (p7d) cho CV 4,33 nhưng mean +3,5% (trượt).
+- Epic: không tìm được bản tăng CV trong spec, giữ p6. Mean p6 đã +2,9%; mọi phần thêm vào đuôi (Golden/Global) làm mean
+  +4,5..+10,7%. Cắt xu ở khoảng giữa bị bẫy chuẩn hóa: cắt xu 100x làm xu 25.000x chiếm phần lớn hơn trong nhóm rương Kim
+  cương (≥100x) → Max Win từ xu 45%; cắt xu 5x (trọng số 100) làm mọi xu khác, kể cả 25.000x, tăng ~10% → mean +8,6%, 43%.
+  Phiên dưới 600x được trả bù nên cắt ở đó không giảm mean. Epic CV bị chặn bởi sàn 600x và trần 25.000x.
+- Các lượt thử p7a–p7d trong `_scratch/`.
 
 ---
 

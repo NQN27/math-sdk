@@ -1,0 +1,81 @@
+=== spec check: p7 ===
+rules (chest gifts / coin chance by chest tier): PASS
+
+[bonus] n=30000 mean=90.9 median=35.5 sd=420 MaxWin=0.013%
+   volatility: CV=4.62  max=25000  pay share of top 1%/5%/10% sessions 25.7% / 46.4% / 58.5%
+   pct p5=10.9 p25=23.3 p50=35.5 p60=43.0 p75=64.5 p90=163.9 p95=294.1 p99=871.0  (as x mean: p5=0.12 p25=0.26 p50=0.40 p60=0.48 p75=0.73 p90=1.84 p95=3.31 p99=9.80)
+   PASS  mean within +-3%             90.9 vs 88.9 (+2.2%)
+   PASS  p5 >= 0.1m                   p5=10.9 (>= 8.9)
+   PASS  p60 <= 0.5m                  p60=43.0 (<= 44.5)
+   PASS  p75 in [0.5m, 0.9m]          p75=64.5 ([44.5, 80.0])
+   PASS  median < 51.5 (b6)           median=35.5
+   source % {'lines': 23.8, 'wildcoin': 2.7, 'chest': 18.2, 'treasure': 55.3}  (lines+wildcoin 26.5%)
+   stage clears/session 0.98 {'0': 1870, '1': 26824, '2': 1266, '3': 37, '4': 3}
+   Treasure: 0.98/session, paid mean 48.6; kinds % {coin: 95.37, scatter: 1.02, clover: 2.51, global: 0.36, star: 0.26, magnet: 0.39, golden: 0.10}
+   Clover: 2.51% of Treasure symbols, factor > 2: 30.1%  {'2': 16689, '3': 3572, '4': 1913, '5': 1026, '10': 472, '20': 209}
+   connections/spin {0: 26.2%, 1: 28.6%, 2: 18.7%, 3: 11.1%, 4: 6.5%, 5: 3.8%, 6: 2.2%, 7: 1.3%, 8: 0.7%, 9: 0.4%, 10: 0.2%, 11: 0.1%, 12: 0.1%, 13: 0.0%, 14: 0.0%, 15: 0.0%, 16: 0.0%, 17: 0.0%, 18: 0.0%, 19: 0.0%, 20: 0.0%, 21: 0.0%, 22: 0.0%}
+   dead spins 25.1% (all at 0 connections: True); longest dead streak per session {'0': 3223, '1': 17017, '2': 7447, '3': 1817, '4': 411, '5': 64, '6': 19, '7': 1, '9': 1}
+   PASS  Clover ~2.5% of Treasure symbols, ~70% 2x   (2.51%, 2x 70%)
+   Max Win sources (4): xu 25.000x 0% | Treasure (Clover+Global+Golden+Nam châm) 1, Treasure (Clover+Global+Golden) 1, dòng 1, Treasure (Clover+Global+Nam châm) 1
+   PASS  Max Win from 25,000x coin <= 40%
+   vs p0 (designer's direction asks):
+   PASS  lines+wildcoin %                  18.13 ->    26.55 (want up)
+   PASS  stage clears/session               0.58 ->     0.98 (want up)
+   PASS  spins with 0 connections %        28.76 ->    26.16 (want down)
+   PASS  Treasure paid per Treasure        84.68 ->    48.57 (want down)
+
+[super] n=50000 mean=243.1 median=86.1 sd=1036 MaxWin=0.074%
+   volatility: CV=4.26  max=25000  pay share of top 1%/5%/10% sessions 31.8% / 50.4% / 62.8%
+   pct p5=37.7 p25=61.8 p50=86.1 p60=101.4 p75=159.2 p90=392.4 p95=785.0 p99=2264.7  (as x mean: p5=0.16 p25=0.26 p50=0.36 p60=0.42 p75=0.66 p90=1.64 p95=3.27 p99=9.44)
+   PASS  mean within +-3%             243.1 vs 240.0 (+1.3%)
+   PASS  p5 >= 0.1m                   p5=37.7 (>= 24.0)
+   PASS  p60 <= 0.5m                  p60=101.4 (<= 120.0)
+   PASS  p75 in [0.5m, 0.9m]          p75=159.2 ([120.0, 216.0])
+   PASS  Max Win ~0.1% (0.07-0.13%)   0.074% (37/50000)
+   source % {'lines': 14.1, 'wildcoin': 0.6, 'chest': 23.6, 'treasure': 61.7}  (lines+wildcoin 14.7%)
+   stage clears/session 1.22 {'0': 2464, '1': 35451, '2': 10821, '3': 1084, '4': 151, '5': 27, '6': 2}
+   Treasure: 1.22/session, paid mean 115.9; kinds % {coin: 96.16, clover: 2.51, scatter: 1.03, magnet: 0.05, star: 0.05, golden: 0.12, global: 0.08}
+   Clover: 2.51% of Treasure symbols, factor > 2: 30.2%  {'2': 32187, '3': 7026, '4': 3567, '5': 3358}
+   connections/spin {0: 19.1%, 1: 26.2%, 2: 20.9%, 3: 14.3%, 4: 8.7%, 5: 5.1%, 6: 2.7%, 7: 1.5%, 8: 0.8%, 9: 0.4%, 10: 0.2%, 11: 0.1%, 12: 0.1%, 13: 0.0%, 14: 0.0%, 15: 0.0%, 16: 0.0%, 17: 0.0%, 18: 0.0%, 19: 0.0%, 21: 0.0%, 22: 0.0%}
+   dead spins 16.6% (all at 0 connections: True); longest dead streak per session {'0': 9532, '1': 31101, '2': 7957, '3': 1195, '4': 181, '5': 29, '6': 5}
+   PASS  Clover ~2.5% of Treasure symbols, ~70% 2x   (2.51%, 2x 70%)
+   Max Win sources (37): xu 25.000x 32% | rương 6, Treasure (Clover+Global+Golden) 4, Treasure (Clover+Golden) 4, Treasure (Clover+Global) 3, Treasure (Golden) 3, Treasure (Global+Golden+Nam châm) 1, Treasure (Clover+Global+Star) 1, Treasure (Clover+Golden+Star) 1, Treasure (Global+Golden) 1, Treasure (Global) 1
+   PASS  Max Win from 25,000x coin <= 40%
+   vs p0 (designer's direction asks):
+   PASS  lines+wildcoin %                  13.80 ->    14.77 (want up)
+   PASS  stage clears/session               1.00 ->     1.22 (want up)
+   PASS  spins with 0 connections %        25.53 ->    19.08 (want down)
+   PASS  Treasure paid per Treasure       143.62 ->   115.90 (want down)
+
+[epic] n=20000 mean=1535.5 median=600.0 sd=3010 MaxWin=1.045%
+   volatility: CV=1.96  max=25000  pay share of top 1%/5%/10% sessions 16.3% / 37.8% / 50.8%
+   pct p5=600.0 p25=600.0 p50=600.0 p60=660.3 p75=1008.2 p90=3239.9 p95=4958.2 p99=25000.0  (as x mean: p5=0.40 p25=0.40 p50=0.40 p60=0.44 p75=0.68 p90=2.17 p95=3.32 p99=16.75)
+   PASS  mean within +-3%             1535.5 vs 1492.5 (+2.9%)
+   PASS  p5 >= 0.1m                   p5=600.0 (>= 149.2)
+   PASS  p60 <= 0.5m                  p60=660.3 (<= 746.2)
+   PASS  p75 in [0.5m, 0.9m]          p75=1008.2 ([746.2, 1343.2])
+   PASS  min >= 600                   min=600.0
+   PASS  Max Win >= 1%                1.045% (209/20000)
+   source % {'lines': 7.1, 'wildcoin': 0.3, 'chest': 13.5, 'treasure': 79.1}  (lines+wildcoin 7.4%)
+   stage clears/session 1.19 {'0': 1275, '1': 14313, '2': 3802, '3': 558, '4': 48, '5': 4}
+   Treasure: 2.18/session, paid mean 424.8; kinds % {coin: 96.16, scatter: 0.95, clover: 2.51, golden: 0.13, star: 0.05, global: 0.10, magnet: 0.09}
+   Clover: 2.51% of Treasure symbols, factor > 2: 30.1%  {'2': 23659, '3': 5170, '4': 2692, '5': 1305, '10': 647, '20': 362}
+   connections/spin {0: 42.8%, 1: 28.2%, 2: 15.1%, 3: 7.3%, 4: 3.4%, 5: 1.6%, 6: 0.8%, 7: 0.4%, 8: 0.2%, 9: 0.1%, 10: 0.0%, 11: 0.0%, 12: 0.0%, 13: 0.0%, 14: 0.0%, 15: 0.0%, 16: 0.0%, 17: 0.0%, 18: 0.0%, 19: 0.0%, 20: 0.0%}
+   dead spins 26.8% (all at 0 connections: True); longest dead streak per session {'0': 555, '1': 9313, '2': 7048, '3': 2266, '4': 629, '5': 146, '6': 32, '7': 10, '8': 1}
+   PASS  Clover ~2.5% of Treasure symbols, ~70% 2x   (2.51%, 2x 70%)
+   Max Win sources (209): xu 25.000x 35% | Treasure (Clover+Global+Golden) 33, Treasure (Clover+Golden) 30, Treasure (Global+Golden) 21, Treasure (Golden) 13, Treasure (Clover+Global) 11, Treasure (Clover+Global+Golden+Nam châm) 6, Treasure (Global) 6, dòng 4, Treasure (Clover+Golden+Nam châm) 3, cộng dồn nhiều nguồn 2, Treasure (Global+Golden+Nam châm) 2, Treasure (Golden+Star) 1, Treasure (Clover+Golden+Star) 1, Treasure (Clover) 1, Treasure (Golden+Nam châm) 1
+   PASS  Max Win from 25,000x coin <= 40%
+   min-win top-ups: 55.9% of sessions, 113.9x per session
+   vs p0 (designer's direction asks):
+   FAIL  lines+wildcoin %                  11.84 ->     7.45 (want up)
+   FAIL  stage clears/session               2.41 ->     1.19 (want up)
+   FAIL  spins with 0 connections %        19.22 ->    42.79 (want down)
+   FAIL  Treasure paid per Treasure       246.79 ->   424.75 (want down)
+
+--- RTP of N random sessions, median of 100 repeats (p10 / p90 of repeats) ---
+bonus    price    91.9  N=5:   60.4% (p10  33.5, p60  75.6, p75 111.7, p90  166.1)  N=20:   79.0% (p10  54.1, p60  88.6, p75 109.6, p90  152.3)  N=100:   88.3% (p10  68.8, p60  92.6, p75 102.5, p90  125.2)  N=1000:   97.0% (p10  84.2, p60 102.0, p75 105.0, p90  121.3)
+super    price   248.2  N=5:   50.6% (p10  29.4, p60  76.1, p75 118.6, p90  195.5)  N=20:   74.1% (p10  43.2, p60  82.5, p75 100.6, p90  153.1)  N=100:   86.4% (p10  63.4, p60  93.9, p75 114.9, p90  174.8)  N=1000:   98.6% (p10  81.6, p60 101.6, p75 109.7, p90  121.9)
+epic     price  1543.4  N=5:   72.6% (p10  41.0, p60  95.1, p75 112.3, p90  209.5)  N=20:   84.4% (p10  62.3, p60  92.8, p75 139.5, p90  171.9)  N=100:  100.6% (p10  76.9, p60 108.3, p75 117.3, p90  131.5)  N=1000:   99.0% (p10  91.2, p60 100.4, p75 102.3, p90  105.4)
+buy3     cost    100.0  N=5:   57.8% (p10  31.7, p60  67.2, p75 103.3, p90  228.5)  N=20:   77.9% (p10  48.9, p60  98.7, p75 124.1, p90  172.9)  N=100:   85.2% (p10  65.9, p60  95.3, p75 113.7, p90  141.5)  N=1000:   95.3% (p10  81.9, p60 100.4, p75 110.7, p90  122.3)   (tier sessions only; trigger spin not included)
+buy4     cost    300.0  N=5:   52.6% (p10  23.8, p60  63.1, p75  92.2, p90  152.2)  N=20:   72.3% (p10  42.8, p60  88.3, p75 118.4, p90  172.7)  N=100:   84.5% (p10  61.6, p60  95.8, p75 121.4, p90  151.7)  N=1000:  100.1% (p10  85.7, p60 104.0, p75 110.0, p90  117.9)   (tier sessions only; trigger spin not included)
+saved D:\Stake Engine\math-sdk\games\0_0_boss_lines_v3\tuning\results\p7_speccheck.json

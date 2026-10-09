@@ -53,12 +53,15 @@ def sample_rtp(draw, price, reps, rng):
     out = {}
     for n in SAMPLE_N:
         vals = sorted(sum(draw(rng) for _ in range(n)) / (n * price) for _ in range(reps))
-        out[n] = (S.median(vals), vals[int(0.1 * reps)], vals[int(0.9 * reps)])
+        # (median, p10, p90, p25, p60, p75) of the repeats; the extra quantiles don't change the draws
+        out[n] = (S.median(vals), vals[int(0.1 * reps)], vals[int(0.9 * reps)],
+                  vals[int(0.25 * reps)], vals[int(0.6 * reps)], vals[int(0.75 * reps)])
     return out
 
 
 def fmt_rtp(r):
-    return "  ".join(f"N={n}: {100 * m:6.1f}% (p10 {100 * lo:5.1f}, p90 {100 * hi:6.1f})" for n, (m, lo, hi) in r.items())
+    return "  ".join(f"N={n}: {100 * v[0]:6.1f}% (p10 {100 * v[1]:5.1f}, p60 {100 * v[4]:5.1f}, p75 {100 * v[5]:5.1f}, "
+                     f"p90 {100 * v[2]:6.1f})" for n, v in r.items())
 
 
 def side_metrics(js, n):
@@ -148,12 +151,16 @@ def main():
             checks += [("Max Win ~0.1% (0.07-0.13%)", 0.0007 <= mw <= 0.0013, f"{100 * mw:.3f}% ({js and js['maxwin_count']}/{n})")]
         if tier == "bonus":
             checks += [("median < 51.5 (b6)", p[50] < 51.5, f"median={p[50]:.1f}")]
-        print(f"\n[{tier}] n={n} mean={mean:.1f} median={p[50]:.1f} sd={S.pstdev(w):.0f} MaxWin={100 * mw:.3f}%")
+        sd = S.pstdev(w)
+        top = {k: sum(w[n - max(1, n * k // 100):]) / (mean * n) for k in (1, 5, 10)}
+        print(f"\n[{tier}] n={n} mean={mean:.1f} median={p[50]:.1f} sd={sd:.0f} MaxWin={100 * mw:.3f}%")
+        print(f"   volatility: CV={sd / mean:.2f}  max={w[-1]:.0f}  pay share of top 1%/5%/10% sessions "
+              + " / ".join(f"{100 * v:.1f}%" for v in top.values()))
         print("   pct " + " ".join(f"p{k}={v:.1f}" for k, v in p.items()) + f"  (as x mean: "
               + " ".join(f"p{k}={v / m:.2f}" for k, v in p.items()) + ")")
         for name, ok, info in checks:
             print(f"   {mark(ok)}  {name:28s} {info}")
-        rep = {"n": n, "mean": mean, "median": p[50], "maxwin_rate": mw, "pct": p,
+        rep = {"n": n, "mean": mean, "median": p[50], "maxwin_rate": mw, "pct": p, "sd": sd, "cv": sd / mean, "top_share": top,
                "checks": {name: [ok, info] for name, ok, info in checks}}
         if js:
             src = js["source_mean"]
