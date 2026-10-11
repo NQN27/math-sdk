@@ -174,3 +174,34 @@ def test_treasure_cells_skip_scatter(gs):
     gs.lit = {(0, 0), (1, 0)}
     gs.bonus_tier = None
     assert gs.treasure_cells() == {(1, 0)}
+
+
+@pytest.mark.parametrize("reset", [False, True])
+def test_lit_reset_each_spin_trial(gs, cfg, reset):
+    """Q23 trial flag: with the tier listed, every Bonus spin after the first starts
+    with no lit cells; without it lit cells only grow during a Bonus (Q23)."""
+    old = cfg.lit_reset_each_spin_tiers
+    cfg.lit_reset_each_spin_tiers = ("bonus",) if reset else ()
+    seen = []
+    orig = gs.play_one_spin
+
+    def spy(*a, **k):
+        if gs.in_bonus:
+            seen.append((gs.bonus_tier, set(gs.lit)))
+        return orig(*a, **k)
+    gs.play_one_spin = spy
+    try:
+        checked = 0
+        for g in rounds(gs, cfg, "buy3", "freegame", 30):
+            spins = [lit for tier, lit in seen if tier == "bonus"]
+            seen.clear()
+            for prev_end, lit in zip(spins, spins[1:]):
+                if reset:
+                    assert lit == set()
+                else:
+                    assert prev_end <= lit
+                checked += 1
+        assert checked > 20
+    finally:
+        cfg.lit_reset_each_spin_tiers = old
+        gs.play_one_spin = orig

@@ -198,6 +198,8 @@ class GameState(GameStateOverride):
             if self.stage_cleared:
                 nxt = ENDLESS if self.stage in (5, ENDLESS) else self.stage + 1
                 self.spawn_stage(nxt)
+            if spin_no > 1 and tier in cfg.lit_reset_each_spin_tiers:
+                self.lit = set()  # Q23 trial: lit cells last one spin
             emit(self, "freeSpinStart", spin=spin_no, freeSpinsLeft=self.free_spins_left,
                  stage=self.stage_label(), globalMult=self.global_factor())
             self.play_one_spin(self.stage_reel(),

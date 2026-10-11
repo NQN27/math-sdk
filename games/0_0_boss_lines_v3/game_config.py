@@ -211,6 +211,11 @@ class GameConfig(Config):
         self.treasure_max_rounds = 60
         self.treasure_hunt_min_coin = 1
         self.treasure_skips_scatter_cells = True  # Q28 (answered) / N7
+        # Q23 trial (designer idea 2026-10-11, NOT approved yet): Bonus tiers listed here clear
+        # the lit cells at the start of every free spin after the first, so a Treasure only uses
+        # cells lit during the spin that cleared the stage. The Scatter cells that triggered the
+        # Bonus are lit for the first spin only. Empty = Q23 as answered (lit for the whole Bonus).
+        self.lit_reset_each_spin_tiers = ()
         self.epic_min_coin = 5  # N6: no Dong coins during Epic free spins
         self.epic_opening_treasure_stage = 2  # N5: Epic starts with a Treasure "as if stage 2 was cleared"
         # Per-Bonus-tier replacements for the weight tables above (coin_value_weights,
