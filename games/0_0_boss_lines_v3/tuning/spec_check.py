@@ -9,8 +9,8 @@ Spec (designer 2026-10-08), m = target mean of the tier:
   * p5 .. p60 inside [0.1 m, 0.5 m]; p60 .. p75 inside [0.5 m, 0.9 m]
   * Epic: every session >= 600x; Max Win rate >= 1%
   * Super: Max Win rate ~0.1%
-  * Bonus (2026-10-09, replaces the band rules above for Bonus): targets/bonus_curve_2026-10-09.csv,
-    p5..p99.5 within +-15%, mean 88.88 within +-1%, Max Win 0.005-0.008%
+  * Bonus (2026-10-12, replaces the band rules above for Bonus): targets/bonus_curve_2026-10-12.csv,
+    p5..p99.5 within +-15%, mean 91 within +-1%, Max Win ~0.01% (0.008-0.012%)
   * more pay from lines + Wild coins; fewer Treasure pays; more stage clears;
     Clover rarer but more often > 2x
   * RTP of 5/20/100/1000 random sessions, 100 repeats, median (per tier and per buy mode)
@@ -24,9 +24,10 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TARGET_RTP = 0.967
-TIERS = {"bonus": 88.88, "super": 240.0, "epic": 1492.5}
-BONUS_CURVE = os.path.join(HERE, "targets", "bonus_curve_2026-10-09.csv")
-BONUS_CURVE_MEAN = 88.88
+TIERS = {"bonus": 91.0, "super": 240.0, "epic": 1492.5}
+BONUS_CURVE = os.path.join(HERE, "targets", "bonus_curve_2026-10-12.csv")  # replaced the 10-09 curve
+BONUS_CURVE_MEAN = 91.0
+BONUS_MW = (0.00008, 0.00012)  # designer 2026-10-12: ~0.01%
 BUY = {"buy3": (100.0, {"bonus": 95.67, "super": 4.23, "epic": 0.1}),
        "buy4": (300.0, {"super": 96.0, "epic": 4.0})}
 FEATURE_COST, FEATURE_TARGET = 500.0, 483.5
@@ -120,7 +121,7 @@ def rule_checks(ov):
 def bonus_curve_checks(w, mean, mw, n):
     """Designer 2026-10-09: Normal Bonus follows a target percentile curve.
     mean tight (+-1%; the optimizer pins it exactly later), p5..p99.5 within +-15%,
-    p1..p4 and p99.8+ shown only, Max Win 0.005-0.008%."""
+    p1..p4 and p99.8+ shown only, Max Win ~0.01%."""
     curve = [tuple(map(float, ln.split(","))) for ln in open(BONUS_CURVE)
              if ln[0].isdigit()]
     rows, bad = [], []
@@ -137,7 +138,7 @@ def bonus_curve_checks(w, mean, mw, n):
     return line, [("mean within +-1% (tight)", abs(mean / m - 1) <= 0.01, f"{mean:.2f} vs {m} ({100 * (mean / m - 1):+.1f}%)"),
             ("curve p5..p99.5 within +-15%", not bad, f"{len(bad)} of {sum(5 <= q <= 99.5 for q, _ in curve)} off: "
              + "; ".join(bad[:12]) + (" ..." if len(bad) > 12 else "")),
-            ("Max Win 0.005-0.008%", 0.00005 <= mw <= 0.00008, f"{100 * mw:.4f}% ({round(mw * n)}/{n})")]
+            ("Max Win ~0.01% (0.008-0.012%)", BONUS_MW[0] <= mw <= BONUS_MW[1], f"{100 * mw:.4f}% ({round(mw * n)}/{n})")]
 
 
 def main():

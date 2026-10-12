@@ -205,3 +205,24 @@ def test_lit_reset_each_spin_trial(gs, cfg, reset):
     finally:
         cfg.lit_reset_each_spin_tiers = old
         gs.play_one_spin = orig
+
+
+@pytest.mark.parametrize("mode,crit,key", [("buy3", "freegame", "bonus_tier"), ("buy4", "freegame", "bonus_tier"),
+                                            ("feature", "basegame", "feature")])
+def test_optimizer_force_records(gs, cfg, mode, crit, key):
+    """Designer 2026-10-12: every Bonus book carries {"bonus_tier": t} and every Feature book
+    {"feature": heroic|treasure_hunt}, so the optimizer can fix each tier's mean exactly."""
+    gs.recorded_events = {}
+    n = 0
+    for g in rounds(gs, cfg, mode, crit, 30):
+        n += 1
+    tagged = {}
+    for desc, rec in gs.recorded_events.items():
+        d = dict(desc)
+        if key in d:
+            for b in rec["bookIds"]:
+                tagged.setdefault(b, []).append(d[key])
+    assert len(tagged) == n and all(len(v) == 1 for v in tagged.values())
+    if key == "bonus_tier":
+        allowed = {cfg.scatter_to_tier[s] for s in cfg.tier_mix[mode]}
+        assert {v[0] for v in tagged.values()} <= allowed

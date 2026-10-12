@@ -134,7 +134,8 @@ class GameState(GameStateOverride):
 
     def run_feature_spin(self, cond) -> None:
         self.gametype = self.config.basegame_type
-        if random.random() < self.config.feature_heroic_chance:
+        feature = "heroic" if random.random() < self.config.feature_heroic_chance else "treasure_hunt"
+        if feature == "heroic":
             self.heroic = True
             self.no_scatter_spin = True
             emit(self, "featureSpin", feature="heroic")
@@ -152,6 +153,9 @@ class GameState(GameStateOverride):
         self.win_manager.update_gametype_wins(self.gametype)
         if self.treasure_hunt:
             self.maybe_enter_bonus(cond)
+        self.record({"feature": feature})  # optimizer fences: Heroic / Treasure hunt means exact
+        if self.wincap_triggered:
+            self.record({"maxwin_feature": feature})
 
     def bonus_min_win_topup(self, tier: str) -> None:
         """Designer 2026-10-08: a tier's Bonus pays at least bonus_min_total_win[tier]
@@ -206,6 +210,10 @@ class GameState(GameStateOverride):
                                min_weapons=cfg.bonus_min_weapons.get(tier, 0))
             self.win_manager.update_gametype_wins(self.gametype)
         self.bonus_min_win_topup(tier)
+        # optimizer fences per tier (designer 2026-10-12: tier means exact in the published tables)
+        self.record({"bonus_tier": tier})
+        if self.wincap_triggered:
+            self.record({"maxwin_tier": tier})
         emit(self, "bonusEnd", tier=tier, spins=spin_no,
              totalWin=round(self.win_manager.running_bet_win, 2))
         if not self.wincap_triggered:

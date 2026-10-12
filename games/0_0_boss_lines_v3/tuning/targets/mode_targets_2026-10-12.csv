@@ -1,0 +1,11 @@
+# designer 2026-10-12: per-mode targets. Tier means: Bonus 91, Super 245, Epic 2045, Treasure hunt 564, Heroic spin 403.
+# Base/Ante columns are trigger rates per spin; buy modes are tier mix (%). "gap" = 96.7% target minus the listed mix (designer's own column).
+# Base note: the gap is paid in Base before the Bonus triggers (random dead spins get a small payout).
+# Feature: Treasure hunt 564 already includes its own Bonus/Super/Epic entries (1.4% / 0.4% / 0.1%).
+mode,cost,bonus,super,epic,treasure_hunt,heroic,gap
+base,1,1/350,1/2815,1/14990,0,0,~0
+ante,3,1/70,1/563,1/2998,0,0,~0
+buy3,100,97.5%,2.4%,0.1%,0,0,0.05
+buy4,300,0%,97.5%,2.5%,0,0,0.10
+random_bonus,400,60%,27%,13%,0,0,0.20
+feature,500,1.4%*,0.4%*,0.1%*,50%,50%,~0

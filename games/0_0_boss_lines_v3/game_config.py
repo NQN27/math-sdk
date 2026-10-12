@@ -232,12 +232,20 @@ class GameConfig(Config):
             "epic": {"spins": 8, "start_stage": 3},
         }
         self.scatter_to_tier = {3: "bonus", 4: "super", 5: "epic"}
-        # Scatter-count mix (%) of a forced Bonus: buy3 (also base/ante freegame fence) and buy4.
-        self.tier_mix = {"buy3": {3: 95.67, 4: 4.23, 5: 0.1}, "buy4": {4: 96, 5: 4}}
-        # Max Win (25,000x) rate per tier session (designer 2026-10-08: Super 0.1%, Epic >= 1%).
-        # Bonus has no target; 0 here. Feature: measured on p3 (Heroic 3e-4, Treasure hunt 1e-4, p_heroic 0.512).
-        self.tier_maxwin_rate = {"bonus": 0.0, "super": 0.001, "epic": 0.01}
-        self.feature_maxwin_rate = 2.0e-4
+        # Scatter-count mix (%) of a forced Bonus (designer table 2026-10-12, tuning/targets/mode_targets_2026-10-12.csv).
+        self.tier_mix = {"buy3": {3: 97.5, 4: 2.4, 5: 0.1}, "buy4": {4: 97.5, 5: 2.5}}
+        # Natural trigger rate per spin of each tier in base / ante (same table).
+        self.tier_trigger_rate = {"base": {"bonus": 1 / 350, "super": 1 / 2815, "epic": 1 / 14990},
+                                  "ante": {"bonus": 1 / 70, "super": 1 / 563, "epic": 1 / 2998}}
+        # Max Win (25,000x) rate per tier session. Bonus ~0.01% (designer 2026-10-12); Super 0.1% and
+        # Epic 1% (2026-10-08) until the designer's Super/Epic curves arrive.
+        self.tier_maxwin_rate = {"bonus": 0.0001, "super": 0.001, "epic": 0.01}
+        # Feature (designer 2026-10-12): 50/50, Heroic 403x, Treasure hunt 564x (its own Bonus entries included).
+        # Heroic pays 0 on 30% of spins (designer curve p1-p30 = 0). Max Win rates: placeholders measured on p4a.
+        self.feature_mean_targets = {"heroic": 403.0, "treasure_hunt": 564.0}
+        self.feature_zero_share = {"heroic": 0.30, "treasure_hunt": 0.0}
+        self.feature_maxwin_rates = {"heroic": 4.0e-4, "treasure_hunt": 1.0e-4}
+        self.feature_maxwin_rate = 0.5 * 4.0e-4 + 0.5 * 1.0e-4
         # Designer 2026-10-08: minimum total Bonus win per tier, topped up at Bonus end.
         self.bonus_min_total_win = {"epic": 600.0}
         # Weapons guaranteed on each free spin's opening board (designer 2026-10-07;
@@ -306,9 +314,10 @@ class GameConfig(Config):
                 Distribution(criteria="basegame", quota=0.899, conditions=cond("HERO")),
             ],
         ))
-        # Tier means (designer 2026-10-07): Bonus 88.9x, Super 240x, Epic 1492.5x. Mix derived for 96.7% RTP:
-        # buy3 = Bonus 95.67 / Super 4.23 / Epic 0.1 (= 96.70x), buy4 = Super 96 / Epic 4 (= 290.1x).
-        self.tier_mean_targets = {"bonus": 88.9, "super": 240.0, "epic": 1492.5}
+        # Tier means (designer table 2026-10-12): Bonus 91x, Super 245x, Epic 2045x. buy3 97.5/2.4/0.1 pays
+        # 96.65x and buy4 97.5/2.5 pays 290.0x; the designer's small gap (0.05x / 0.10x) is left to the
+        # trigger spin's own line wins.
+        self.tier_mean_targets = {"bonus": 91.0, "super": 245.0, "epic": 2045.0}
         for name, cost, triggers in (("buy3", 100.0, self.tier_mix["buy3"]), ("buy4", 300.0, self.tier_mix["buy4"])):
             self.bet_modes.append(BetMode(
                 name=name, cost=cost, rtp=self.rtp, max_win=maxwin,
