@@ -263,6 +263,18 @@ base/ante dùng tần suất vào Bonus và mean tự nhiên (chưa qua optimize
   Phiên dưới 600x được trả bù nên cắt ở đó không giảm mean. Epic CV bị chặn bởi sàn 600x và trần 25.000x.
 - Các lượt thử p7a–p7d trong `_scratch/`.
 
+
+**Normal Bonus – yêu cầu designer 2026-10-14 (CHỈ Normal Bonus, "làm kĩ")**
+Ngoài đường cong Sheet (`targets/bonus_curve_2026-10-14.csv`, mean 91, Max Win ~0,0108%):
+- Golden trả về tỷ lệ THẤP (b11 0,45 → khoảng 0,1 như p7); không dùng Golden làm đòn bẩy đuôi chính.
+- Sự kiện Wild ≥ ~20% (`wild_event_chance`; b11 5%, p7 35%).
+- Power ≥ ~40% trong sự kiện Wild (`wild_event_weights` nhân/xu/power 30/30/40; trước 45/45/10).
+- Xu 100x giữ hiếm (b11 ×0,3 là ổn).
+- Rương giảm bớt một chút (b11 rương = 68% tiền Bonus; cấp rương 79/9/11/1).
+- Max Win: 25–50% đến từ xu 25.000x (`spec_check` chấm 25–50%).
+Mỗi kết quả Bonus phải báo kèm: tỷ lệ/chia sự kiện Wild, Golden, tỷ trọng rương, % Max Win từ xu.
+Super/Epic giữ thiết lập riêng trừ khi designer nói khác.
+
 ---
 
 ## 1. Mục tiêu (designer, 2026-10-07)
