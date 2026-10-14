@@ -24,10 +24,15 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TARGET_RTP = 0.967
-TIERS = {"bonus": 91.0, "super": 240.0, "epic": 1492.5}
-BONUS_CURVE = os.path.join(HERE, "targets", "bonus_curve_2026-10-12.csv")  # replaced the 10-09 curve
-BONUS_CURVE_MEAN = 91.0
-BONUS_MW = (0.00008, 0.00012)  # designer 2026-10-12: ~0.01%
+TIERS = {"bonus": 91.0, "super": 245.0, "epic": 2045.0}
+# Designer Google Sheet 2026-10-14: one target percentile curve per tier (replaces the band rules).
+# The sheet's Total = sum(value at p_k * width of (p_k-1, p_k]); the last bucket (to p100 = 25,000x) is the
+# Max Win share, so the implied Max Win rates are Bonus 0.0108%, Super 0.0855%, Epic 1.000%.
+CURVES = {  # tier: (file, mean, Max Win range accepted)
+    "bonus": ("bonus_curve_2026-10-14.csv", 91.0, (0.000081, 0.000135)),
+    "super": ("super_curve_2026-10-14.csv", 245.0, (0.00064, 0.00107)),
+    "epic": ("epic_curve_2026-10-14.csv", 2045.0, (0.009, 0.0115)),
+}
 BUY = {"buy3": (100.0, {"bonus": 95.67, "super": 4.23, "epic": 0.1}),
        "buy4": (300.0, {"super": 96.0, "epic": 4.0})}
 FEATURE_COST, FEATURE_TARGET = 500.0, 483.5
@@ -118,11 +123,11 @@ def rule_checks(ov):
     return out
 
 
-def bonus_curve_checks(w, mean, mw, n):
-    """Designer 2026-10-09: Normal Bonus follows a target percentile curve.
-    mean tight (+-1%; the optimizer pins it exactly later), p5..p99.5 within +-15%,
-    p1..p4 and p99.8+ shown only, Max Win ~0.01%."""
-    curve = [tuple(map(float, ln.split(","))) for ln in open(BONUS_CURVE)
+def curve_checks(tier, w, mean, mw, n):
+    """Designer curve for a tier: mean tight (+-1%; the optimizer pins it exactly later),
+    p5..p99.5 within +-15%, p1..p4 and above p99.5 shown only, Max Win near the sheet's implied rate."""
+    fname, m, (lo, hi) = CURVES[tier]
+    curve = [tuple(map(float, ln.split(","))) for ln in open(os.path.join(HERE, "targets", fname))
              if ln[0].isdigit()]
     rows, bad = [], []
     for q, v in curve:
@@ -134,11 +139,10 @@ def bonus_curve_checks(w, mean, mw, n):
     line = ("   curve (target -> actual): " + "  ".join(
         f"p{q:g} {v:g}->{g:.1f}" for q, v, g in rows
         if q in (1, 3, 5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 75, 80, 85, 90, 95, 97, 98, 99, 99.5, 99.8, 99.9)))
-    m = BONUS_CURVE_MEAN
     return line, [("mean within +-1% (tight)", abs(mean / m - 1) <= 0.01, f"{mean:.2f} vs {m} ({100 * (mean / m - 1):+.1f}%)"),
             ("curve p5..p99.5 within +-15%", not bad, f"{len(bad)} of {sum(5 <= q <= 99.5 for q, _ in curve)} off: "
              + "; ".join(bad[:12]) + (" ..." if len(bad) > 12 else "")),
-            ("Max Win ~0.01% (0.008-0.012%)", BONUS_MW[0] <= mw <= BONUS_MW[1], f"{100 * mw:.4f}% ({round(mw * n)}/{n})")]
+            (f"Max Win {100 * lo:.4f}-{100 * hi:.4f}%", lo <= mw <= hi, f"{100 * mw:.4f}% ({round(mw * n)}/{n})")]
 
 
 def main():
@@ -165,21 +169,18 @@ def main():
         mean = sum(w) / n
         mw = js["maxwin_count"] / n if js else sum(x >= 25000 for x in w) / n
         p = {k: pct(w, k) for k in (5, 25, 50, 60, 75, 90, 95, 99)}
-        if tier == "bonus":  # designer 2026-10-09: curve replaces the band rules for Bonus
-            curve_line, checks = bonus_curve_checks(w, mean, mw, n)
+        if tier in CURVES:  # designer curves replace the band rules
+            curve_line, checks = curve_checks(tier, w, mean, mw, n)
         else:
             curve_line, checks = None, []
-        checks += [] if tier == "bonus" else [
+        checks += [] if tier in CURVES else [
             ("mean within +-3%", abs(mean / m - 1) <= 0.03, f"{mean:.1f} vs {m} ({100 * (mean / m - 1):+.1f}%)"),
             ("p5 >= 0.1m", p[5] >= 0.1 * m, f"p5={p[5]:.1f} (>= {0.1 * m:.1f})"),
             ("p60 <= 0.5m", p[60] <= 0.5 * m, f"p60={p[60]:.1f} (<= {0.5 * m:.1f})"),
             ("p75 in [0.5m, 0.9m]", 0.5 * m <= p[75] <= 0.9 * m, f"p75={p[75]:.1f} ([{0.5 * m:.1f}, {0.9 * m:.1f}])"),
         ]
         if tier == "epic":
-            checks += [("min >= 600", w[0] >= 600 - 1e-6, f"min={w[0]:.1f}"),
-                       ("Max Win >= 1%", mw >= 0.01, f"{100 * mw:.3f}% ({js and js['maxwin_count']}/{n})")]
-        if tier == "super":
-            checks += [("Max Win ~0.1% (0.07-0.13%)", 0.0007 <= mw <= 0.0013, f"{100 * mw:.3f}% ({js and js['maxwin_count']}/{n})")]
+            checks += [("min >= 600", w[0] >= 600 - 1e-6, f"min={w[0]:.1f}")]
         sd = S.pstdev(w)
         top = {k: sum(w[n - max(1, n * k // 100):]) / (mean * n) for k in (1, 5, 10)}
         print(f"\n[{tier}] n={n} mean={mean:.1f} median={p[50]:.1f} sd={sd:.0f} MaxWin={100 * mw:.3f}%")

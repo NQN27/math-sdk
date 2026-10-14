@@ -22,6 +22,9 @@ GAME = os.path.dirname(HERE)
 SDK = os.path.dirname(os.path.dirname(GAME))
 # worker processes (designer 2026-10-08: keep the machine usable; override with TUNE_PROCS)
 PROCS = int(os.environ.get("TUNE_PROCS", "2"))
+# first session index (seed); run a long job as several chunks with different TUNE_START, then
+# merge them with tuning/merge_runs.py (keeps RAM low; same results as one long run)
+START = int(os.environ.get("TUNE_START", "0"))
 
 
 def _setup(overrides):
@@ -191,7 +194,7 @@ def main():
     chunk = n // procs
     t0 = time.time()
     with Pool(procs) as pool:
-        parts = pool.map(worker, [(tier, k * chunk, chunk, overrides) for k in range(procs)])
+        parts = pool.map(worker, [(tier, START + k * chunk, chunk, overrides) for k in range(procs)])
     rows = [r for p, _ in parts for r in p]
     diag = _diag_merge([d for _, d in parts])
     wins = sorted(r["win"] for r in rows)
@@ -205,7 +208,7 @@ def main():
     for r in rows:
         stages[str(r["stage"])] = stages.get(str(r["stage"]), 0) + 1
     summary = {
-        "tier": tier, "n": N, "tag": tag, "overrides": overrides,
+        "tier": tier, "n": N, "tag": tag, "start": START, "overrides": overrides,
         "mean": sum(wins) / N, "median": statistics.median(wins),
         "p": {p: pct(p) for p in (10, 25, 50, 75, 90, 95, 99, 99.9)},
         "maxwin_rate": sum(r["maxwin"] for r in rows) / N,

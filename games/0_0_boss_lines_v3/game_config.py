@@ -237,15 +237,15 @@ class GameConfig(Config):
         # Natural trigger rate per spin of each tier in base / ante (same table).
         self.tier_trigger_rate = {"base": {"bonus": 1 / 350, "super": 1 / 2815, "epic": 1 / 14990},
                                   "ante": {"bonus": 1 / 70, "super": 1 / 563, "epic": 1 / 2998}}
-        # Max Win (25,000x) rate per tier session. Bonus ~0.01% (designer 2026-10-12); Super 0.1% and
-        # Epic 1% (2026-10-08) until the designer's Super/Epic curves arrive.
-        self.tier_maxwin_rate = {"bonus": 0.0001, "super": 0.001, "epic": 0.01}
+        # Max Win (25,000x) rate per tier session, implied by the designer's Google Sheet curves (2026-10-14):
+        # Total = sum(value * bucket width), the last bucket (to p100 = 25,000x) is the Max Win share.
+        self.tier_maxwin_rate = {"bonus": 0.000108, "super": 0.000855, "epic": 0.01}
         # Feature (designer 2026-10-12): 50/50, Heroic 403x, Treasure hunt 564x (its own Bonus entries included).
-        # Heroic pays 0 on 30% of spins (designer curve p1-p30 = 0). Max Win rates: placeholders measured on p4a.
+        # Heroic pays 0 on 30% of spins (designer curve p1-p30 = 0). Max Win rates implied by the sheet (2026-10-14).
         self.feature_mean_targets = {"heroic": 403.0, "treasure_hunt": 564.0}
         self.feature_zero_share = {"heroic": 0.30, "treasure_hunt": 0.0}
-        self.feature_maxwin_rates = {"heroic": 4.0e-4, "treasure_hunt": 1.0e-4}
-        self.feature_maxwin_rate = 0.5 * 4.0e-4 + 0.5 * 1.0e-4
+        self.feature_maxwin_rates = {"heroic": 0.001945, "treasure_hunt": 0.00185}
+        self.feature_maxwin_rate = 0.5 * 0.001945 + 0.5 * 0.00185
         # Designer 2026-10-08: minimum total Bonus win per tier, topped up at Bonus end.
         self.bonus_min_total_win = {"epic": 600.0}
         # Weapons guaranteed on each free spin's opening board (designer 2026-10-07;
