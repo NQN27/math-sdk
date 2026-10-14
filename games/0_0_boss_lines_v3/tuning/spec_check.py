@@ -228,8 +228,9 @@ def main():
                     coin = ms.get("xu 25.000x", 0)
                     print(f"   Max Win sources ({tot_mw}): xu 25.000x {100 * coin / tot_mw:.0f}% | "
                           + ", ".join(f"{k} {v}" for k, v in sorted(ms.items(), key=lambda kv: -kv[1]) if k != "xu 25.000x"))
-                    checks_mw = coin / tot_mw <= 0.40
-                    print(f"   {mark(checks_mw)}  Max Win from 25,000x coin <= 40%")
+                    # designer 2026-10-08: <= 40%; 2026-10-14: ~25-50% (coin Max Wins should not be rare either)
+                    checks_mw = 0.25 <= coin / tot_mw <= 0.50
+                    print(f"   {mark(checks_mw)}  Max Win from 25,000x coin 25-50%")
                 if d.get("topups"):
                     print(f"   min-win top-ups: {100 * d['topups'] / n:.1f}% of sessions, "
                           f"{d['topup_paid'] / n:.1f}x per session")
