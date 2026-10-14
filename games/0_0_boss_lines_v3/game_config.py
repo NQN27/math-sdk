@@ -173,6 +173,11 @@ class GameConfig(Config):
         self.wild_mult_weights = {2: 40, 3: 25, 4: 15, 5: 12, 10: 8}
         self.wild_mult_combine = "mul"  # Q2 (answered 2026-10-07): 2x and 5x on one line -> 10x
         self.wild_coin_uses_global = True  # Q1
+        # Wild coin event (designer 2026-10-14, Normal Bonus trial; OK for it to differ from Treasure coins):
+        # minimum coin value, and an optional own value table (None = the Treasure coin table).
+        # Both can be set per Bonus tier through tier_weights. Defaults keep the old behaviour.
+        self.wild_coin_min_value = 0.0
+        self.wild_coin_value_weights = None
 
         # ---- Powers --------------------------------------------------------------
         self.power_names = ["enhance", "upgrade", "transform", "replace", "destroy"]

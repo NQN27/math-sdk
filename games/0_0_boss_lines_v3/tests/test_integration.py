@@ -226,3 +226,23 @@ def test_optimizer_force_records(gs, cfg, mode, crit, key):
     if key == "bonus_tier":
         allowed = {cfg.scatter_to_tier[s] for s in cfg.tier_mix[mode]}
         assert {v[0] for v in tagged.values()} <= allowed
+
+
+def test_wild_coin_min_and_table(gs, cfg):
+    """Designer 2026-10-14 (Normal Bonus trial): Wild coin events can have a minimum value and
+    their own coin table; defaults (0, None) keep drawing from the Treasure coin table."""
+    old = (cfg.wild_coin_min_value, cfg.wild_coin_value_weights, dict(cfg.tier_weights))
+    try:
+        cfg.tier_weights = {"bonus": {"wild_coin_min_value": 2.0, "wild_coin_value_weights": {1: 50, 2: 30, 5: 20}}}
+        cfg.wild_coin_min_value, cfg.wild_coin_value_weights = 0.0, None
+        vals = []
+        for g in rounds(gs, cfg, "buy3", "freegame", 40):
+            tier = None  # only Normal Bonus free spins (not the trigger spin, not Super/Epic)
+            for e in g.book.events:
+                if e["type"] == "bonusStart":
+                    tier = e["tier"]
+                elif e["type"] == "wildEvent" and e["event"] == "coin" and tier == "bonus" and e["value"] < cfg.wincap:
+                    vals.append(e["value"])
+        assert vals and all(v in (2, 5) for v in vals)
+    finally:
+        cfg.wild_coin_min_value, cfg.wild_coin_value_weights, cfg.tier_weights = old

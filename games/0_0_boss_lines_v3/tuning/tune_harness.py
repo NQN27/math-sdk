@@ -51,7 +51,9 @@ def _setup(overrides):
         return {k: numkeys(base.get(k, sub), v) for k, v in table.items()}
     if "tier_weights" in overrides:
         overrides["tier_weights"] = {
-            tier: {name: numkeys(getattr(cfg, name), table) for name, table in tables.items()}
+            # a table whose config default is None (e.g. wild_coin_value_weights) takes the coin table's key types
+            tier: {name: numkeys(getattr(cfg, name) if getattr(cfg, name) is not None else cfg.coin_value_weights, table)
+                   for name, table in tables.items()}
             for tier, tables in overrides["tier_weights"].items()}
     for k, v in overrides.items():
         cur = getattr(cfg, k)

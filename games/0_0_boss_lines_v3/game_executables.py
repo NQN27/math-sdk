@@ -271,15 +271,15 @@ class GameExecutables(GameCalculations):
         table = self.config.tier_weights.get(key, {}).get(name) if key else None
         return table if table is not None else getattr(self.config, name)
 
-    def draw_coin(self, min_value: float, min_tier: str = None) -> float:
-        """Coin value >= min_value (and >= min_tier's lowest value)."""
+    def draw_coin(self, min_value: float, min_tier: str = None, table: dict = None) -> float:
+        """Coin value >= min_value (and >= min_tier's lowest value), from `table` or the coin table."""
         if getattr(self, "force_wincap", False):
             return 25000
         if self.in_bonus and self.bonus_tier == "epic" and not self.epic_opening:
             min_value = max(min_value, self.config.epic_min_coin)  # N6
         if min_tier is not None:
             min_value = max(min_value, self.config.coin_tiers[min_tier][0])
-        pool = {v: w for v, w in self.weights("coin_value_weights").items() if v >= min_value}
+        pool = {v: w for v, w in (table or self.weights("coin_value_weights")).items() if v >= min_value}
         return get_random_outcome(pool)
 
     def current_min_coin(self) -> float:
@@ -308,7 +308,8 @@ class GameExecutables(GameCalculations):
                 self.wild_mult[cell] = f
                 emit(self, "wildEvent", event="multiplier", position=pos(self, c, r), factor=f)
             elif kind == "coin":
-                v = self.draw_coin(self.current_min_coin())
+                v = self.draw_coin(max(self.current_min_coin(), self.weights("wild_coin_min_value")),
+                                   table=self.weights("wild_coin_value_weights"))
                 g = self.global_factor() if self.config.wild_coin_uses_global else 1
                 paid = self.award(v * g)
                 emit(self, "wildEvent", event="coin", position=pos(self, c, r), value=v, globalMult=g, paid=paid)
