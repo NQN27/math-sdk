@@ -89,7 +89,8 @@ def _one(gs, cfg, tier, i):
 def _diag_new():
     return {"conn_hist": {}, "conn_zero": {}, "spins": 0, "zero_spins": 0, "zero_streak_hist": {},
             "stage_clears_hist": {}, "treasure_kinds": {}, "clover_factor": {}, "golden_factor": {},
-            "global_factor": {}, "treasure_paid": [], "topups": 0, "topup_paid": 0.0, "maxwin_src": {}}
+            "global_factor": {}, "treasure_paid": [], "topups": 0, "topup_paid": 0.0, "maxwin_src": {},
+            "wild_events": {}, "chest_tiers": {}}
 
 
 def _bump(d, k, v=1):
@@ -123,6 +124,10 @@ def _diag_session(diag, ev):
                     _bump(diag[c["kind"] + "_factor"], c["value"])
         elif t == "treasureEnd":
             diag["treasure_paid"].append(e["paid"])
+        elif t == "wildEvent":
+            _bump(diag["wild_events"], e["event"])
+        elif t == "chestOpened":
+            _bump(diag["chest_tiers"], e.get("upgradedTo") or e["chest"])
         elif t == "bonusMinWin":
             diag["topups"] += 1
             diag["topup_paid"] += e["topUp"]
@@ -181,7 +186,7 @@ def _diag_merge(parts):
     tot["treasure_count"] = len(tp)
     tot["treasure_paid_mean"] = sum(tp) / len(tp) if tp else 0.0
     for k in ("conn_hist", "conn_zero", "zero_streak_hist", "stage_clears_hist", "clover_factor",
-              "golden_factor", "global_factor", "maxwin_src"):
+              "golden_factor", "global_factor", "maxwin_src", "wild_events", "chest_tiers"):
         tot[k] = dict(sorted(tot[k].items(), key=lambda kv: (float(kv[0]) if kv[0].replace(".", "", 1).isdigit() else -kv[1])))
     return tot
 
