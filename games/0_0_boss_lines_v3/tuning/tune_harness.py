@@ -92,7 +92,7 @@ def _diag_new():
     return {"conn_hist": {}, "conn_zero": {}, "spins": 0, "zero_spins": 0, "zero_streak_hist": {},
             "stage_clears_hist": {}, "treasure_kinds": {}, "clover_factor": {}, "golden_factor": {},
             "global_factor": {}, "treasure_paid": [], "topups": 0, "topup_paid": 0.0, "maxwin_src": {},
-            "wild_events": {}, "chest_tiers": {}}
+            "wild_events": {}, "chest_tiers": {}, "wildmult_extra": 0.0}
 
 
 def _bump(d, k, v=1):
@@ -128,6 +128,8 @@ def _diag_session(diag, ev):
             diag["treasure_paid"].append(e["paid"])
         elif t == "wildEvent":
             _bump(diag["wild_events"], e["event"])
+        elif t == "lineWins":  # extra line pay caused by Wild multipliers (part of "lines")
+            diag["wildmult_extra"] += sum(w["win"] * (1 - 1 / w["wildMult"]) for w in e["wins"] if w["wildMult"] > 1)
         elif t == "chestOpened":
             _bump(diag["chest_tiers"], e.get("upgradedTo") or e["chest"])
         elif t == "bonusMinWin":
