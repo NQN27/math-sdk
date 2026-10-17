@@ -2,6 +2,24 @@
 
 Đọc file này trước khi tune tiếp.
 
+**Cập nhật 2026-10-17: ứng viên theo tier, đo với đường cong Google Sheet 2026-10-14** (`tuning/targets/*_curve_2026-10-14.csv`):
+
+| Tier | Override | Kiểm tra | Mean (mục tiêu) | Đường cong (±15%) | Max Win (mục tiêu) | Còn lệch |
+|---|---|---|---|---|---|---|
+| Normal Bonus | `b14.json` | 200k | 91,43 (91) | 77/96 | 0,008% (0,0108%) | đáy p13–p30 (đã chấp nhận), p99 +22% |
+| Super | `s1.json` | 200k | 239,0 (245) | 67/96 | 0,056% (0,0855%) | p10–14 −16%, p18–27 +15..33%, p71–75 +16%, p85–95 −15%, p99.5 +76% |
+| Epic | `e2.json` | 50k | 1.974,8 (2.045) | 91/95 | 1,006% (1%) | p94–96 +16..22% (p99 nằm đúng Max Win) |
+
+- e2 ⊃ s1 ⊃ b14: mỗi file chứa cả các tier trước, nên dùng `e2.json` cho cả ba tier.
+- Super dùng luật thử designer duyệt 2026-10-17: xu tối thiểu chặng 2 của Super 0,2x (`tier_stage_min_coin`). Lúc clear
+  chặng đầu của Super gần như cả 30 ô đã sáng, nên với sàn 1x mọi phiên clear đều ≥ ~40x và không thể lấp p15–p35.
+- Đòn bẩy giãn phân bố là **Star** (cộng giá trị vào mọi xu, `star_value_weights` mới): Clover/Golden/Global/xu chỉ nhân,
+  làm lệch phải. Epic e2: Star hiếm nhưng lớn (1,0; 10/20/50x = 45/45/10), Golden {2:60,3:38,5:2} 0,36, Global 0,02,
+  Clover chỉ 2–5x, xu Epic dồn sang 10–20x, xu 25000 ×5. Super s1: Star 3,5 (1/2/3x = 50/45/5), Golden 0,3, Global 0,15 (2x),
+  rương Kim cương 2 quà, SUP_S4/S5/E Wild 0,3.
+- 10k phiên quá nhiễu ở đuôi (mean các chunk 10k của Super dao động 226–263): so đuôi ở ≥20k, chốt ở 50k.
+- Mean lệch vài % do optimizer khóa chính xác khi xuất bảng.
+
 **Cập nhật 2026-10-09 (tối): ứng viên hiện tại là `tuning/overrides/p7.json`** (p6 + biến động Bonus/Super, xem "Phase 7"). Trước đó: `p6.json` (p3 + Clover 2,5% ký hiệu Treasure với hệ số
 2x 70 / 3x 15 / 4x 8 / phần còn lại 7, + Max Win đa nguồn). Bảng chấm `tuning/results/p6_speccheck.txt`. Các bước thử p5a–p5m, p6a–p6j nằm trong `_scratch/` (không commit). Chi tiết ở mục
 "Phase 5–6" cuối §0. Bảng dưới đây là p3 (giữ để so sánh).
