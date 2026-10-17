@@ -304,6 +304,9 @@ class GameConfig(Config):
             return c
 
         maxwin = self.wincap
+        # Scatter mix of the base/ante "freegame" BOOKS only: enough Super/Epic books for the optimizer's
+        # tier fences, which then set the real trigger rates (tier_trigger_rate). Not a game rule.
+        self.base_book_scatter_mix = {3: 60, 4: 25, 5: 15}
         self.bet_modes = []
         for name, cost, reel in (("base", 1.0, "BR0"), ("ante", 3.0, "ANTE")):
             self.bet_modes.append(BetMode(
@@ -314,7 +317,7 @@ class GameConfig(Config):
                                  conditions=cond(reel, force_wincap=True)),
                     Distribution(criteria="freegame", quota=0.1,
                                  conditions=cond(reel, force_freegame=True,
-                                                 scatter_triggers=dict(self.tier_mix["buy3"]))),
+                                                 scatter_triggers=dict(self.base_book_scatter_mix))),
                     Distribution(criteria="0", quota=0.4, win_criteria=0.0, conditions=cond(reel)),
                     Distribution(criteria="basegame", quota=0.5, conditions=cond(reel)),
                 ],
