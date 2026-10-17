@@ -233,7 +233,7 @@ class GameConfig(Config):
         self.epic_opening_treasure_stage = 2  # N5: Epic starts with a Treasure "as if stage 2 was cleared"
         # Per-Bonus-tier replacements for the weight tables above (coin_value_weights,
         # treasure_kind_weights, clover/golden/global_factor_weights), e.g.
-        # {"epic": {"treasure_kind_weights": {...}}}; key "treasure_hunt" = Treasure hunt
+        # {"epic": {"treasure_kind_weights": {...}}}; key "treasure_hunt" = Treasure hunt, key "heroic" = Heroic
         # feature spin (until it enters a Bonus). Tuning only; no rule change.
         self.tier_weights = {}
         self.win_levels = [(20, "nice"), (50, "big"), (100, "super"), (500, "mega"), (25000, "maxwin")]

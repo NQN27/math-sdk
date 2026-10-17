@@ -266,8 +266,8 @@ class GameExecutables(GameCalculations):
     def weights(self, name: str) -> dict:
         """Tunable config value `name` (weight table or scalar), overridden per Bonus
         tier (and for the Treasure hunt feature spin, key "treasure_hunt") by
-        config.tier_weights."""
-        key = self.bonus_tier if self.in_bonus else ("treasure_hunt" if self.treasure_hunt else None)
+        config.tier_weights; key "heroic" = the Heroic feature spin."""
+        key = self.bonus_tier if self.in_bonus else ("treasure_hunt" if self.treasure_hunt else ("heroic" if self.heroic else None))
         table = self.config.tier_weights.get(key, {}).get(name) if key else None
         return table if table is not None else getattr(self.config, name)
 
