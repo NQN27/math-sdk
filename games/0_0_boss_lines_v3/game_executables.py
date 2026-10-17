@@ -280,12 +280,15 @@ class GameExecutables(GameCalculations):
         if min_tier is not None:
             min_value = max(min_value, self.config.coin_tiers[min_tier][0])
         pool = {v: w for v, w in (table or self.weights("coin_value_weights")).items() if v >= min_value}
+        if not pool and table:  # an own table with nothing at this minimum falls back to the coin table
+            return self.draw_coin(min_value)
         return get_random_outcome(pool)
 
     def current_min_coin(self) -> float:
         if self.treasure_hunt and not self.in_bonus:  # a Bonus entered from Treasure hunt uses stage minimums
             return self.config.treasure_hunt_min_coin
-        return self.config.stage_min_coin.get(self.stage, 0.2)
+        tier = self.config.tier_stage_min_coin.get(self.bonus_tier, {}) if self.in_bonus else {}
+        return tier.get(self.stage, self.config.stage_min_coin.get(self.stage, 0.2))
 
     def wild_events(self, wins) -> bool:
         connected = {(p["reel"], p["row"]) for w in wins for p in w["positions"]
@@ -545,8 +548,10 @@ class GameExecutables(GameCalculations):
         cfg = self.config
         names = {"coin": "TC", "magnet": "TM", "clover": "TV", "golden": "TV", "star": "TS",
                  "global": "TG", "scatter": "SC"}
-        if kind in ("coin", "star"):
+        if kind == "coin":
             v = self.draw_coin(min_coin)
+        elif kind == "star":
+            v = self.draw_coin(min_coin, table=self.weights("star_value_weights"))
         elif kind == "magnet":
             v = 0.0
         elif kind == "clover":

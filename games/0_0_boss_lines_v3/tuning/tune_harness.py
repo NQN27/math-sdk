@@ -55,8 +55,15 @@ def _setup(overrides):
             tier: {name: numkeys(getattr(cfg, name) if getattr(cfg, name) is not None else cfg.coin_value_weights, table)
                    for name, table in tables.items()}
             for tier, tables in overrides["tier_weights"].items()}
+    def autokeys(table):  # config default is an empty dict: numeric JSON keys -> numbers (recursively)
+        if not isinstance(table, dict):
+            return table
+        num = lambda k: (int(float(k)) if float(k).is_integer() else float(k)) if isinstance(k, str) and k.replace(".", "", 1).isdigit() else k
+        return {num(k): autokeys(v) for k, v in table.items()}
     for k, v in overrides.items():
         cur = getattr(cfg, k)
+        if cur == {} and isinstance(v, dict):
+            v = autokeys(v)
         if isinstance(cur, dict) and isinstance(v, dict):
             v = {(float(kk) if isinstance(next(iter(cur), None), (int, float)) and not isinstance(kk, (int, float))
                   else kk): vv for kk, vv in v.items()}

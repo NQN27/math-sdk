@@ -466,6 +466,22 @@ def test_treasure_hunt_min_coin_only_outside_bonus(gs, cfg):
     assert gs.current_min_coin() == cfg.stage_min_coin[5]
 
 
+
+# ---- Per-tier stage coin minimum (designer 2026-10-17, Super trial) --------------
+def test_tier_stage_min_coin_overrides_one_tier(gs, cfg):
+    old = cfg.tier_stage_min_coin
+    try:
+        cfg.tier_stage_min_coin = {"super": {2: 0.2}}
+        gs.treasure_hunt, gs.in_bonus, gs.stage = False, True, 2
+        gs.bonus_tier = "super"
+        assert gs.current_min_coin() == 0.2
+        gs.stage = 3  # other stages keep the proposal minimum
+        assert gs.current_min_coin() == cfg.stage_min_coin[3]
+        gs.bonus_tier, gs.stage = "bonus", 2  # other tiers keep it too
+        assert gs.current_min_coin() == cfg.stage_min_coin[2] == 1
+    finally:
+        cfg.tier_stage_min_coin = old
+
 def test_treasure_hunt_spin_coins_at_least_1x(gs, cfg):
     saved = cfg.feature_heroic_chance
     cfg.feature_heroic_chance = 0.0
@@ -506,3 +522,16 @@ def test_bonus_min_total_win_topup(gs, cfg):
     finally:
         cfg.bonus_min_total_win.clear()
         cfg.bonus_min_total_win.update(saved)
+
+
+# ---- Treasure Star value table (tuning flag, 2026-10-17) -------------------------
+def test_star_value_weights_own_table_and_fallback(gs, cfg):
+    old = cfg.star_value_weights
+    try:
+        cfg.star_value_weights = {2: 1}
+        gs.treasure_hunt, gs.in_bonus, gs.bonus_tier, gs.stage = False, False, None, 1
+        assert gs._treasure_cell("star", 1).prize == 2
+        assert gs._treasure_cell("star", 5).prize >= 5  # nothing >= 5 in the own table: coin table
+        assert gs._treasure_cell("coin", 1).prize in cfg.coin_value_weights  # coins unaffected
+    finally:
+        cfg.star_value_weights = old

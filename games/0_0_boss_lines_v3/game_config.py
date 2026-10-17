@@ -133,6 +133,10 @@ class GameConfig(Config):
         self.stage_min_chest = {0: "dong", 1: "dong", 2: "dong", 3: "bac", 4: "vang",
                                 5: "kimcuong", ENDLESS: "kimcuong"}
         self.stage_min_coin = {0: 0.2, 1: 0.2, 2: 1, 3: 1, 4: 5, 5: 20, ENDLESS: 20}
+        # Per-Bonus-tier replacements of stage_min_coin, e.g. {"super": {2: 0.2}} (designer 2026-10-17:
+        # trial for Super, whose first clear lights ~all cells, so a 1x minimum puts every clear >= ~40x).
+        # Empty = the proposal minimums above for every tier.
+        self.tier_stage_min_coin = {}
         self.boss_zones = {"boss1": (0, 1), "boss2": (2, 3), "boss3": (4, 5)}
         self.endless_zone = {"endless": tuple(range(6))}
 
@@ -178,6 +182,10 @@ class GameConfig(Config):
         # Both can be set per Bonus tier through tier_weights. Defaults keep the old behaviour.
         self.wild_coin_min_value = 0.0
         self.wild_coin_value_weights = None
+        # Treasure Star value: optional own weights over the (fixed) coin values; None = the coin table.
+        # Per Bonus tier through tier_weights (tuning only, 2026-10-17: Super spread). Values below the
+        # stage minimum are dropped; if none is left the coin table is used.
+        self.star_value_weights = None
 
         # ---- Powers --------------------------------------------------------------
         self.power_names = ["enhance", "upgrade", "transform", "replace", "destroy"]
