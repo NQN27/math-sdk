@@ -13,8 +13,7 @@ import random
 
 from game_override import GameStateOverride
 from game_config import ENDLESS
-from game_events import emit, boss_state_event
-from src.events.events import reveal_event
+from game_events import emit, boss_state_event, pos, reveal
 from src.calculations.statistics import get_random_outcome
 
 
@@ -68,7 +67,7 @@ class GameState(GameStateOverride):
             self._guarantee_wild_or_weapon(min_wild_weapon)
         if min_weapons:
             self._guarantee_wild_or_weapon(min_weapons, weapons_only=True)
-        reveal_event(self)
+        reveal(self)
         self.resolve_actions()
         if not self.wincap_triggered:
             self.open_chests()
@@ -98,7 +97,7 @@ class GameState(GameStateOverride):
         self.win_manager.reset_spin_win()
         self.begin_spin()
         self.draw_board(self.stage_reel())
-        reveal_event(self)
+        reveal(self)
         self.epic_opening = True
         emit(self, "epicOpeningTreasure")
         self.run_treasure(self.treasure_cells(), self.config.stage_min_coin[self.config.epic_opening_treasure_stage])
@@ -147,7 +146,7 @@ class GameState(GameStateOverride):
             self.spawn_stage(None)
             self.begin_spin()
             self.draw_board("BR0")
-            reveal_event(self)
+            reveal(self)
             self.run_treasure(self.all_cells(), self.current_min_coin())
             self.emit_spin_end()
         self.win_manager.update_gametype_wins(self.gametype)
@@ -190,7 +189,8 @@ class GameState(GameStateOverride):
         self.last_endless_hp = None
         spec = cfg.bonus_tiers[tier]
         self.free_spins_left = spec["spins"]
-        emit(self, "bonusStart", tier=tier, freeSpins=self.free_spins_left, stage=spec["start_stage"])
+        emit(self, "bonusStart", tier=tier, freeSpins=self.free_spins_left, stage=spec["start_stage"],
+             triggerCells=[pos(self, c, r) for c, r in sorted(trigger_cells)])
         self.spawn_stage(spec["start_stage"])
         if tier == "epic":
             self.epic_opening_treasure()
@@ -202,10 +202,12 @@ class GameState(GameStateOverride):
             if self.stage_cleared:
                 nxt = ENDLESS if self.stage in (5, ENDLESS) else self.stage + 1
                 self.spawn_stage(nxt)
-            if spin_no > 1 and tier in cfg.lit_reset_each_spin_tiers:
+            lit_reset = spin_no > 1 and tier in cfg.lit_reset_each_spin_tiers
+            if lit_reset:
                 self.lit = set()  # Q23 trial: lit cells last one spin
             emit(self, "freeSpinStart", spin=spin_no, freeSpinsLeft=self.free_spins_left,
-                 stage=self.stage_label(), globalMult=self.global_factor())
+                 stage=self.stage_label(), globalMult=self.global_factor(),
+                 **({"litReset": True} if lit_reset else {}))
             self.play_one_spin(self.stage_reel(),
                                min_weapons=cfg.bonus_min_weapons.get(tier, 0))
             self.win_manager.update_gametype_wins(self.gametype)
