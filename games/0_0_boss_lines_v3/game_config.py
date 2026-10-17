@@ -246,7 +246,9 @@ class GameConfig(Config):
         }
         self.scatter_to_tier = {3: "bonus", 4: "super", 5: "epic"}
         # Scatter-count mix (%) of a forced Bonus (designer table 2026-10-12, tuning/targets/mode_targets_2026-10-12.csv).
-        self.tier_mix = {"buy3": {3: 97.5, 4: 2.4, 5: 0.1}, "buy4": {4: 97.5, 5: 2.5}}
+        self.tier_mix = {"buy3": {3: 97.5, 4: 2.4, 5: 0.1}, "buy4": {4: 97.5, 5: 2.5},
+                         # Random Bonus (cost 400): one spin with guaranteed 3/4/5 Scatters (designer 2026-10-12)
+                         "random_bonus": {3: 60, 4: 27, 5: 13}}
         # Natural trigger rate per spin of each tier in base / ante (same table).
         self.tier_trigger_rate = {"base": {"bonus": 1 / 350, "super": 1 / 2815, "epic": 1 / 14990},
                                   "ante": {"bonus": 1 / 70, "super": 1 / 563, "epic": 1 / 2998}}
@@ -329,9 +331,10 @@ class GameConfig(Config):
         ))
         # Tier means (designer table 2026-10-12): Bonus 91x, Super 245x, Epic 2045x. buy3 97.5/2.4/0.1 pays
         # 96.65x and buy4 97.5/2.5 pays 290.0x; the designer's small gap (0.05x / 0.10x) is left to the
-        # trigger spin's own line wins.
+        # trigger spin's own line wins. Random Bonus 60/27/13 pays 386.6x of 386.8x (0.967 x 400).
         self.tier_mean_targets = {"bonus": 91.0, "super": 245.0, "epic": 2045.0}
-        for name, cost, triggers in (("buy3", 100.0, self.tier_mix["buy3"]), ("buy4", 300.0, self.tier_mix["buy4"])):
+        for name, cost, triggers in (("buy3", 100.0, self.tier_mix["buy3"]), ("buy4", 300.0, self.tier_mix["buy4"]),
+                                      ("random_bonus", 400.0, self.tier_mix["random_bonus"])):
             self.bet_modes.append(BetMode(
                 name=name, cost=cost, rtp=self.rtp, max_win=maxwin,
                 auto_close_disabled=False, is_feature=False, is_buybonus=True,

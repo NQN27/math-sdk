@@ -18,7 +18,7 @@ if __name__ == "__main__":
     compression = True
     profiling = False
 
-    num_sim_args = {"base": 2000, "ante": 2000, "feature": 1000, "buy3": 1000, "buy4": 1000}
+    num_sim_args = {"base": 2000, "ante": 2000, "feature": 1000, "buy3": 1000, "buy4": 1000, "random_bonus": 1000}
     run_conditions = {
         "run_sims": True,
         "run_optimization": False,

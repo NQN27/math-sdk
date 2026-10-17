@@ -99,8 +99,8 @@ class OptimizationSetup:
         caps = {bm.get_name(): bm.get_wincap() for bm in cfg.bet_modes}
         opt = {}
 
-        # ---- buy modes: forced 3/4/5 Scatters, tier mix from the designer table ------------------------
-        for mode in ("buy3", "buy4"):
+        # ---- buy modes (buy3, buy4, Random Bonus): forced 3/4/5 Scatters, tier mix from the designer table ------------------------
+        for mode in ("buy3", "buy4", "random_bonus"):
             mix = cfg.tier_mix[mode]
             tot = sum(mix.values())
             prob = {cfg.scatter_to_tier[n]: w / tot for n, w in mix.items()}

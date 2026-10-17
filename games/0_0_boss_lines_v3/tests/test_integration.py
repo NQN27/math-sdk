@@ -16,7 +16,8 @@ def rounds(gs, cfg, mode, crit, n=N):
 
 
 CASES = [("base", "basegame"), ("base", "0"), ("base", "freegame"), ("ante", "basegame"),
-         ("feature", "basegame"), ("buy3", "freegame"), ("buy4", "freegame")]
+         ("feature", "basegame"), ("buy3", "freegame"), ("buy4", "freegame"),
+         ("random_bonus", "freegame")]
 
 
 @pytest.mark.parametrize("mode,crit", CASES)
@@ -121,7 +122,7 @@ def tame(cfg):
         getattr(cfg, k).update(v)
 
 
-@pytest.mark.parametrize("mode", ["buy3", "buy4", "feature"])
+@pytest.mark.parametrize("mode", ["buy3", "buy4", "random_bonus", "feature"])
 def test_mode_guarantees_and_bookkeeping(gs, tame, mode):
     cfg = tame
     checked = 0
@@ -164,7 +165,7 @@ def test_mode_guarantees_and_bookkeeping(gs, tame, mode):
             assert played == starts[0]["freeSpins"] + added
     if mode == "buy4":
         assert epic_spins > 0
-    if mode in ("buy3", "buy4"):
+    if mode in ("buy3", "buy4", "random_bonus"):
         assert checked >= 20, f"only {checked} uncapped Bonus rounds were checked"
 
 
