@@ -482,19 +482,25 @@ def test_tier_stage_min_coin_overrides_one_tier(gs, cfg):
     finally:
         cfg.tier_stage_min_coin = old
 
-def test_lit_cap_limits_one_tier(gs, cfg):
-    old = cfg.lit_cap
+def test_lit_decay_one_tier(gs, cfg):
+    old = cfg.lit_decay
+    cells = [(c, r) for c in range(6) for r in range(5)]
     try:
-        cfg.lit_cap = {"super": 3}
         gs.treasure_hunt, gs.in_bonus = False, True
+        cfg.lit_decay = {"super": {"free": 3, "decay": 0.0}}  # decay 0: nothing past the free cells lights
         gs.bonus_tier, gs.lit = "super", {(0, 0)}
-        gs.destroy_cells([(1, 0), (2, 0), (3, 0), (4, 0)], lit_cells=[(1, 0), (2, 0), (3, 0), (4, 0)])
-        assert gs.lit == {(0, 0), (1, 0), (2, 0)}  # cell order until the cap
-        gs.bonus_tier, gs.lit = "bonus", set()  # other tiers are not capped
-        gs.destroy_cells([(1, 0), (2, 0), (3, 0), (4, 0)], lit_cells=[(1, 0), (2, 0), (3, 0), (4, 0)])
-        assert len(gs.lit) == 4
+        gs.destroy_cells(cells[1:6], lit_cells=cells[1:6])
+        assert gs.lit == {(0, 0), (0, 1), (0, 2)}
+        cfg.lit_decay = {"super": {"free": 3, "decay": 0.8}}  # gradual: some but not all cells light
+        random.seed(1)
+        gs.lit = set()
+        gs.destroy_cells(cells, lit_cells=cells)
+        assert 3 < len(gs.lit) < 30
+        gs.bonus_tier, gs.lit = "bonus", set()  # other tiers light every connected cell
+        gs.destroy_cells(cells, lit_cells=cells)
+        assert len(gs.lit) == 30
     finally:
-        cfg.lit_cap = old
+        cfg.lit_decay = old
         gs.lit = set()
 
 

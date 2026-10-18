@@ -162,10 +162,11 @@ class GameExecutables(GameCalculations):
         for c, r in cells:
             self.board[c][r] = None
             self.enhance[c][r] = 0
-        cap = self.config.lit_cap.get(self.bonus_tier) if self.in_bonus else None
+        decay = self.config.lit_decay.get(self.bonus_tier) if self.in_bonus else None
         for cell in lit_cells:
-            if cap is not None and len(self.lit) >= cap:
-                break
+            if decay and cell not in self.lit:
+                if random.random() >= decay["decay"] ** max(0, len(self.lit) + 1 - decay["free"]):
+                    continue
             self.lit.add(cell)
 
     def refill(self) -> list:

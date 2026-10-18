@@ -41,9 +41,10 @@ def _no_bias():
     return ConstructFenceBias(applied_criteria=[], bias_ranges=[], bias_weights=[]).return_dict()
 
 
-def tier_fences(cfg, prob, cost, extra_per_book=0.0, pooled_wincap=False):
+def tier_fences(cfg, prob, cost, extra_per_book=0.0, pooled_wincap=False, mw_tiers=None):
     """Fence plan [(name, rtp, hr, search)] for tiers entered with probability prob[t] per round.
-    extra_per_book: x-bet added to every tier book (the trigger spin's share of the designer's gap)."""
+    extra_per_book: x-bet added to every tier book (the trigger spin's share of the designer's gap).
+    mw_tiers: only these tiers get a Max Win fence (others keep their Max Win books in the tier fence)."""
     cap = cfg.wincap
     tiers = [t for t in TIER_ORDER if prob.get(t, 0) > 0]
     plan, mw_fences, pooled = [], [], 0.0
@@ -51,13 +52,17 @@ def tier_fences(cfg, prob, cost, extra_per_book=0.0, pooled_wincap=False):
         p, mw = prob[t], cfg.tier_maxwin_rate[t]
         if pooled_wincap:
             pooled += p * mw * cap / cost
+        elif mw_tiers is not None:
+            if t in mw_tiers:
+                mw_fences.append((t, p * mw * cap / cost, 1 / (p * mw), {"maxwin_tier": t}))
         elif p * mw >= MIN_MW_PROB:
             mw_fences.append((t, p * mw * cap / cost, 1 / (p * mw), {"maxwin_tier": t}))
     for i, (t, rtp, hr, search) in enumerate(mw_fences):
         plan.append(("wincap" if i == 0 else f"wincap_{t}", rtp, hr, search))
     for t in tiers:
         p, mw, m = prob[t], cfg.tier_maxwin_rate[t], cfg.tier_mean_targets[t] + extra_per_book
-        own_mw = pooled_wincap or p * mw >= MIN_MW_PROB  # Max Win books already taken by a Max Win fence
+        # Max Win books already taken by a Max Win fence
+        own_mw = pooled_wincap or (t in mw_tiers if mw_tiers is not None else p * mw >= MIN_MW_PROB)
         if own_mw:
             rtp, hr = p * (m - mw * cap) / cost, 1 / (p * (1 - mw))
         else:
@@ -147,10 +152,13 @@ class OptimizationSetup:
         # ---- base / ante: natural trigger rates per tier from the designer table -------------------------
         for mode in ("base", "ante"):
             prob = cfg.tier_trigger_rate[mode]
-            plan, pooled = tier_fences(cfg, prob, cost[mode], pooled_wincap=True)
-            conds = {"wincap": _wincap_fence(pooled, caps[mode]),
-                     "0": ConstructConditions(rtp=0, av_win=0, search_conditions=0).return_dict()}
-            conds.update(_conditions(plan, cost[mode], cap))
+            # Max Win only through the tiers in base_maxwin_fence_tiers, each at its exact rate; the other
+            # tiers' (very rare) Max Win books stay in their tier fence, so every tier mean is exact.
+            plan, _ = tier_fences(cfg, prob, cost[mode], mw_tiers=cfg.base_maxwin_fence_tiers)
+            conds = _conditions(plan, cost[mode], cap)
+            conds = {**{k: v for k, v in conds.items() if k.startswith("wincap")},
+                     "0": ConstructConditions(rtp=0, av_win=0, search_conditions=0).return_dict(),
+                     **{k: v for k, v in conds.items() if not k.startswith("wincap")}}
             # base game proper (line wins, Treasure at stage 0) pays the rest - the designer's "gap"
             conds["basegame"] = ConstructConditions(hr=3.5, rtp=0.0).return_dict()
             opt[mode] = {
@@ -172,10 +180,19 @@ class OptimizationSetup:
         z = cfg.feature_zero_share["heroic"]
         conds["0"] = ConstructConditions(rtp=0, av_win=0, hr=round(1 / (share["heroic"] * z), 4),
                                          search_conditions=0).return_dict()
+        # Treasure hunt spins that enter a Bonus: own fences (before the Treasure hunt fence) fix their share
+        entry = cfg.feature_bonus_entry
+        for t, (s, avg) in entry.items():
+            p = share["treasure_hunt"] * s
+            conds[f"th_{t}"] = ConstructConditions(rtp=round(p * avg / cost["feature"], 7), hr=round(1 / p, 4),
+                                                   search_conditions={"bonus_tier": t}).return_dict()
         for f, key in (("heroic", "heroic"), ("treasure_hunt", "basegame")):
             p, mw, m = share[f], cfg.feature_maxwin_rates[f], cfg.feature_mean_targets[f]
             zero = cfg.feature_zero_share[f]
             nonzero = 1 - zero - mw  # Max Win books are taken by the feature's own Max Win fence
+            if f == "treasure_hunt":  # minus the Bonus-entry books fenced above
+                nonzero -= sum(s for s, _ in entry.values())
+                m -= sum(s * avg for s, avg in entry.values())
             rtp = p * (m - mw * cap) / cost["feature"]
             conds[key] = ConstructConditions(rtp=round(rtp, 7), hr=round(1 / (p * nonzero), 4),
                                              search_conditions={"feature": f}).return_dict()

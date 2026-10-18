@@ -229,10 +229,11 @@ class GameConfig(Config):
         # cells lit during the spin that cleared the stage. The Scatter cells that triggered the
         # Bonus are lit for the first spin only. Empty = Q23 as answered (lit for the whole Bonus).
         self.lit_reset_each_spin_tiers = ()
-        # Trial (designer idea 2026-10-18, NOT approved yet): most cells a Bonus tier may have lit,
-        # e.g. {"super": 24}. Connected cells light as usual (cell order) until the cap is reached.
-        # Empty = no cap.
-        self.lit_cap = {}
+        # Trial (designer 2026-10-18, NOT approved yet; replaces a hard lit-cell cap): per Bonus tier
+        # {"free": n, "decay": d}. A connected cell that is not lit yet lights with chance
+        # d ** max(0, lit + 1 - n), lit = cells already lit (the first n always light), so lighting gets gradually harder as the board fills.
+        # Empty = every connected cell lights (Q23).
+        self.lit_decay = {}
         self.epic_min_coin = 5  # N6: no Dong coins during Epic free spins
         self.epic_opening_treasure_stage = 2  # N5: Epic starts with a Treasure "as if stage 2 was cleared"
         # Per-Bonus-tier replacements for the weight tables above (coin_value_weights,
@@ -265,6 +266,14 @@ class GameConfig(Config):
         self.feature_zero_share = {"heroic": 0.30, "treasure_hunt": 0.0}
         self.feature_maxwin_rates = {"heroic": 0.001945, "treasure_hunt": 0.00185}
         self.feature_maxwin_rate = 0.5 * 0.001945 + 0.5 * 0.00185
+        # Treasure hunt spins that enter a Bonus (designer: Bonus 1.4% / Super 0.4% / Epic 0.1% of Treasure hunt
+        # spins): {tier: (share of Treasure hunt spins, average book pay x bet incl. the Treasure hunt spin)}.
+        # The average sits near the books' median so the optimizer can reach it. Epic is left free: a 10k
+        # Feature run has only ~1 Epic book.
+        self.feature_bonus_entry = {"bonus": (0.014, 260.0), "super": (0.004, 720.0)}
+        # base/ante: tiers whose Max Win books get their own exact-rate fence (the others keep their Max Win books
+        # inside the tier fence, so the tier mean incl. Max Win is exact and its Max Win rate is free).
+        self.base_maxwin_fence_tiers = ("epic",)
         # Designer 2026-10-08: minimum total Bonus win per tier, topped up at Bonus end.
         self.bonus_min_total_win = {"epic": 600.0}
         # Weapons guaranteed on each free spin's opening board (designer 2026-10-07;
