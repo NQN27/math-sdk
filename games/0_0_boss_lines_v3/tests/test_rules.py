@@ -482,6 +482,22 @@ def test_tier_stage_min_coin_overrides_one_tier(gs, cfg):
     finally:
         cfg.tier_stage_min_coin = old
 
+def test_lit_cap_limits_one_tier(gs, cfg):
+    old = cfg.lit_cap
+    try:
+        cfg.lit_cap = {"super": 3}
+        gs.treasure_hunt, gs.in_bonus = False, True
+        gs.bonus_tier, gs.lit = "super", {(0, 0)}
+        gs.destroy_cells([(1, 0), (2, 0), (3, 0), (4, 0)], lit_cells=[(1, 0), (2, 0), (3, 0), (4, 0)])
+        assert gs.lit == {(0, 0), (1, 0), (2, 0)}  # cell order until the cap
+        gs.bonus_tier, gs.lit = "bonus", set()  # other tiers are not capped
+        gs.destroy_cells([(1, 0), (2, 0), (3, 0), (4, 0)], lit_cells=[(1, 0), (2, 0), (3, 0), (4, 0)])
+        assert len(gs.lit) == 4
+    finally:
+        cfg.lit_cap = old
+        gs.lit = set()
+
+
 def test_treasure_hunt_spin_coins_at_least_1x(gs, cfg):
     saved = cfg.feature_heroic_chance
     cfg.feature_heroic_chance = 0.0

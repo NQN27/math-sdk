@@ -162,7 +162,10 @@ class GameExecutables(GameCalculations):
         for c, r in cells:
             self.board[c][r] = None
             self.enhance[c][r] = 0
+        cap = self.config.lit_cap.get(self.bonus_tier) if self.in_bonus else None
         for cell in lit_cells:
+            if cap is not None and len(self.lit) >= cap:
+                break
             self.lit.add(cell)
 
     def refill(self) -> list:

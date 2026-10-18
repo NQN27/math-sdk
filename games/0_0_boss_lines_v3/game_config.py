@@ -229,6 +229,10 @@ class GameConfig(Config):
         # cells lit during the spin that cleared the stage. The Scatter cells that triggered the
         # Bonus are lit for the first spin only. Empty = Q23 as answered (lit for the whole Bonus).
         self.lit_reset_each_spin_tiers = ()
+        # Trial (designer idea 2026-10-18, NOT approved yet): most cells a Bonus tier may have lit,
+        # e.g. {"super": 24}. Connected cells light as usual (cell order) until the cap is reached.
+        # Empty = no cap.
+        self.lit_cap = {}
         self.epic_min_coin = 5  # N6: no Dong coins during Epic free spins
         self.epic_opening_treasure_stage = 2  # N5: Epic starts with a Treasure "as if stage 2 was cleared"
         # Per-Bonus-tier replacements for the weight tables above (coin_value_weights,
