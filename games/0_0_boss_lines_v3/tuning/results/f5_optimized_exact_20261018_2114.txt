@@ -1,0 +1,899 @@
+{
+ "buy3": {
+  "wincap": [
+   0.00513,
+   48732.943469785576,
+   25000.0
+  ],
+  "wincap_bonus": [
+   0.026325001,
+   9496.675802595411,
+   25000.000000000004
+  ],
+  "epic": [
+   0.0204505,
+   1000.0,
+   2045.0499999999997
+  ],
+  "super": [
+   0.053682,
+   41.7023,
+   223.86628686
+  ],
+  "freegame": [
+   0.8614125,
+   1.0258,
+   88.36369425000001
+  ]
+ },
+ "buy4": {
+  "wincap": [
+   0.020833333,
+   4000.000064000001,
+   25000.0
+  ],
+  "wincap_super": [
+   0.06946875,
+   1199.580146948568,
+   25000.0
+  ],
+  "epic": [
+   0.1495917,
+   40.404,
+   1813.2309140400002
+  ],
+  "freegame": [
+   0.7271062,
+   1.0265,
+   223.91235429000002
+  ]
+ },
+ "random_bonus": {
+  "wincap": [
+   0.08125,
+   769.2307692307692,
+   24999.999999999996
+  ],
+  "wincap_super": [
+   0.014428125,
+   4331.8171973142735,
+   25000.0
+  ],
+  "wincap_bonus": [
+   0.00405,
+   15432.0987654321,
+   25000.0
+  ],
+  "epic": [
+   0.58344,
+   7.77,
+   1813.3315199999997
+  ],
+  "super": [
+   0.1510819,
+   3.7069,
+   224.01819804399997
+  ],
+  "freegame": [
+   0.13275,
+   1.6668,
+   88.50708
+  ]
+ },
+ "base": {
+  "wincap": [
+   0.0319853,
+   null,
+   25000.0
+  ],
+  "0": [
+   0,
+   null,
+   0.0
+  ],
+  "epic": [
+   0.1197465,
+   15141.4141,
+   1813.13134352565
+  ],
+  "super": [
+   0.0794405,
+   2817.4089,
+   223.81637172044998
+  ],
+  "freegame": [
+   0.2522857,
+   350.0378,
+   88.30953139946
+  ],
+  "basegame": [
+   0.483542,
+   3.5,
+   1.6923970000000002
+  ]
+ },
+ "ante": {
+  "wincap": [
+   0.0533089,
+   null,
+   75000.0
+  ],
+  "0": [
+   0,
+   null,
+   0.0
+  ],
+  "epic": [
+   0.1995775,
+   3028.2828,
+   1813.131331551
+  ],
+  "super": [
+   0.1324008,
+   563.4818,
+   223.81632331632005
+  ],
+  "freegame": [
+   0.4204762,
+   70.0076,
+   88.30958885736
+  ],
+  "basegame": [
+   0.1612366,
+   3.5,
+   1.6929843
+  ]
+ },
+ "feature": {
+  "wincap": [
+   0.049792,
+   1004.1773778920308,
+   25000.0
+  ],
+  "wincap_treasure_hunt": [
+   0.045140001,
+   1107.6650175528353,
+   25000.0
+  ],
+  "0": [
+   0,
+   6.5104,
+   0.0
+  ],
+  "heroic": [
+   0.36288,
+   2.798,
+   507.66912
+  ],
+  "basegame": [
+   0.509188,
+   2.053,
+   522.681482
+  ]
+ }
+}
+
+Creating books...
+
+Creating books for 0_0_boss_lines_v3 in base
+Batch 1 of 20
+Thread 0 finished with 43.067 RTP. [baseGame: 0.764, freeGame: 42.303]
+Batch 2 of 20
+Thread 0 finished with 31.874 RTP. [baseGame: 1.642, freeGame: 30.232]
+Batch 3 of 20
+Thread 0 finished with 103.56 RTP. [baseGame: 51.294, freeGame: 52.266]
+Batch 4 of 20
+Thread 0 finished with 98.904 RTP. [baseGame: 25.745, freeGame: 73.159]
+Batch 5 of 20
+Thread 0 finished with 87.14 RTP. [baseGame: 50.85, freeGame: 36.29]
+Batch 6 of 20
+Thread 0 finished with 44.584 RTP. [baseGame: 1.149, freeGame: 43.435]
+Batch 7 of 20
+Thread 0 finished with 39.417 RTP. [baseGame: 1.454, freeGame: 37.963]
+Batch 8 of 20
+Thread 0 finished with 34.972 RTP. [baseGame: 0.757, freeGame: 34.215]
+Batch 9 of 20
+Thread 0 finished with 43.879 RTP. [baseGame: 2.094, freeGame: 41.786]
+Batch 10 of 20
+Thread 0 finished with 71.953 RTP. [baseGame: 25.882, freeGame: 46.07]
+Batch 11 of 20
+Thread 0 finished with 78.995 RTP. [baseGame: 25.953, freeGame: 53.041]
+Batch 12 of 20
+Thread 0 finished with 105.819 RTP. [baseGame: 77.017, freeGame: 28.802]
+Batch 13 of 20
+Thread 0 finished with 84.288 RTP. [baseGame: 50.733, freeGame: 33.555]
+Batch 14 of 20
+Thread 0 finished with 36.33 RTP. [baseGame: 0.711, freeGame: 35.619]
+Batch 15 of 20
+Thread 0 finished with 45.703 RTP. [baseGame: 1.137, freeGame: 44.566]
+Batch 16 of 20
+Thread 0 finished with 29.396 RTP. [baseGame: 2.047, freeGame: 27.349]
+Batch 17 of 20
+Thread 0 finished with 53.87 RTP. [baseGame: 25.672, freeGame: 28.198]
+Batch 18 of 20
+Thread 0 finished with 83.628 RTP. [baseGame: 51.06, freeGame: 32.568]
+Batch 19 of 20
+Thread 0 finished with 94.885 RTP. [baseGame: 51.834, freeGame: 43.052]
+Batch 20 of 20
+Thread 0 finished with 148.377 RTP. [baseGame: 75.816, freeGame: 72.562]
+Saving books for  0_0_boss_lines_v3 in base
+Saving force files for 0_0_boss_lines_v3 in base
+Saving LUTs for 0_0_boss_lines_v3 in base
+Wrote verification file: D:\Stake Engine\math-sdk\games\0_0_boss_lines_v3\library\configs\books_base.verification.json
+
+Creating books for 0_0_boss_lines_v3 in ante
+Batch 1 of 20
+Thread 0 finished with 11.554 RTP. [baseGame: 0.257, freeGame: 11.296]
+Batch 2 of 20
+Thread 0 finished with 11.291 RTP. [baseGame: 0.334, freeGame: 10.957]
+Batch 3 of 20
+Thread 0 finished with 45.365 RTP. [baseGame: 16.936, freeGame: 28.429]
+Batch 4 of 20
+Thread 0 finished with 28.24 RTP. [baseGame: 8.627, freeGame: 19.612]
+Batch 5 of 20
+Thread 0 finished with 29.455 RTP. [baseGame: 16.902, freeGame: 12.554]
+Batch 6 of 20
+Thread 0 finished with 11.418 RTP. [baseGame: 0.331, freeGame: 11.087]
+Batch 7 of 20
+Thread 0 finished with 13.376 RTP. [baseGame: 0.264, freeGame: 13.112]
+Batch 8 of 20
+Thread 0 finished with 19.603 RTP. [baseGame: 0.296, freeGame: 19.307]
+Batch 9 of 20
+Thread 0 finished with 20.636 RTP. [baseGame: 0.273, freeGame: 20.363]
+Batch 10 of 20
+Thread 0 finished with 21.554 RTP. [baseGame: 8.71, freeGame: 12.844]
+Batch 11 of 20
+Thread 0 finished with 32.503 RTP. [baseGame: 8.629, freeGame: 23.873]
+Batch 12 of 20
+Thread 0 finished with 36.895 RTP. [baseGame: 25.296, freeGame: 11.599]
+Batch 13 of 20
+Thread 0 finished with 32.145 RTP. [baseGame: 17.128, freeGame: 15.016]
+Batch 14 of 20
+Thread 0 finished with 12.656 RTP. [baseGame: 0.568, freeGame: 12.087]
+Batch 15 of 20
+Thread 0 finished with 13.674 RTP. [baseGame: 0.404, freeGame: 13.27]
+Batch 16 of 20
+Thread 0 finished with 14.574 RTP. [baseGame: 0.248, freeGame: 14.326]
+Batch 17 of 20
+Thread 0 finished with 29.516 RTP. [baseGame: 8.588, freeGame: 20.928]
+Batch 18 of 20
+Thread 0 finished with 28.671 RTP. [baseGame: 16.91, freeGame: 11.761]
+Batch 19 of 20
+Thread 0 finished with 32.545 RTP. [baseGame: 16.932, freeGame: 15.613]
+Batch 20 of 20
+Thread 0 finished with 34.426 RTP. [baseGame: 25.233, freeGame: 9.193]
+Saving books for  0_0_boss_lines_v3 in ante
+Saving force files for 0_0_boss_lines_v3 in ante
+Saving LUTs for 0_0_boss_lines_v3 in ante
+Wrote verification file: D:\Stake Engine\math-sdk\games\0_0_boss_lines_v3\library\configs\books_ante.verification.json
+
+Creating books for 0_0_boss_lines_v3 in feature
+Batch 1 of 10
+Thread 0 finished with 0.934 RTP. [baseGame: 0.933, freeGame: 0.001]
+Batch 2 of 10
+Thread 0 finished with 0.918 RTP. [baseGame: 0.918, freeGame: 0.001]
+Batch 3 of 10
+Thread 0 finished with 0.952 RTP. [baseGame: 0.951, freeGame: 0.001]
+Batch 4 of 10
+Thread 0 finished with 1.087 RTP. [baseGame: 1.087, freeGame: 0.0]
+Batch 5 of 10
+Thread 0 finished with 0.854 RTP. [baseGame: 0.853, freeGame: 0.001]
+Batch 6 of 10
+Thread 0 finished with 0.918 RTP. [baseGame: 0.917, freeGame: 0.001]
+Batch 7 of 10
+Thread 0 finished with 1.092 RTP. [baseGame: 1.089, freeGame: 0.002]
+Batch 8 of 10
+Thread 0 finished with 0.991 RTP. [baseGame: 0.99, freeGame: 0.001]
+Batch 9 of 10
+Thread 0 finished with 1.031 RTP. [baseGame: 1.027, freeGame: 0.004]
+Batch 10 of 10
+Thread 0 finished with 1.056 RTP. [baseGame: 1.047, freeGame: 0.009]
+Saving books for  0_0_boss_lines_v3 in feature
+Saving force files for 0_0_boss_lines_v3 in feature
+Saving LUTs for 0_0_boss_lines_v3 in feature
+Wrote verification file: D:\Stake Engine\math-sdk\games\0_0_boss_lines_v3\library\configs\books_feature.verification.json
+
+Creating books for 0_0_boss_lines_v3 in buy3
+Batch 1 of 10
+Thread 0 finished with 0.852 RTP. [baseGame: 0.01, freeGame: 0.842]
+Batch 2 of 10
+Thread 0 finished with 1.231 RTP. [baseGame: 0.007, freeGame: 1.224]
+Batch 3 of 10
+Thread 0 finished with 1.452 RTP. [baseGame: 0.005, freeGame: 1.446]
+Batch 4 of 10
+Thread 0 finished with 1.202 RTP. [baseGame: 0.005, freeGame: 1.197]
+Batch 5 of 10
+Thread 0 finished with 1.055 RTP. [baseGame: 0.005, freeGame: 1.05]
+Batch 6 of 10
+Thread 0 finished with 0.994 RTP. [baseGame: 0.006, freeGame: 0.988]
+Batch 7 of 10
+Thread 0 finished with 1.524 RTP. [baseGame: 0.006, freeGame: 1.518]
+Batch 8 of 10
+Thread 0 finished with 1.231 RTP. [baseGame: 0.01, freeGame: 1.222]
+Batch 9 of 10
+Thread 0 finished with 1.164 RTP. [baseGame: 0.006, freeGame: 1.158]
+Batch 10 of 10
+Thread 0 finished with 1.8 RTP. [baseGame: 0.005, freeGame: 1.795]
+Saving books for  0_0_boss_lines_v3 in buy3
+Saving force files for 0_0_boss_lines_v3 in buy3
+Saving LUTs for 0_0_boss_lines_v3 in buy3
+Wrote verification file: D:\Stake Engine\math-sdk\games\0_0_boss_lines_v3\library\configs\books_buy3.verification.json
+
+Creating books for 0_0_boss_lines_v3 in buy4
+Batch 1 of 10
+Thread 0 finished with 1.134 RTP. [baseGame: 0.002, freeGame: 1.133]
+Batch 2 of 10
+Thread 0 finished with 1.062 RTP. [baseGame: 0.001, freeGame: 1.061]
+Batch 3 of 10
+Thread 0 finished with 1.04 RTP. [baseGame: 0.002, freeGame: 1.039]
+Batch 4 of 10
+Thread 0 finished with 1.047 RTP. [baseGame: 0.003, freeGame: 1.044]
+Batch 5 of 10
+Thread 0 finished with 1.239 RTP. [baseGame: 0.002, freeGame: 1.238]
+Batch 6 of 10
+Thread 0 finished with 1.45 RTP. [baseGame: 0.001, freeGame: 1.449]
+Batch 7 of 10
+Thread 0 finished with 1.325 RTP. [baseGame: 0.001, freeGame: 1.324]
+Batch 8 of 10
+Thread 0 finished with 0.987 RTP. [baseGame: 0.002, freeGame: 0.985]
+Batch 9 of 10
+Thread 0 finished with 1.275 RTP. [baseGame: 0.002, freeGame: 1.273]
+Batch 10 of 10
+Thread 0 finished with 1.171 RTP. [baseGame: 0.001, freeGame: 1.17]
+Saving books for  0_0_boss_lines_v3 in buy4
+Saving force files for 0_0_boss_lines_v3 in buy4
+Saving LUTs for 0_0_boss_lines_v3 in buy4
+Wrote verification file: D:\Stake Engine\math-sdk\games\0_0_boss_lines_v3\library\configs\books_buy4.verification.json
+
+Creating books for 0_0_boss_lines_v3 in random_bonus
+Batch 1 of 10
+Thread 0 finished with 1.041 RTP. [baseGame: 0.001, freeGame: 1.04]
+Batch 2 of 10
+Thread 0 finished with 0.926 RTP. [baseGame: 0.001, freeGame: 0.925]
+Batch 3 of 10
+Thread 0 finished with 1.064 RTP. [baseGame: 0.001, freeGame: 1.063]
+Batch 4 of 10
+Thread 0 finished with 1.257 RTP. [baseGame: 0.001, freeGame: 1.256]
+Batch 5 of 10
+Thread 0 finished with 1.255 RTP. [baseGame: 0.001, freeGame: 1.254]
+Batch 6 of 10
+Thread 0 finished with 0.99 RTP. [baseGame: 0.001, freeGame: 0.988]
+Batch 7 of 10
+Thread 0 finished with 1.12 RTP. [baseGame: 0.001, freeGame: 1.118]
+Batch 8 of 10
+Thread 0 finished with 0.908 RTP. [baseGame: 0.001, freeGame: 0.907]
+Batch 9 of 10
+Thread 0 finished with 1.084 RTP. [baseGame: 0.001, freeGame: 1.082]
+Batch 10 of 10
+Thread 0 finished with 1.156 RTP. [baseGame: 0.001, freeGame: 1.155]
+Saving books for  0_0_boss_lines_v3 in random_bonus
+Saving force files for 0_0_boss_lines_v3 in random_bonus
+Saving LUTs for 0_0_boss_lines_v3 in random_bonus
+Wrote verification file: D:\Stake Engine\math-sdk\games\0_0_boss_lines_v3\library\configs\books_random_bonus.verification.json
+
+Finished creating books in 690.9308292865753 seconds.
+
+Running optimization for mode: base
+Running Simulations: 0_0_boss_lines_v3 - Mode: base
+../games/0_0_boss_lines_v3\library\forces\force_record_base.json
+json force path: ../games/0_0_boss_lines_v3\library\forces\force_record_base.json
+
+Creating wincap Fence
+
+
+Creating 0 Fence
+
+
+Creating epic Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+
+Creating super Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+
+Creating freegame Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+
+Creating basegame Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Creating Initial Distributions
+Creating Initial Distributions
+Creating Initial Distributions
+Creating Initial Distributions
+Thread 0: 50% done
+Thread 1: 50% done
+Thread 3: 50% done
+Thread 2: 50% done
+Thread 0: 100% done
+Thread 2: 100% done
+Thread 1: 100% done
+Thread 3: 100% done
+Printing info for Distribution 1
+Printing info for Distribution 6
+Printing info for Distribution 3
+Printing info for Distribution 2
+Printing info for Distribution 8
+Printing info for Distribution 9
+Printing info for Distribution 7
+Printing info for Distribution 4
+Printing info for Distribution 10
+Printing info for Distribution 5
+time taken 72ms
+
+Running optimization for mode: ante
+Running Simulations: 0_0_boss_lines_v3 - Mode: ante
+../games/0_0_boss_lines_v3\library\forces\force_record_ante.json
+json force path: ../games/0_0_boss_lines_v3\library\forces\force_record_ante.json
+
+Creating wincap Fence
+
+
+Creating 0 Fence
+
+
+Creating epic Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+
+Creating super Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+
+Creating freegame Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+
+Creating basegame Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Creating Initial Distributions
+Creating Initial Distributions
+Creating Initial Distributions
+Creating Initial Distributions
+Thread 1: 50% done
+Thread 2: 50% done
+Thread 0: 50% done
+Thread 3: 50% done
+Thread 3: 100% done
+Thread 0: 100% done
+Thread 1: 100% done
+Thread 2: 100% done
+Printing info for Distribution 1
+Printing info for Distribution 6
+Printing info for Distribution 3
+Printing info for Distribution 2
+Printing info for Distribution 8
+Printing info for Distribution 7
+Printing info for Distribution 4
+Printing info for Distribution 9
+Printing info for Distribution 5
+Printing info for Distribution 10
+time taken 72ms
+
+Running optimization for mode: feature
+Running Simulations: 0_0_boss_lines_v3 - Mode: feature
+../games/0_0_boss_lines_v3\library\forces\force_record_feature.json
+json force path: ../games/0_0_boss_lines_v3\library\forces\force_record_feature.json
+
+Creating wincap Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+
+Creating wincap_treasure_hunt Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+
+Creating 0 Fence
+
+
+Creating heroic Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+
+Creating basegame Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Creating Initial Distributions
+Creating Initial Distributions
+Creating Initial Distributions
+Creating Initial Distributions
+Thread 1: 50% done
+Thread 0: 50% done
+Thread 2: 50% done
+Thread 3: 50% done
+Thread 0: 100% done
+Thread 1: 100% done
+Thread 2: 100% done
+Thread 3: 100% done
+Printing info for Distribution 1
+Printing info for Distribution 6
+Printing info for Distribution 8
+Printing info for Distribution 7
+Printing info for Distribution 9
+Printing info for Distribution 10
+Printing info for Distribution 3
+Printing info for Distribution 2
+Printing info for Distribution 4
+Printing info for Distribution 5
+time taken 37ms
+
+Running optimization for mode: buy3
+Running Simulations: 0_0_boss_lines_v3 - Mode: buy3
+../games/0_0_boss_lines_v3\library\forces\force_record_buy3.json
+json force path: ../games/0_0_boss_lines_v3\library\forces\force_record_buy3.json
+
+Creating wincap Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+
+Creating wincap_bonus Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+
+Creating epic Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+
+Creating super Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+
+Creating freegame Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Creating Initial Distributions
+Creating Initial Distributions
+Creating Initial Distributions
+Creating Initial Distributions
+Thread 2: 50% done
+Thread 0: 50% done
+Thread 1: 50% done
+Thread 3: 50% done
+Thread 2: 100% done
+Thread 0: 100% done
+Thread 1: 100% done
+Thread 3: 100% done
+Printing info for Distribution 1
+Printing info for Distribution 3
+Printing info for Distribution 6
+Printing info for Distribution 2
+Printing info for Distribution 4
+Printing info for Distribution 8
+Printing info for Distribution 7
+Printing info for Distribution 5
+Printing info for Distribution 9
+Printing info for Distribution 10
+time taken 38ms
+
+Running optimization for mode: buy4
+Running Simulations: 0_0_boss_lines_v3 - Mode: buy4
+../games/0_0_boss_lines_v3\library\forces\force_record_buy4.json
+json force path: ../games/0_0_boss_lines_v3\library\forces\force_record_buy4.json
+
+Creating wincap Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+
+Creating wincap_super Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+
+Creating epic Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+
+Creating freegame Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Creating Initial Distributions
+Creating Initial Distributions
+Creating Initial Distributions
+Creating Initial Distributions
+Thread 3: 50% done
+Thread 1: 50% done
+Thread 2: 50% done
+Thread 0: 50% done
+Thread 3: 100% done
+Thread 1: 100% done
+Thread 0: 100% done
+Thread 2: 100% done
+Printing info for Distribution 1
+Printing info for Distribution 6
+Printing info for Distribution 4
+Printing info for Distribution 2
+Printing info for Distribution 3
+Printing info for Distribution 5
+Printing info for Distribution 8
+Printing info for Distribution 7
+Printing info for Distribution 9
+Printing info for Distribution 10
+time taken 55ms
+
+Running optimization for mode: random_bonus
+Running Simulations: 0_0_boss_lines_v3 - Mode: random_bonus
+../games/0_0_boss_lines_v3\library\forces\force_record_random_bonus.json
+json force path: ../games/0_0_boss_lines_v3\library\forces\force_record_random_bonus.json
+
+Creating wincap Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+
+Creating wincap_super Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+
+Creating wincap_bonus Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+
+Creating epic Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+
+Creating super Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+
+Creating freegame Fence
+
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Creating Initial Random Distributions...
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Combining Criteria Distributions....
+Creating Initial Distributions
+Creating Initial Distributions
+Creating Initial Distributions
+Creating Initial Distributions
+Thread 1: 50% done
+Thread 2: 50% done
+Thread 0: 50% done
+Thread 3: 50% done
+Thread 1: 100% done
+Thread 2: 100% done
+Thread 0: 100% done
+Thread 3: 100% done
+Printing info for Distribution 1
+Printing info for Distribution 8
+Printing info for Distribution 6
+Printing info for Distribution 3
+Printing info for Distribution 2
+Printing info for Distribution 9
+Printing info for Distribution 7
+Printing info for Distribution 10
+Printing info for Distribution 4
+Printing info for Distribution 5
+time taken 52ms
+
+done ['base', 'ante', 'feature', 'buy3', 'buy4', 'random_bonus']
+base: RTP 96.700000% -> exactly 96.7% (book 1 pay 0x weight -794; book 13477 pay 36.7x weight +19709)
+ante: RTP 96.700000% -> exactly 96.7% (book 1 pay 0x weight +3280; book 18853 pay 183.65x weight +4206)
+feature: RTP 96.701041% -> exactly 96.7% (book 3 pay 0x weight +653208301; book 8785 pay 2509.4x weight -2736964941)
+buy3: RTP 96.704428% -> exactly 96.7% (book 108 pay 0x weight +2750283296; book 6485 pay 504.05x weight -11585608983)
+buy4: RTP 96.698280% -> exactly 96.7% (book 257 pay 0.2x weight -445267959; book 7087 pay 2213.3x weight +2953898714)
+random_bonus: RTP 96.698555% -> exactly 96.7% (book 108 pay 0x weight -232970740; book 3417 pay 3651.45x weight +1966378944)
+base          RTP 96.7000%  0x 71.10%  MaxWin 1 in 781,609
+   bonus_tier=bonus: share 0.2857% (1 in 350.0), mean 88.31
+   bonus_tier=super: share 0.0355% (1 in 2,817.0), mean 227.70
+   bonus_tier=epic: share 0.0066% (1 in 15,116.0), mean 1,852.12
+   maxwin_tier=epic: share 0.0000% (1 in 8,988,504.2), mean 25,000.00
+   maxwin_tier=super: share 0.0000% (1 in 17,977,008.3), mean 25,000.00
+ante          RTP 96.7000%  0x 69.79%  MaxWin 1 in 156,322
+   bonus_tier=bonus: share 1.4284% (1 in 70.0), mean 88.31
+   bonus_tier=super: share 0.1775% (1 in 563.5), mean 223.82
+   bonus_tier=epic: share 0.0331% (1 in 3,016.6), mean 1,902.62
+   maxwin_tier=epic: share 0.0001% (1 in 781,608.1), mean 25,000.00
+feature       RTP 96.7000%  0x 15.36%  MaxWin 1 in 527
+   feature=heroic: share 51.2001% (1 in 2.0), mean 403.00
+   feature=treasure_hunt: share 48.7999% (1 in 2.0), mean 567.96
+   bonus_tier=bonus: share 5.8647% (1 in 17.1), mean 214.51
+   bonus_tier=super: share 0.3930% (1 in 254.4), mean 858.83
+   maxwin_feature=heroic: share 0.0996% (1 in 1,004.2), mean 25,000.00
+   maxwin_feature=treasure_hunt: share 0.0903% (1 in 1,107.7), mean 25,000.00
+   bonus_tier=epic: share 0.0314% (1 in 3,181.9), mean 2,509.40
+buy3          RTP 96.7000%  0x 0.05%  MaxWin 1 in 7,947
+   bonus_tier=bonus: share 97.4999% (1 in 1.0), mean 91.05
+   bonus_tier=super: share 2.4001% (1 in 41.7), mean 245.05
+   bonus_tier=epic: share 0.1000% (1 in 999.9), mean 2,045.05
+   maxwin_tier=bonus: share 0.0105% (1 in 9,496.2), mean 25,000.00
+   maxwin_tier=super: share 0.0021% (1 in 48,730.3), mean 25,000.00
+buy4          RTP 96.7000%  0x 0.00%  MaxWin 1 in 923
+   bonus_tier=super: share 97.4998% (1 in 1.0), mean 245.10
+   bonus_tier=epic: share 2.5002% (1 in 40.0), mean 2,045.12
+   maxwin_tier=epic: share 0.0250% (1 in 4,000.1), mean 25,000.00
+   maxwin_tier=super: share 0.0834% (1 in 1,199.6), mean 25,000.00
+random_bonus  RTP 96.7000%  0x 0.01%  MaxWin 1 in 627
+   bonus_tier=super: share 26.9994% (1 in 3.7), mean 245.20
+   bonus_tier=epic: share 13.0000% (1 in 7.7), mean 2,045.22
+   bonus_tier=bonus: share 60.0007% (1 in 1.7), mean 91.20
+   maxwin_tier=epic: share 0.1300% (1 in 769.2), mean 25,000.00
+   maxwin_tier=bonus: share 0.0065% (1 in 15,432.4), mean 25,000.00
+   maxwin_tier=super: share 0.0231% (1 in 4,331.9), mean 25,000.00
