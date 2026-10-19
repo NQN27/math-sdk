@@ -229,7 +229,7 @@ class GameConfig(Config):
         # cells lit during the spin that cleared the stage. The Scatter cells that triggered the
         # Bonus are lit for the first spin only. Empty = Q23 as answered (lit for the whole Bonus).
         self.lit_reset_each_spin_tiers = ()
-        # Trial (designer 2026-10-18, NOT approved yet; replaces a hard lit-cell cap): per Bonus tier
+        # Trial (designer 2026-10-18, NOT approved yet; replaces a hard lit-cell cap): per Bonus tier (or "heroic")
         # {"free": n, "decay": d}. A connected cell that is not lit yet lights with chance
         # d ** max(0, lit + 1 - n), lit = cells already lit (the first n always light), so lighting gets gradually harder as the board fills.
         # Empty = every connected cell lights (Q23).

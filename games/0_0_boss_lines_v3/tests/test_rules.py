@@ -499,7 +499,12 @@ def test_lit_decay_one_tier(gs, cfg):
         gs.bonus_tier, gs.lit = "bonus", set()  # other tiers light every connected cell
         gs.destroy_cells(cells, lit_cells=cells)
         assert len(gs.lit) == 30
+        cfg.lit_decay = {"heroic": {"free": 3, "decay": 0.0}}  # Heroic spin (not in a Bonus) has its own key
+        gs.in_bonus, gs.heroic, gs.lit = False, True, set()
+        gs.destroy_cells(cells, lit_cells=cells)
+        assert len(gs.lit) == 3
     finally:
+        gs.heroic, gs.in_bonus = False, False
         cfg.lit_decay = old
         gs.lit = set()
 
