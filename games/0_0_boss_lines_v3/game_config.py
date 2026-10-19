@@ -346,9 +346,20 @@ class GameConfig(Config):
             ],
         ))
         # Tier means (designer table 2026-10-12): Bonus 91x, Super 245x, Epic 2045x. buy3 97.5/2.4/0.1 pays
-        # 96.65x and buy4 97.5/2.5 pays 290.0x; the designer's small gap (0.05x / 0.10x) is left to the
-        # trigger spin's own line wins. Random Bonus 60/27/13 pays 386.6x of 386.8x (0.967 x 400).
+        # 96.65x of 96.7x, buy4 97.5/2.5 290.0x of 290.1x, Random Bonus 60/27/13 386.6x of 386.8x.
+        # Designer 2026-10-19: close that gap through the tier mix, not by adding it to every tier mean, so each
+        # tier mean is exact: the Epic share grows by the gap / (2045 - lowest tier mean), taken from the lowest
+        # tier (buy3 Epic 0.10256%, buy4 Epic 2.50556%, Random Bonus Epic 13.01%).
         self.tier_mean_targets = {"bonus": 91.0, "super": 245.0, "epic": 2045.0}
+        for mode, cost in (("buy3", 100.0), ("buy4", 300.0), ("random_bonus", 400.0)):
+            mix = self.tier_mix[mode]
+            tot = sum(mix.values())
+            mean = {n: self.tier_mean_targets[self.scatter_to_tier[n]] for n in mix}
+            gap = self.rtp * cost - sum(w / tot * mean[n] for n, w in mix.items())
+            low = min(mix)
+            d = gap / (mean[5] - mean[low]) * tot
+            mix[5] += d
+            mix[low] -= d
         for name, cost, triggers in (("buy3", 100.0, self.tier_mix["buy3"]), ("buy4", 300.0, self.tier_mix["buy4"]),
                                       ("random_bonus", 400.0, self.tier_mix["random_bonus"])):
             self.bet_modes.append(BetMode(
