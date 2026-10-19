@@ -40,29 +40,22 @@ def fix(mode):
     R = 967 * c * W - 10 * S  # (pay in cents: RTP = S / (W*c*100) -> 10*S == 967*c*W)
     if R == 0:
         print(f"{mode}: already exact"); return
-    by_w = sorted(rows, key=lambda r: (r[2], -r[1]))  # lowest pay first, heaviest first
-    A = by_w[0]
-    alpha = 10 * A[2] - 967 * c
-    best = None
-    for B in sorted(rows, key=lambda r: -r[1])[:2000]:  # heavy books: small relative changes
-        if B is A:
-            continue
-        beta = 10 * B[2] - 967 * c
-        g, x, y = _egcd(alpha, beta)
-        if R % g:
-            continue
-        da, db = x * (R // g), y * (R // g)
-        # move along the solution line to the smallest |da| + |db|
-        sa, sb = beta // g, -alpha // g
-        t = round(-(da * sa + db * sb) / (sa * sa + sb * sb))
-        da, db = da + t * sa, db + t * sb
-        if A[1] + da > 0 and B[1] + db > 0:
-            cost_ = abs(da) / A[1] + abs(db) / B[1]
-            if best is None or cost_ < best[0]:
-                best = (cost_, B, da, db)
+    # Only touch books outside the small Bonus-tier / Max Win groups (a weight change there moves that tier's
+    # exact mean, e.g. buy3 Epic): keep books in no such group, or in the dominant tier (>= 50% of the weight).
+    forces = json.load(open(os.path.join(GAME, "library", "forces", f"force_record_{mode}.json")))
+    wt = {r[0]: r[1] for r in rows}
+    frozen = set()
+    for r in forces:
+        s = r["search"]
+        if len(s) == 1 and s[0]["name"] in ("bonus_tier", "maxwin_tier", "maxwin_feature"):
+            ids = set(r["bookIds"])
+            if s[0]["name"] != "bonus_tier" or sum(wt.get(i, 0) for i in ids) < 0.5 * W:
+                frozen |= ids
+    free = [r for r in rows if r[0] not in frozen]
+    best = _solve(free, R, c) or _solve(rows, R, c)  # fall back to every book if the free ones have no solution
     if best is None:
         raise SystemExit(f"{mode}: no exact integer solution found")
-    _, B, da, db = best
+    _, A, B, da, db = best
     A[1] += da
     B[1] += db
     S2, W2 = sum(w * p for _, w, p in rows), sum(w for _, w, _ in rows)
@@ -70,7 +63,34 @@ def fix(mode):
     with open(f, "w", newline="") as fh:
         csv.writer(fh).writerows(rows)
     print(f"{mode}: RTP {float(Fraction(S, W * c * 100)) * 100:.6f}% -> exactly 96.7% "
-          f"(book {A[0]} pay {A[2] / 100:g}x weight {da:+d}; book {B[0]} pay {B[2] / 100:g}x weight {db:+d})")
+          f"(book {A[0]} pay {A[2] / 100:g}x weight {da:+d}; book {B[0]} pay {B[2] / 100:g}x weight {db:+d})"
+          + ("" if A in free and B in free else " [fallback: a Bonus-tier book was changed]"))
+
+
+def _solve(free, R, c):
+    """(cost, A, B, da, db) with da*(10*pa - 967c) + db*(10*pb - 967c) == R, smallest relative change, or None"""
+    by_w = sorted(free, key=lambda r: (r[2], -r[1]))  # lowest pay first, heaviest first
+    best = None
+    heavy = sorted(free, key=lambda r: -r[1])[:2000]  # heavy books: small relative changes
+    for A in by_w[:20]:
+        alpha = 10 * A[2] - 967 * c
+        for B in heavy:
+            if B is A:
+                continue
+            beta = 10 * B[2] - 967 * c
+            g, x, y = _egcd(alpha, beta)
+            if g == 0 or R % g:
+                continue
+            da, db = x * (R // g), y * (R // g)
+            # move along the solution line to the smallest |da| + |db|
+            sa, sb = beta // g, -alpha // g
+            t = round(-(da * sa + db * sb) / (sa * sa + sb * sb))
+            da, db = da + t * sa, db + t * sb
+            if A[1] + da > 0 and B[1] + db > 0:
+                cost_ = abs(da) / A[1] + abs(db) / B[1]
+                if best is None or cost_ < best[0]:
+                    best = (cost_, A, B, da, db)
+    return best
 
 
 if __name__ == "__main__":
