@@ -423,6 +423,33 @@ def test_lit_rule_basic_only(gs):
     assert (0, 0) in gs.lit and (1, 0) in gs.lit
 
 
+def test_lit_rule_lines(gs, cfg):
+    """lit_rule "lines": only winning-line cells (Wild included) and fired weapons light; other copies of
+    the connected symbol and cells hit by a weapon do not."""
+    old = cfg.lit_rule
+    try:
+        cfg.lit_rule = "lines"
+        gs.spawn_stage(1)
+        rows = board_with_top("H2 H2 W H2 L1 L2")
+        rows[4] = "L1 L2 L3 L4 L1 H2"  # a stray H2, in no winning line
+        set_board(gs, rows)
+        gs.lit = set()
+        gs.refill = lambda: []
+        gs.step_connect()
+        wins_cells = {(0, 0), (1, 0), (2, 0), (3, 0)}
+        assert wins_cells <= gs.lit
+        assert (5, 4) not in gs.lit  # destroyed as a copy of H2, but not in the line
+        assert gs.board[5][4] is None
+        for b in gs.bosses:
+            b["hp"] = b["hp_max"] = 500
+        set_board(gs, ["H3 H3 L1 L2 L3 L4", "BM H5 L1 L2 L3 L4"] + FILLER[2:])
+        gs.lit = set()
+        gs.step_weapons()
+        assert gs.lit == {(0, 1)}  # the bomb's own cell lights, the cells it destroys do not
+    finally:
+        cfg.lit_rule = old
+
+
 def test_weapon_allowed_rules(gs):
     gs.spawn_stage(1)
     gs.bosses[2]["alive"] = False  # boss 3 dead -> no Arrow in columns 5-6

@@ -231,6 +231,13 @@ class GameConfig(Config):
         # cells lit during the spin that cleared the stage. The Scatter cells that triggered the
         # Bonus are lit for the first spin only. Empty = Q23 as answered (lit for the whole Bonus).
         self.lit_reset_each_spin_tiers = ()
+        # Which cells light (designer 2026-10-20, NOT approved into config yet):
+        #  "symbols": every destroyed copy of a connected symbol (basic symbols, not Wild) - as built so far;
+        #  "lines":   only the cells of the winning lines' positions (Wilds included; not the other copies of the
+        #             symbol, not the non-matching rest of a payline), plus activated special symbols: a weapon's
+        #             own cell when it fires, a Scatter collected in a Bonus, and the triggering Scatters at Bonus
+        #             entry. Cells destroyed by weapons, Destroy or any other mechanic never light.
+        self.lit_rule = "symbols"
         # Trial (designer 2026-10-18, NOT approved yet; replaces a hard lit-cell cap): per Bonus tier (or "heroic")
         # {"free": n, "decay": d}. A connected cell that is not lit yet lights with chance
         # d ** max(0, lit + 1 - n), lit = cells already lit (the first n always light), so lighting gets gradually harder as the board fills.

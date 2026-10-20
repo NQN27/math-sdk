@@ -415,7 +415,10 @@ class GameExecutables(GameCalculations):
         dark = [cell for cell in self.darkened if self.is_scatter(self.board[cell[0]][cell[1]])]
         emit(self, "destroy", cause="connect", cells=[pos(self, c, r) for c, r in cells],
              scatters=[pos(self, c, r) for c, r in dark])
-        lit = [(c, r) for c, r in cells if (c, r) not in wild_cells]  # basic symbols only
+        if self.config.lit_rule == "lines":  # only the winning lines' cells (Wilds too) + collected Scatters
+            lit = list(dict.fromkeys((p["reel"], p["row"]) for w in wins for p in w["positions"])) + dark
+        else:
+            lit = [(c, r) for c, r in cells if (c, r) not in wild_cells]  # basic symbols only
         self.destroy_cells(cells + dark, lit_cells=lit)
         self.darkened.clear()
         self.wild_mult.clear()
@@ -442,7 +445,7 @@ class GameExecutables(GameCalculations):
                 # still destroyed in step (6).
                 cells = [cell for cell in self.darkened if self.is_scatter(self.board[cell[0]][cell[1]])]
                 emit(self, "destroy", cause="scatter", cells=[], scatters=[pos(self, c, r) for c, r in cells])
-                self.destroy_cells(cells)
+                self.destroy_cells(cells, lit_cells=cells if self.config.lit_rule == "lines" else ())
                 self.darkened.clear()
                 self.refill()
         return any_act
@@ -478,6 +481,10 @@ class GameExecutables(GameCalculations):
             dmg /= self.config.arrow_endless_divisor
         return round_half_up(dmg)
 
+    def _weapon_lit(self, c, r) -> list:
+        """lit_rule "lines": a weapon that fires lights its own cell."""
+        return [(c, r)] if self.config.lit_rule == "lines" else []
+
     def step_weapons(self) -> bool:
         weapons = [(c, r) for c, r in self.all_cells() if self.is_weapon(self.board[c][r])]
         if not weapons:
@@ -494,7 +501,7 @@ class GameExecutables(GameCalculations):
                 dmg = self.arrow_damage(b) if (b is not None and b["alive"]) else 0
                 emit(self, "weapon", weapon="arrow", position=pos(self, c, r), damage=dmg,
                      boss=b["id"] if b else None)
-                self.destroy_cells([(c, r)])
+                self.destroy_cells([(c, r)], lit_cells=self._weapon_lit(c, r))
                 if dmg:
                     self.deal_damage([(c, r, dmg)], "arrow")
                 continue
@@ -505,7 +512,7 @@ class GameExecutables(GameCalculations):
             emit(self, "weapon", weapon={"BM": "bomb", "SW": "sword", "LT": "lightning"}[name],
                  position=pos(self, c, r), factor=factor, cells=[pos(self, tc, tr) for tc, tr in targets])
             # nothing destroyed by a weapon lights its cell; a destroyed weapon never fires
-            self.destroy_cells(targets + [(c, r)])
+            self.destroy_cells(targets + [(c, r)], lit_cells=self._weapon_lit(c, r))
             self.deal_damage(hits, name)
         self.refill()
         return True
