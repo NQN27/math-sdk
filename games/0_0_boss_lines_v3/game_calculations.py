@@ -152,16 +152,17 @@ class GameCalculations(Executables):
         return enhance_f, wild_f
 
     def pay_lines(self, wins) -> float:
-        """Step (5): line pay x sum(Enhance) x Wild multiplier x Global."""
+        """Step (5): line pay x sum(Enhance) x Wild multiplier x Global (x the Heroic line multiplier)."""
         g = self.global_factor()
+        lm = getattr(self, "line_mult", 1)
         total = 0.0
         out = []
         for w in wins:
             ef, wf = self.line_factor(w)
-            amount = round(w["win"] * ef * wf * g, 4)
+            amount = round(w["win"] * ef * wf * g * lm, 4)
             total += amount
             out.append({"line": w["meta"]["lineIndex"], "symbol": w["symbol"], "kind": w["kind"],
-                        "base": w["win"], "enhance": ef, "wildMult": wf, "globalMult": g, "win": amount,
+                        "base": w["win"], "enhance": ef, "wildMult": wf, "globalMult": g, "lineMult": lm, "win": amount,
                         "positions": [pos(self, p["reel"], p["row"]) for p in w["positions"]]})
         paid = self.award(total)
         emit(self, "lineWins", wins=out, total=paid)

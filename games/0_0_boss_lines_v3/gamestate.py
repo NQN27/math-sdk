@@ -140,6 +140,9 @@ class GameState(GameStateOverride):
             self.no_scatter_spin = True
             emit(self, "featureSpin", feature="heroic")
             self.spawn_stage(5)
+            if self.config.heroic_line_mult_weights:
+                self.line_mult = get_random_outcome(self.config.heroic_line_mult_weights)
+                emit(self, "heroicLineMult", mult=self.line_mult)
             self.play_one_spin("HERO", min_wild_weapon=self.config.heroic_min_wild_or_weapon)
         else:
             self.treasure_hunt = True

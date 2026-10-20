@@ -14,6 +14,7 @@ class GameStateOverride(GameExecutables):
         self.no_scatter_spin = False
         self.force_wincap = False
         self.global_mult = 0
+        self.line_mult = 1  # Heroic random line multiplier (heroic_line_mult_weights)
         self.reserve = {p: 0 for p in self.config.power_names}
         self.lit = set()
         self.last_endless_hp = None

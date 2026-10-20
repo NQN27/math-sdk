@@ -482,6 +482,34 @@ def test_tier_stage_min_coin_overrides_one_tier(gs, cfg):
     finally:
         cfg.tier_stage_min_coin = old
 
+def test_heroic_line_mult(gs, cfg):
+    old = cfg.heroic_line_mult_weights
+    saved = cfg.feature_heroic_chance
+    try:
+        cfg.heroic_line_mult_weights = {7: 1}
+        cfg.feature_heroic_chance = 1.0
+        gs.betmode, gs.criteria = "feature", "basegame"
+        seen = 0
+        for i in range(20):
+            random.seed(500 + i)
+            gs.reset_book()
+            gs.run_feature_spin(gs.get_current_distribution_conditions())
+            ev = gs.book.events
+            assert any(e["type"] == "heroicLineMult" and e["mult"] == 7 for e in ev)
+            for e in ev:
+                if e["type"] == "lineWins":
+                    for w in e["wins"]:
+                        assert w["lineMult"] == 7
+                        assert abs(w["win"] - round(w["base"] * w["enhance"] * w["wildMult"] * w["globalMult"] * 7, 4)) < 1e-6
+                        seen += 1
+        assert seen > 0
+        gs.reset_book()
+        assert gs.line_mult == 1  # off again for the next book
+    finally:
+        cfg.heroic_line_mult_weights = old
+        cfg.feature_heroic_chance = saved
+
+
 def test_lit_decay_one_tier(gs, cfg):
     old = cfg.lit_decay
     cells = [(c, r) for c in range(6) for r in range(5)]

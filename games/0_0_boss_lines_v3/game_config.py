@@ -282,6 +282,10 @@ class GameConfig(Config):
         # Which symbol fills a guaranteed slot (Heroic: any; Super/Epic: weapons only); placeholder.
         self.guarantee_symbol_weights = {"W": 70, "AR": 10, "BM": 8, "SW": 8, "LT": 4}
         self.heroic_min_wild_or_weapon = 5
+        # Trial (designer 2026-10-20, NOT approved yet): a Heroic spin starts with a random line multiplier
+        # {factor: weight} (2x-10x) that multiplies its line wins only, to raise the lines' share of Heroic pay
+        # (~5% -> ~20%). Empty = off.
+        self.heroic_line_mult_weights = {}
         self.base_global_into_bonus = False  # Q25
         # Q27 (answered): placeholder 50/50; tune only inside [0.2, 0.8].
         # Heroic and Treasure hunt may have DIFFERENT means (designer 2026-10-07);
