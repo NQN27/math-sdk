@@ -134,6 +134,12 @@ def test_bomb_destroyed_weapon_does_not_fire(gs):
     assert not any(e["type"] == "weapon" and e["weapon"] == "arrow" for e in gs.book.events)
 
 
+def test_weapon_factor_is_always_1(gs, cfg):
+    assert cfg.weapon_factor_weights == {1: 1}
+    for name in ("BM", "SW", "LT"):
+        assert gs.make_symbol(name).prize == 1
+
+
 def test_weapon_factor_multiplies_damage(gs):
     gs.spawn_stage(4)
     for b in gs.bosses:

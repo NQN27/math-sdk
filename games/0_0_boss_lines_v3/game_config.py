@@ -198,7 +198,9 @@ class GameConfig(Config):
         self.destroy_deals_damage = True  # Q13 (answered: Destroy counts as destruction)
 
         # ---- Weapons -------------------------------------------------------------
-        self.weapon_factor_weights = {1: 30, 2: 20, 3: 14, 4: 10, 5: 8, 6: 6, 7: 4, 8: 3, 9: 3, 10: 2}
+        # Designer 2026-10-20: weapons have no damage factor any more (always 1); every tuning candidate since
+        # b6 already used {1: 1}. Was {1: 30, 2: 20, 3: 14, 4: 10, 5: 8, 6: 6, 7: 4, 8: 3, 9: 3, 10: 2}.
+        self.weapon_factor_weights = {1: 1}
         self.arrow_base = 3
         self.arrow_k_choices = [round(0.05 * i, 2) for i in range(1, 11)]
         self.arrow_endless_divisor = 3
