@@ -287,7 +287,7 @@ class GameConfig(Config):
         # (~5% -> ~20%). Empty = off.
         self.heroic_line_mult_weights = {}
         # Trial (designer 2026-10-20, NOT approved yet): share of Heroic spins that are BUILT as dead spins
-        # (no weapons, the guaranteed Wilds placed in columns 4-6, columns 1-3 repaired until no payline pays),
+        # (natural board without weapons + the guaranteed Wilds on random cells, redrawn until nothing connects),
         # so the designer's 30% 0x Heroic share comes from real dead boards, not from re-weighted natural ones.
         # 0 = off.
         self.heroic_dead_spin_chance = 0.0

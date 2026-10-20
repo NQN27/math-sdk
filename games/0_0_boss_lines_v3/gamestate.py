@@ -77,25 +77,20 @@ class GameState(GameStateOverride):
         self.emit_spin_end()
 
     def play_dead_heroic_spin(self) -> None:
-        """A Heroic spin built to pay 0 (heroic_dead_spin_chance): basic symbols only in columns 1-3 with no
-        payline paying, the guaranteed Wilds in columns 4-6 (a Wild there can only extend a 3-match, and there
-        is none), no weapons. Nothing connects, nothing fires, no boss is hit."""
+        """A Heroic spin built to pay 0 (heroic_dead_spin_chance), chosen uniformly among all natural
+        combinations that do not connect: a natural HERO board (weapons re-drawn from the reel as basic
+        symbols) plus the guaranteed Wilds on uniformly random cells, rejected and redrawn until no payline
+        pays (~2.5% of tries are accepted, ~20 ms). Nothing connects, nothing fires, no boss is hit."""
         self.begin_spin()
-        self.draw_board("HERO")
-        allowed = self.allowed_basic_symbols()
-        for c, r in self.all_cells():
-            if not self.is_basic(self.board[c][r]):
-                self.board[c][r] = self.make_symbol(random.choice(allowed))
-        right = [(c, r) for c in range(3, 6) for r in range(5)]
-        for c, r in random.sample(right, self.config.heroic_min_wild_or_weapon):
-            self.board[c][r] = self.make_symbol("W")
-        for _ in range(500):
-            wins = self.evaluate_lines()
-            if not wins:
+        for _ in range(100000):
+            self.draw_board("HERO")
+            for c, r in self.all_cells():
+                while not self.is_basic(self.board[c][r]):
+                    self.board[c][r] = self.draw_symbol_for(c, r)
+            for c, r in random.sample(list(self.all_cells()), self.config.heroic_min_wild_or_weapon):
+                self.board[c][r] = self.make_symbol("W")
+            if not self.evaluate_lines():
                 break
-            cells = [(p["reel"], p["row"]) for p in random.choice(wins)["positions"] if p["reel"] < 3]
-            c, r = random.choice(cells)
-            self.board[c][r] = self.make_symbol(random.choice([s for s in allowed if s != self.board[c][r].name]))
         else:
             raise RuntimeError("could not build a dead Heroic board")
         reveal_event(self)

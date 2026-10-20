@@ -487,6 +487,7 @@ def test_heroic_dead_spin_pays_zero(gs, cfg):
     try:
         cfg.heroic_dead_spin_chance, cfg.feature_heroic_chance = 1.0, 1.0
         gs.betmode, gs.criteria = "feature", "basegame"
+        left = 0
         for i in range(40):
             random.seed(900 + i)
             gs.reset_book()
@@ -494,9 +495,11 @@ def test_heroic_dead_spin_pays_zero(gs, cfg):
             assert gs.win_manager.running_bet_win == 0
             reveal = next(e for e in gs.book.events if e["type"] == "reveal")
             wilds = [(c, r) for c in range(6) for r in range(5) if gs.board[c][r] is not None and gs.board[c][r].name == "W"]
-            assert len(wilds) == cfg.heroic_min_wild_or_weapon and all(c >= 3 for c, _ in wilds)
+            assert len(wilds) == cfg.heroic_min_wild_or_weapon
+            left += any(c < 3 for c, _ in wilds)
             assert not any(gs.is_weapon(gs.board[c][r]) for c in range(6) for r in range(5))
             assert not any(e["type"] in ("lineWins", "weapon", "wildEvent", "chestOpened") for e in gs.book.events)
+        assert left > 0  # Wilds also land in columns 1-3
     finally:
         cfg.heroic_dead_spin_chance, cfg.feature_heroic_chance = saved
 
