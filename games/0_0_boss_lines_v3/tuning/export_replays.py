@@ -1,7 +1,7 @@
 """Export real simulated sessions for the replay viewer (single process).
 
 usage: python tuning/export_replays.py overrides.json OUT.json [per_tier_pool]
-Simulates a pool of sessions per tier (Bonus / Super / Epic), picks ~12 spread
+Simulates a pool of sessions per tier (Bonus / Super / Epic / Heroic / Treasure hunt), picks ~12 spread
 over the payout distribution (plus the biggest and any Max Win), then re-runs
 those exact sessions (seeds are deterministic) and saves their events.
 """
@@ -13,8 +13,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import tune_harness as H  # noqa: E402
 
 PICK_PCT = [2, 10, 25, 40, 50, 60, 75, 85, 92, 97, 99.5]
-POOL = {"bonus": 400, "super": 300, "epic": 200}
-TARGET = {"bonus": 88.9, "super": 240.0, "epic": 1492.5}
+POOL = {"bonus": 400, "super": 300, "epic": 150, "feature_heroic": 400, "feature_treasure": 300}
+TARGET = {"bonus": 91.0, "super": 245.0, "epic": 2045.0, "feature_heroic": 403.0, "feature_treasure": 564.0}
 
 
 def main():
