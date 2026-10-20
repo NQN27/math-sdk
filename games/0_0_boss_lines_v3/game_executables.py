@@ -178,7 +178,40 @@ class GameExecutables(GameCalculations):
                 filled.append((c, r))
         if filled:
             board_cells_event(self, "refill", filled)
+            self.mark_wild_skins(filled)
         return filled
+
+    def mark_wild_skins(self, cells) -> None:
+        """Display-only Wilds (wild_skin_chance): pick cells of already-winning lines among `cells` where a
+        Wild would leave every line win unchanged, and emit them. Own RNG: the game's draws are untouched."""
+        chance = self.config.wild_skin_chance
+        if chance <= 0:
+            return
+        wins = self.evaluate_lines()
+        if not wins:
+            return
+        sig = lambda ws: sorted((w["meta"]["lineIndex"], w["symbol"], w["kind"], w["win"]) for w in ws)
+        base = sig(wins)
+        fresh = set(cells)
+        rng = self.skin_rng
+        skins = []
+        for w in wins:
+            if rng.random() >= chance:
+                continue
+            cand = [(p["reel"], p["row"]) for p in w["positions"]
+                    if (p["reel"], p["row"]) in fresh and self.is_basic(self.board[p["reel"]][p["row"]])
+                    and (p["reel"], p["row"]) not in skins]
+            rng.shuffle(cand)
+            for c, r in cand:
+                real = self.board[c][r]
+                self.board[c][r] = self.create_symbol("W")
+                same = sig(self.evaluate_lines()) == base
+                self.board[c][r] = real
+                if same:
+                    skins.append((c, r))
+                    break
+        if skins:
+            emit(self, "wildSkin", cells=[{**pos(self, c, r), "symbol": self.board[c][r].name} for c, r in skins])
 
     # =========================================================================
     # Powers

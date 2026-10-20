@@ -288,6 +288,12 @@ class GameConfig(Config):
         # {factor: weight} (2x-10x) that multiplies its line wins only, to raise the lines' share of Heroic pay
         # (~5% -> ~20%). Empty = off.
         self.heroic_line_mult_weights = {}
+        # Trial (designer 2026-10-20, NOT approved yet): display-only Wilds. On a fresh board (opening board or
+        # refill), each winning line shows one of its symbols as a Wild with this chance, only where a real
+        # Wild there would give exactly the same line wins (no new or longer line). The cell keeps its real
+        # symbol for every rule (damage, lighting, no Wild event), and the choice uses its own RNG, so the
+        # math is unchanged. Event "wildSkin". 0 = off.
+        self.wild_skin_chance = 0.0
         # Trial (designer 2026-10-20, NOT approved yet): share of Heroic spins that are BUILT as dead spins
         # (natural board without weapons + the guaranteed Wilds on random cells, redrawn until nothing connects),
         # so the designer's 30% 0x Heroic share comes from real dead boards, not from re-weighted natural ones.

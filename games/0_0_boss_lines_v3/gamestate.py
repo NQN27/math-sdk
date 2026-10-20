@@ -69,6 +69,7 @@ class GameState(GameStateOverride):
         if min_weapons:
             self._guarantee_wild_or_weapon(min_weapons, weapons_only=True)
         reveal_event(self)
+        self.mark_wild_skins(list(self.all_cells()))
         self.resolve_actions()
         if not self.wincap_triggered:
             self.open_chests()

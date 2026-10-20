@@ -488,6 +488,34 @@ def test_tier_stage_min_coin_overrides_one_tier(gs, cfg):
     finally:
         cfg.tier_stage_min_coin = old
 
+def test_wild_skin_is_display_only(gs, cfg):
+    """Display-only Wilds sit on cells of already-winning lines and change no outcome."""
+    old = cfg.wild_skin_chance
+    try:
+        res, skins = {}, 0
+        for ch in (0.0, 0.6):
+            cfg.wild_skin_chance = ch
+            out = []
+            for i in range(15):
+                random.seed(700 + i)
+                gs.betmode, gs.criteria = "buy3", "freegame"
+                gs.reset_book()
+                gs.run_bonus("bonus", {(0, 1), (2, 2), (4, 3)})
+                out.append(gs.win_manager.running_bet_win)
+                if ch:
+                    ev = gs.book.events
+                    for k, e in enumerate(ev):
+                        if e["type"] == "wildSkin":
+                            skins += len(e["cells"])
+                            nxt = next(x for x in ev[k + 1:] if x["type"] == "lineWins")
+                            won = {(p["reel"], p["row"]) for w in nxt["wins"] for p in w["positions"]}
+                            assert all((c["reel"], c["row"]) in won for c in e["cells"])
+            res[ch] = out
+        assert res[0.0] == res[0.6] and skins > 0
+    finally:
+        cfg.wild_skin_chance = old
+
+
 def test_heroic_dead_spin_pays_zero(gs, cfg):
     saved = (cfg.heroic_dead_spin_chance, cfg.feature_heroic_chance)
     try:
