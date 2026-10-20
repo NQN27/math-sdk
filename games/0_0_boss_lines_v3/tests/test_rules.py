@@ -482,6 +482,25 @@ def test_tier_stage_min_coin_overrides_one_tier(gs, cfg):
     finally:
         cfg.tier_stage_min_coin = old
 
+def test_heroic_dead_spin_pays_zero(gs, cfg):
+    saved = (cfg.heroic_dead_spin_chance, cfg.feature_heroic_chance)
+    try:
+        cfg.heroic_dead_spin_chance, cfg.feature_heroic_chance = 1.0, 1.0
+        gs.betmode, gs.criteria = "feature", "basegame"
+        for i in range(40):
+            random.seed(900 + i)
+            gs.reset_book()
+            gs.run_feature_spin(gs.get_current_distribution_conditions())
+            assert gs.win_manager.running_bet_win == 0
+            reveal = next(e for e in gs.book.events if e["type"] == "reveal")
+            wilds = [(c, r) for c in range(6) for r in range(5) if gs.board[c][r] is not None and gs.board[c][r].name == "W"]
+            assert len(wilds) == cfg.heroic_min_wild_or_weapon and all(c >= 3 for c, _ in wilds)
+            assert not any(gs.is_weapon(gs.board[c][r]) for c in range(6) for r in range(5))
+            assert not any(e["type"] in ("lineWins", "weapon", "wildEvent", "chestOpened") for e in gs.book.events)
+    finally:
+        cfg.heroic_dead_spin_chance, cfg.feature_heroic_chance = saved
+
+
 def test_heroic_line_mult(gs, cfg):
     old = cfg.heroic_line_mult_weights
     saved = cfg.feature_heroic_chance

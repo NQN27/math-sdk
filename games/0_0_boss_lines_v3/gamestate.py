@@ -76,6 +76,32 @@ class GameState(GameStateOverride):
             self.run_treasure(self.treasure_cells(), self.current_min_coin())
         self.emit_spin_end()
 
+    def play_dead_heroic_spin(self) -> None:
+        """A Heroic spin built to pay 0 (heroic_dead_spin_chance): basic symbols only in columns 1-3 with no
+        payline paying, the guaranteed Wilds in columns 4-6 (a Wild there can only extend a 3-match, and there
+        is none), no weapons. Nothing connects, nothing fires, no boss is hit."""
+        self.begin_spin()
+        self.draw_board("HERO")
+        allowed = self.allowed_basic_symbols()
+        for c, r in self.all_cells():
+            if not self.is_basic(self.board[c][r]):
+                self.board[c][r] = self.make_symbol(random.choice(allowed))
+        right = [(c, r) for c in range(3, 6) for r in range(5)]
+        for c, r in random.sample(right, self.config.heroic_min_wild_or_weapon):
+            self.board[c][r] = self.make_symbol("W")
+        for _ in range(500):
+            wins = self.evaluate_lines()
+            if not wins:
+                break
+            cells = [(p["reel"], p["row"]) for p in random.choice(wins)["positions"] if p["reel"] < 3]
+            c, r = random.choice(cells)
+            self.board[c][r] = self.make_symbol(random.choice([s for s in allowed if s != self.board[c][r].name]))
+        else:
+            raise RuntimeError("could not build a dead Heroic board")
+        reveal_event(self)
+        self.resolve_actions()
+        self.emit_spin_end()
+
     def win_levels(self, amount: float) -> list:
         return [name for bound, name in self.config.win_levels if amount >= bound]
 
@@ -143,7 +169,10 @@ class GameState(GameStateOverride):
             if self.config.heroic_line_mult_weights:
                 self.line_mult = get_random_outcome(self.config.heroic_line_mult_weights)
                 emit(self, "heroicLineMult", mult=self.line_mult)
-            self.play_one_spin("HERO", min_wild_weapon=self.config.heroic_min_wild_or_weapon)
+            if random.random() < self.config.heroic_dead_spin_chance:
+                self.play_dead_heroic_spin()
+            else:
+                self.play_one_spin("HERO", min_wild_weapon=self.config.heroic_min_wild_or_weapon)
         else:
             self.treasure_hunt = True
             emit(self, "featureSpin", feature="treasureHunt")
