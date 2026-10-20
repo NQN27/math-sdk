@@ -32,12 +32,13 @@ def line(name, draw, price, rng):
     out = []
     for n in SAMPLE_N:
         v = sorted(sum(draw(rng) for _ in range(n)) / (n * price) for _ in range(REPS))
-        out.append(f"N={n}: {100 * v[REPS // 2]:6.1f}% (p10 {100 * v[REPS // 10]:5.1f}, p90 {100 * v[9 * REPS // 10]:6.1f})")
+        out.append(f"N={n}: {100 * v[REPS // 2]:6.1f}% (p10 {100 * v[REPS // 10]:5.1f}, p90 {100 * v[9 * REPS // 10]:6.1f}, "
+                   f"p99 {100 * v[99 * REPS // 100]:6.1f})")
     print(f"{name:24s} " + "  ".join(out))
 
 
 rng = random.Random(20261019)
-print(f"RTP of N random rounds, median of {REPS} repeats (p10, p90)")
+print(f"RTP of N random rounds, median of {REPS} repeats (p10, p90, p99)")
 for mode, cost in COST.items():
     rows = {int(r[0]): (int(r[1]), int(r[2]) / 100) for r in csv.reader(open(os.path.join(LIB, "publish_files", f"lookUpTable_{mode}_0.csv")))}
     line(f"{mode}", sampler(list(rows.values())), cost, rng)
