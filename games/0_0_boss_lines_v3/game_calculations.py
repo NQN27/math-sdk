@@ -165,7 +165,7 @@ class GameCalculations(Executables):
                         "base": w["win"], "enhance": ef, "wildMult": wf, "globalMult": g, "lineMult": lm, "win": amount,
                         "positions": [pos(self, p["reel"], p["row"]) for p in w["positions"]]})
         paid = self.award(total)
-        emit(self, "lineWins", wins=out, total=paid)
+        emit(self, "lineWins", wins=out, total=round(paid, 4))  # drop float noise (0.44999999999999996)
         return paid
 
     # ---- wallet --------------------------------------------------------------------------

@@ -737,6 +737,6 @@ class GameExecutables(GameCalculations):
         total = sum(v for _, v in self._treasure_values(cells, kinds))
         g = self.global_factor()
         paid = self.award(total * g)
-        emit(self, "treasureEnd", total=total, globalMult=g, paid=paid)
+        emit(self, "treasureEnd", total=round(total, 4), globalMult=g, paid=round(paid, 4))
         self.record({"kind": "treasure", "symbol": "treasure", "gametype": self.gametype})
         return paid
