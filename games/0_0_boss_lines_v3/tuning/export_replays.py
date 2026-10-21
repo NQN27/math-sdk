@@ -22,6 +22,17 @@ def main():
     scale = float(sys.argv[3]) if len(sys.argv) > 3 else 1.0
     ov = json.load(open(ov_path))
     gs, cfg = H._setup(json.loads(json.dumps(ov)))
+    # Replay-only "lit" events: the cells each destroy actually lit (lit_rule / lit_decay make this impossible
+    # to rebuild from the other events). No RNG is used, so sessions stay identical.
+    from game_events import emit, pos
+    real_destroy = type(gs).destroy_cells
+    def destroy_cells(self, cells, lit_cells=()):
+        before = set(self.lit)
+        real_destroy(self, cells, lit_cells)
+        new = [c for c in self.lit if c not in before]
+        if new:
+            emit(self, "lit", cells=[pos(self, c, r) for c, r in sorted(new)])
+    type(gs).destroy_cells = destroy_cells
     sessions = []
     for tier, n in POOL.items():
         n = int(n * scale)
@@ -49,7 +60,7 @@ def main():
             })
         print(tier, "pool", n, "picked", len(picks), "median", ranked[n // 2][0])
     meta = {"overrides": os.path.basename(ov_path), "targets": TARGET, "pool": {k: int(v * scale) for k, v in POOL.items()},
-            "boss_zones": cfg.boss_zones, "wincap": cfg.wincap}
+            "boss_zones": cfg.boss_zones, "wincap": cfg.wincap, "litEvents": True}
     json.dump({"meta": meta, "sessions": sessions}, open(out, "w"), separators=(",", ":"))
     print("wrote", out, os.path.getsize(out) // 1024, "KB,", len(sessions), "sessions")
 
