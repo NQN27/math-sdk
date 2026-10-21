@@ -302,6 +302,9 @@ class GameConfig(Config):
         # Weapons guaranteed on each free spin's opening board (designer 2026-10-07;
         # was 3 Wild-or-weapon for both, which drove Super to ~1068x vs 240x).
         self.bonus_min_weapons = {"super": 1, "epic": 2}
+        # Trial (designer 2026-10-21: fewer but stronger weapons): {tier: chance} that a free spin gets the full
+        # guarantee above; otherwise it guarantees one weapon fewer. Empty = always the full guarantee.
+        self.bonus_min_weapons_chance = {}
         # Which symbol fills a guaranteed slot (Heroic: any; Super/Epic: weapons only); placeholder.
         self.guarantee_symbol_weights = {"W": 70, "AR": 10, "BM": 8, "SW": 8, "LT": 4}
         self.heroic_min_wild_or_weapon = 5

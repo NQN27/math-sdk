@@ -240,8 +240,11 @@ class GameState(GameStateOverride):
             emit(self, "freeSpinStart", spin=spin_no, freeSpinsLeft=self.free_spins_left,
                  stage=self.stage_label(), globalMult=self.global_factor(),
                  **({"litReset": True} if lit_reset else {}))
-            self.play_one_spin(self.stage_reel(),
-                               min_weapons=cfg.bonus_min_weapons.get(tier, 0))
+            n_weapons = cfg.bonus_min_weapons.get(tier, 0)
+            chance = cfg.bonus_min_weapons_chance.get(tier)
+            if n_weapons and chance is not None and random.random() >= chance:
+                n_weapons -= 1  # this spin guarantees one weapon fewer (designer 2026-10-21: fewer weapons)
+            self.play_one_spin(self.stage_reel(), min_weapons=n_weapons)
             self.win_manager.update_gametype_wins(self.gametype)
         self.bonus_min_win_topup(tier)
         # optimizer fences per tier (designer 2026-10-12: tier means exact in the published tables)
