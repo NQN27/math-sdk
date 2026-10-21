@@ -15,7 +15,9 @@ tier fence instead; its mean is still exact, only its Max Win rate is then free.
 rtp = fraction of the mode cost; hr = 1 / probability per round.
 """
 
+import json
 import math
+import os
 
 from optimization_program.optimization_config import (
     ConstructScaling,
@@ -28,6 +30,17 @@ from optimization_program.optimization_config import (
 TARGET = 0.967  # 96.7% RTP for every bet mode (designer, 2026-10-07)
 MIN_MW_PROB = 2e-5  # below this per-round Max Win probability a separate Max Win fence would be empty
 TIER_ORDER = ("epic", "super", "bonus")  # rarest first; the last tier present is named "freegame"
+
+
+def _mw_book_tiers(mode):
+    """Tiers that have Max Win books in this mode's current books (force records), or None before any books
+    exist. A Max Win fence for a tier with no such book would match 0 books and stop the optimizer, so that
+    tier keeps its (absent) Max Win inside its tier fence instead."""
+    f = os.path.join(os.path.dirname(os.path.abspath(__file__)), "library", "forces", f"force_record_{mode}.json")
+    if not os.path.exists(f):
+        return None
+    return {r["search"][0]["value"] for r in json.load(open(f))
+            if len(r["search"]) == 1 and r["search"][0]["name"] == "maxwin_tier" and r["bookIds"]}
 
 
 def _params(test_spins):
@@ -139,7 +152,10 @@ class OptimizationSetup:
             tot = sum(mix.values())
             prob = {cfg.scatter_to_tier[n]: w / tot for n, w in mix.items()}
             gap = TARGET * cost[mode] - sum(p * cfg.tier_mean_targets[t] for t, p in prob.items())
-            plan, _ = tier_fences(cfg, prob, cost[mode], extra_per_book=gap)
+            have = _mw_book_tiers(mode)
+            mw_tiers = None if have is None else {t for t, p in prob.items()
+                                                  if p * cfg.tier_maxwin_rate[t] >= MIN_MW_PROB and t in have}
+            plan, _ = tier_fences(cfg, prob, cost[mode], extra_per_book=gap, mw_tiers=mw_tiers)
             conds = _conditions(plan, cost[mode], cap)
             opt[mode] = {
                 "conditions": _close(conds, "freegame"),
@@ -154,7 +170,9 @@ class OptimizationSetup:
             prob = cfg.tier_trigger_rate[mode]
             # Max Win only through the tiers in base_maxwin_fence_tiers, each at its exact rate; the other
             # tiers' (very rare) Max Win books stay in their tier fence, so every tier mean is exact.
-            plan, _ = tier_fences(cfg, prob, cost[mode], mw_tiers=cfg.base_maxwin_fence_tiers)
+            have = _mw_book_tiers(mode)
+            plan, _ = tier_fences(cfg, prob, cost[mode], mw_tiers=tuple(t for t in cfg.base_maxwin_fence_tiers
+                                                                         if have is None or t in have))
             conds = _conditions(plan, cost[mode], cap)
             conds = {**{k: v for k, v in conds.items() if k.startswith("wincap")},
                      "0": ConstructConditions(rtp=0, av_win=0, search_conditions=0).return_dict(),

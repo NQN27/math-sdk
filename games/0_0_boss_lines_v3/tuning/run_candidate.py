@@ -43,6 +43,7 @@ if __name__ == "__main__":
     print(json.dumps(plan_summary(config), indent=1, default=str))
     if run_books:
         create_books(gamestate, config, sims, batch_size=1000, threads=1, compress=True, profiling=False)
+    OptimizationSetup(config)  # again: fences can depend on the books just made (e.g. tiers without Max Win books)
     generate_configs(gamestate)  # writes math_config.json (the optimizer's fences) from this run's setup
     if run_opt:
         from optimization_program.run_script import OptimizationExecution
