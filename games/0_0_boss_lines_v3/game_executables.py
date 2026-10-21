@@ -133,6 +133,8 @@ class GameExecutables(GameCalculations):
                 chance = self.weights("last_hit_base") + self.weights("last_hit_scale") * (1 - b["hp"] / b["hp_max"])
                 if self.is_final_bonus_spin():
                     chance *= self.weights("last_hit_final_spin_mult")
+                if step == "arrow":
+                    chance *= cfg.arrow_last_hit_mult
                 if random.random() < chance:
                     self._kill(b, "lastHit")
             self._boss_drop(b)
@@ -184,6 +186,7 @@ class GameExecutables(GameCalculations):
     def mark_wild_skins(self, cells) -> None:
         """Display-only Wilds (wild_skin_chance): pick cells of already-winning lines among `cells` where a
         Wild would leave every line win unchanged, and emit them. Own RNG: the game's draws are untouched."""
+        self.skin_cells = set()
         chance = self.config.wild_skin_chance
         if chance <= 0:
             return
@@ -210,6 +213,7 @@ class GameExecutables(GameCalculations):
                 if same:
                     skins.append((c, r))
                     break
+        self.skin_cells = set(skins)  # only the fresh board's skins; all are destroyed in the coming connect
         if skins:
             emit(self, "wildSkin", cells=[{**pos(self, c, r), "symbol": self.board[c][r].name} for c, r in skins])
 
@@ -411,7 +415,10 @@ class GameExecutables(GameCalculations):
             s = self.board[c][r]
             if (self.is_basic(s) and s.name in names) or (c, r) in wild_cells:
                 cells.append((c, r))
-                hits.append((c, r, self.config.symbol_damage[s.name]))
+                dmg = self.config.symbol_damage[s.name]
+                if (c, r) in self.skin_cells and self.config.wild_skin_damage is not None:
+                    dmg = self.config.wild_skin_damage  # a display-only Wild deals Wild damage
+                hits.append((c, r, dmg))
         dark = [cell for cell in self.darkened if self.is_scatter(self.board[cell[0]][cell[1]])]
         emit(self, "destroy", cause="connect", cells=[pos(self, c, r) for c, r in cells],
              scatters=[pos(self, c, r) for c, r in dark])
@@ -456,8 +463,9 @@ class GameExecutables(GameCalculations):
     def _weapon_targets(self, c, r, name):
         cfg = self.config
 
-        def hit(s):  # N1: any symbol, except Scatter outside Bonus
-            return s is not None and (self.in_bonus or not self.is_scatter(s))
+        def hit(s):  # N1: any symbol, except Scatter outside Bonus; other weapons are spared (designer 2026-10-21)
+            return (s is not None and (self.in_bonus or not self.is_scatter(s))
+                    and not (cfg.weapons_spare_weapons and self.is_weapon(s)))
 
         if name == "BM":
             area = [(cc, rr) for cc in range(c - 1, c + 2) for rr in range(r - 1, r + 2)
@@ -509,6 +517,8 @@ class GameExecutables(GameCalculations):
             targets = self._weapon_targets(c, r, name)
             hits = [(tc, tr, self.config.symbol_damage[self.board[tc][tr].name] * factor) for tc, tr in targets
                     if self.board[tc][tr].name in self.config.symbol_damage]  # only paying symbols deal damage
+            if self.config.weapon_self_damage:
+                hits.append((c, r, self.config.weapon_self_damage))  # the weapon's own cell (designer 2026-10-21)
             emit(self, "weapon", weapon={"BM": "bomb", "SW": "sword", "LT": "lightning"}[name],
                  position=pos(self, c, r), factor=factor, cells=[pos(self, tc, tr) for tc, tr in targets])
             # nothing destroyed by a weapon lights its cell; a destroyed weapon never fires

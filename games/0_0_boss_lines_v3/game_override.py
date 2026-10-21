@@ -17,6 +17,7 @@ class GameStateOverride(GameExecutables):
         self.force_wincap = False
         self.global_mult = 0
         self.line_mult = 1  # Heroic random line multiplier (heroic_line_mult_weights)
+        self.skin_cells = set()  # display-only Wilds on the current board
         self.skin_rng = random.Random(self.book_id * 1_000_003 + 7)  # display-only Wilds (wild_skin_chance)
         self.reserve = {p: 0 for p in self.config.power_names}
         self.lit = set()

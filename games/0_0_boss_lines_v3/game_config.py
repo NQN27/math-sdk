@@ -203,6 +203,20 @@ class GameConfig(Config):
         self.weapon_factor_weights = {1: 1}
         self.arrow_base = 3
         self.arrow_k_choices = [round(0.05 * i, 2) for i in range(1, 11)]
+        # Designer 2026-10-21 (trial flags, set in the candidate overrides, defaults keep the old rules):
+        # Bomb/Sword/Lightning also deal this damage from their own cell to the boss of its column.
+        self.weapon_self_damage = 0
+        # Last-hit chance multiplier when the damage step is an Arrow ("arrow" step).
+        self.arrow_last_hit_mult = 1.0
+        # Damage of a display-only Wild (wild_skin_chance) when its cell is destroyed: None = the real symbol's
+        # damage (pure display), a number = that damage (designer: every Wild deals 3, shown or real).
+        self.wild_skin_damage = None
+        # A weapon's area (Bomb/Sword) never destroys another weapon: that weapon stays and fires in its turn
+        # (designer 2026-10-21: one weapon firing must not remove another).
+        self.weapons_spare_weapons = True
+        # Feature (Heroic / Treasure hunt): event "featureBigWin" when the spin pays more than this x the Feature
+        # cost (designer 2026-10-21: effect only above buy price + 10%). Display only.
+        self.feature_big_win_ratio = 1.1
         self.arrow_endless_divisor = 3
 
         # ---- Last hit / boss drops ----------------------------------------------

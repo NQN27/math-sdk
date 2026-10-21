@@ -180,6 +180,10 @@ class GameState(GameStateOverride):
         self.win_manager.update_gametype_wins(self.gametype)
         if self.treasure_hunt:
             self.maybe_enter_bonus(cond)
+        cost = next(bm.get_cost() for bm in self.config.bet_modes if bm.get_name() == "feature")
+        if self.win_manager.running_bet_win > self.config.feature_big_win_ratio * cost:
+            emit(self, "featureBigWin", feature=feature, win=round(self.win_manager.running_bet_win, 2),
+                 threshold=round(self.config.feature_big_win_ratio * cost, 2))
         self.record({"feature": feature})  # optimizer fences: Heroic / Treasure hunt means exact
         if self.wincap_triggered:
             self.record({"maxwin_feature": feature})

@@ -118,12 +118,13 @@ def test_bomb_area_clipped_at_corner(gs):
 def test_sword_hits_every_symbol_but_base_scatter(gs):
     set_board(gs, ["SW W AR L1 SC H2"] + FILLER[1:])
     gs.in_bonus = False
-    assert sorted(gs._weapon_targets(0, 0, "SW")) == [(1, 0), (2, 0), (3, 0), (5, 0)]
+    # the Arrow at (2, 0) is another weapon: spared (designer 2026-10-21)
+    assert sorted(gs._weapon_targets(0, 0, "SW")) == [(1, 0), (3, 0), (5, 0)]
     gs.in_bonus = True
-    assert sorted(gs._weapon_targets(0, 0, "SW")) == [(1, 0), (2, 0), (3, 0), (4, 0), (5, 0)]
+    assert sorted(gs._weapon_targets(0, 0, "SW")) == [(1, 0), (3, 0), (4, 0), (5, 0)]
 
 
-def test_bomb_destroyed_weapon_does_not_fire(gs):
+def test_bomb_spares_other_weapons_which_still_fire(gs):
     gs.spawn_stage(4)
     for b in gs.bosses:
         b["hp"] = b["hp_max"] = 500
@@ -131,7 +132,24 @@ def test_bomb_destroyed_weapon_does_not_fire(gs):
     gs.board[0][0].prize = 1
     gs.refill = lambda: []
     gs.step_weapons()
-    assert not any(e["type"] == "weapon" and e["weapon"] == "arrow" for e in gs.book.events)
+    # designer 2026-10-21: one weapon firing must not remove another; the Arrow next to the Bomb fires too
+    assert any(e["type"] == "weapon" and e["weapon"] == "arrow" for e in gs.book.events)
+
+
+def test_weapon_self_damage_and_arrow_last_hit(gs, cfg):
+    old = (cfg.weapon_self_damage, cfg.arrow_last_hit_mult)
+    try:
+        cfg.weapon_self_damage = 3
+        gs.spawn_stage(4)
+        for b in gs.bosses:
+            b["hp"] = b["hp_max"] = 500
+        set_board(gs, ["L1 L2 L3 L4 L1 L2", "L3 L4 SW L2 L3 L4"] + FILLER[2:])
+        gs.refill = lambda: []
+        gs.step_weapons()
+        # sword at (2,1) hits its row (5 cells, L=1 each): boss1 2, boss2 1+3 (own cell), boss3 2
+        assert [b["hp"] for b in gs.bosses] == [498, 496, 498]
+    finally:
+        cfg.weapon_self_damage, cfg.arrow_last_hit_mult = old
 
 
 def test_weapon_factor_is_always_1(gs, cfg):
