@@ -266,6 +266,10 @@ class GameConfig(Config):
         # d ** max(0, lit + 1 - n), lit = cells already lit (the first n always light), so lighting gets gradually harder as the board fills.
         # Empty = every connected cell lights (Q23).
         self.lit_decay = {}
+        # Steer connections onto already-lit cells instead of dropping lit cells (designer 2026-10-22, replaces
+        # lit_decay): {tier or "heroic": {"free": n, "decay": d, "tries": k}}. A board / refill whose connections would
+        # light new cells past `free` is kept with chance d ** (lit + new - free), else redrawn (up to k draws). {} = off.
+        self.lit_steer = {}
         self.epic_min_coin = 5  # N6: no Dong coins during Epic free spins
         self.epic_opening_treasure_stage = 2  # N5: Epic starts with a Treasure "as if stage 2 was cleared"
         # Per-Bonus-tier replacements for the weight tables above (coin_value_weights,

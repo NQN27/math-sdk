@@ -172,6 +172,21 @@ class GameExecutables(GameCalculations):
                     continue
             self.lit.add(cell)
 
+    def lit_steer_cfg(self):
+        return self.config.lit_steer.get(self.bonus_tier if self.in_bonus else ("heroic" if self.heroic else None))
+
+    def lit_steer_accepts(self) -> bool:
+        """lit_steer (designer 2026-10-22): every connected cell still lights (rule unchanged), but a board whose
+        connections would light many NEW cells is kept only with chance decay ** max(0, lit + new - free), so
+        connections lean onto cells that are already lit. True = keep this board."""
+        st = self.lit_steer_cfg()
+        if not st:
+            return True
+        new = {(p["reel"], p["row"]) for w in self.evaluate_lines() for p in w["positions"]} - self.lit
+        if not new:
+            return True
+        return random.random() < st["decay"] ** max(0, len(self.lit) + len(new) - st["free"])
+
     def refill(self) -> list:
         """Fill every empty cell in place, in cell-priority order."""
         filled = []
@@ -179,6 +194,12 @@ class GameExecutables(GameCalculations):
             if self.board[c][r] is None:
                 self.board[c][r] = self.draw_symbol_for(c, r)
                 filled.append((c, r))
+        st = self.lit_steer_cfg() if filled else None
+        for _ in range(st["tries"] - 1 if st else 0):  # lit_steer: redraw the new symbols a few times
+            if self.lit_steer_accepts():
+                break
+            for c, r in filled:
+                self.board[c][r] = self.draw_symbol_for(c, r)
         if filled:
             board_cells_event(self, "refill", filled)
             self.mark_wild_skins(filled)

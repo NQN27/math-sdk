@@ -754,6 +754,31 @@ def test_heroic_line_mult(gs, cfg):
         cfg.feature_heroic_chance = saved
 
 
+def test_lit_steer_keeps_rule_but_fewer_new_lit_cells(gs, cfg):
+    """lit_steer redraws boards / refills that would light many new cells; every connected cell still lights."""
+    import os, sys
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tuning"))
+    import tune_harness as H
+    saved = (cfg.lit_steer, cfg.lit_decay)
+    def avg_cells():
+        tot = n = 0
+        for i in range(60):
+            H._one(gs, cfg, "bonus", i)
+            for e in gs.book.events:
+                if e["type"] == "treasureStart":
+                    tot += len(e["cells"]); n += 1
+        return tot / max(1, n)
+    try:
+        cfg.lit_decay = {}
+        cfg.lit_steer = {}
+        free = avg_cells()
+        cfg.lit_steer = {"bonus": {"free": 3, "decay": 0.5, "tries": 8}}
+        steered = avg_cells()
+        assert steered < free
+    finally:
+        cfg.lit_steer, cfg.lit_decay = saved
+
+
 def test_lit_decay_one_tier(gs, cfg):
     old = cfg.lit_decay
     cells = [(c, r) for c in range(6) for r in range(5)]
