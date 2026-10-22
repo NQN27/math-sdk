@@ -186,10 +186,11 @@ class GameExecutables(GameCalculations):
 
     def mark_wild_skins(self, cells) -> None:
         """Display-only Wilds (wild_skin_chance): pick cells of already-winning lines among `cells` where a
-        Wild would leave every line win unchanged, and emit them. Own RNG: the game's draws are untouched."""
+        Wild would leave every line win unchanged, and emit them. Own RNG: the game's draws are untouched.
+        Never in Heroic (designer 2026-10-22): every Heroic Wild is real and always fires an event / multiplier."""
         self.skin_cells = set()
         chance = self.config.wild_skin_chance
-        if chance <= 0:
+        if chance <= 0 or getattr(self, "heroic", False):
             return
         wins = self.evaluate_lines()
         if not wins:

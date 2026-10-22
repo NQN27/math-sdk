@@ -648,6 +648,20 @@ def test_heroic_dead_spin_natural_wilds(gs, cfg):
          cfg.heroic_dead_wild_col_weights) = saved
 
 
+def test_no_display_wilds_in_heroic(gs, cfg):
+    saved = (cfg.wild_skin_chance, cfg.feature_heroic_chance, cfg.heroic_dead_spin_chance)
+    try:
+        cfg.wild_skin_chance, cfg.feature_heroic_chance, cfg.heroic_dead_spin_chance = 1.0, 1.0, 0.0
+        gs.betmode, gs.criteria = "feature", "basegame"
+        for i in range(30):
+            random.seed(2900 + i)
+            gs.reset_book()
+            gs.run_feature_spin(gs.get_current_distribution_conditions())
+            assert not any(e["type"] == "wildSkin" for e in gs.book.events)
+    finally:
+        cfg.wild_skin_chance, cfg.feature_heroic_chance, cfg.heroic_dead_spin_chance = saved
+
+
 def test_heroic_line_mult(gs, cfg):
     old = cfg.heroic_line_mult_weights
     saved = cfg.feature_heroic_chance
