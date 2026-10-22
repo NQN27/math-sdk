@@ -15,8 +15,9 @@ MEAN = {"bonus": 91.0, "super": 245.0, "epic": 2045.0, "feature_treasure": 564.0
         "base": 0.967 - 91 / 350 - 245 / 2815 - 2045 / 14990}[tier]  # base: the spin without its Bonus
 ZERO = {"feature_heroic": 0.30,  # game_config.feature_zero_share
         "base": 0.75}  # designer base curve: 0x up to p75 (the optimizer's "0" fence)
+CURVE_DATE = {"heroic": "2026-10-22"}  # Heroic re-targeted for the line-only design (designer 2026-10-22)
 CURVE = {"feature_treasure": "treasure_hunt", "feature_heroic": "heroic"}.get(tier, tier)
-curve = {float(a): float(b) for a, b in (l.strip().split(",") for l in open(f"tuning/targets/{CURVE}_curve_2026-10-14.csv") if l[0].isdigit())}
+curve = {float(a): float(b) for a, b in (l.strip().split(",") for l in open(f"tuning/targets/{CURVE}_curve_{CURVE_DATE.get(CURVE, '2026-10-14')}.csv") if l[0].isdigit())}
 P = [p for p in (1, 5, 10, 25, 40, 50, 60, 75, 80, 85, 90, 95, 98, 99, 99.5, 99.9) if p in curve]
 print(f"{'tag':8s} {'mean':>7s} {'clr':>5s} {'MW':>4s} " + " ".join(f"{'p'+format(p,'g'):>7s}" for p in P) + "  fit")
 print(f"{'target':8s} {MEAN:7.1f} {'':5s} {'':4s} " + " ".join(f"{curve[p]:7.1f}" for p in P))
