@@ -583,6 +583,31 @@ def test_heroic_dead_spin_pays_zero(gs, cfg):
         cfg.heroic_dead_spin_chance, cfg.feature_heroic_chance = saved
 
 
+def test_heroic_dead_spin_natural_wilds(gs, cfg):
+    """Keeping a Wild placement for many symbol redraws and weighting the left columns still builds
+    0-pay boards with exactly the guaranteed Wilds, and puts plenty of them in columns 1-3."""
+    saved = (cfg.heroic_dead_spin_chance, cfg.feature_heroic_chance, cfg.heroic_dead_symbol_tries,
+             cfg.heroic_dead_wild_col_weights)
+    try:
+        cfg.heroic_dead_spin_chance, cfg.feature_heroic_chance = 1.0, 1.0
+        cfg.heroic_dead_symbol_tries, cfg.heroic_dead_wild_col_weights = 20, [3, 3, 3, 1, 1, 1]
+        gs.betmode, gs.criteria = "feature", "basegame"
+        cols = [0] * 6
+        for i in range(30):
+            random.seed(1900 + i)
+            gs.reset_book()
+            gs.run_feature_spin(gs.get_current_distribution_conditions())
+            assert gs.win_manager.running_bet_win == 0
+            wilds = [(c, r) for c in range(6) for r in range(5) if gs.board[c][r] is not None and gs.board[c][r].name == "W"]
+            assert len(wilds) == cfg.heroic_min_wild_or_weapon
+            for c, _ in wilds:
+                cols[c] += 1
+        assert sum(cols[:3]) > 0.35 * sum(cols)
+    finally:
+        (cfg.heroic_dead_spin_chance, cfg.feature_heroic_chance, cfg.heroic_dead_symbol_tries,
+         cfg.heroic_dead_wild_col_weights) = saved
+
+
 def test_heroic_line_mult(gs, cfg):
     old = cfg.heroic_line_mult_weights
     saved = cfg.feature_heroic_chance

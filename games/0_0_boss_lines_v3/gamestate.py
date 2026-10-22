@@ -80,22 +80,45 @@ class GameState(GameStateOverride):
         """A Heroic spin built to pay 0 (heroic_dead_spin_chance), chosen uniformly among all natural
         combinations that do not connect: a natural HERO board (weapons re-drawn from the reel as basic
         symbols) plus the guaranteed Wilds on uniformly random cells, rejected and redrawn until no payline
-        pays (~2.5% of tries are accepted, ~20 ms). Nothing connects, nothing fires, no boss is hit."""
+        pays (~2.5% of tries are accepted, ~20 ms). With heroic_dead_symbol_tries > 1 a Wild placement is
+        kept for that many symbol redraws first. Nothing connects, nothing fires, no boss is hit."""
         self.begin_spin()
+        tries = self.config.heroic_dead_symbol_tries
         for _ in range(100000):
-            self.draw_board("HERO")
-            for c, r in self.all_cells():
-                while not self.is_basic(self.board[c][r]):
-                    self.board[c][r] = self.draw_symbol_for(c, r)
-            for c, r in random.sample(list(self.all_cells()), self.config.heroic_min_wild_or_weapon):
-                self.board[c][r] = self.make_symbol("W")
-            if not self.evaluate_lines():
-                break
+            wilds = None
+            for _ in range(tries):  # >1: keep the Wild cells and redraw only the basic symbols around them
+                self.draw_board("HERO")
+                for c, r in self.all_cells():
+                    while not self.is_basic(self.board[c][r]):
+                        self.board[c][r] = self.draw_symbol_for(c, r)
+                if wilds is None:
+                    wilds = self.dead_heroic_wild_cells()
+                for c, r in wilds:
+                    self.board[c][r] = self.make_symbol("W")
+                if not self.evaluate_lines():
+                    break
+            else:
+                continue
+            break
         else:
             raise RuntimeError("could not build a dead Heroic board")
         reveal(self)
         self.resolve_actions()
         self.emit_spin_end()
+
+    def dead_heroic_wild_cells(self) -> list:
+        """Cells for the guaranteed Wilds of a dead Heroic board: uniform, or weighted by column with
+        heroic_dead_wild_col_weights (left-side Wilds connect far more often, so a dead board would
+        otherwise show them mostly in columns 4-6)."""
+        cells, n = list(self.all_cells()), self.config.heroic_min_wild_or_weapon
+        col_w = self.config.heroic_dead_wild_col_weights
+        if not col_w:
+            return random.sample(cells, n)
+        picked = []
+        for _ in range(n):
+            left = [x for x in cells if x not in picked]
+            picked.append(random.choices(left, weights=[col_w[c] for c, _ in left])[0])
+        return picked
 
     def win_levels(self, amount: float) -> list:
         return [name for bound, name in self.config.win_levels if amount >= bound]

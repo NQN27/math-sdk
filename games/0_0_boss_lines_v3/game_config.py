@@ -323,6 +323,11 @@ class GameConfig(Config):
         # so the designer's 30% 0x Heroic share comes from real dead boards, not from re-weighted natural ones.
         # 0 = off.
         self.heroic_dead_spin_chance = 0.0
+        # tries of basic symbols per Wild placement when building a dead Heroic board. 1 = redraw the
+        # Wild cells too every try (dead-board Wilds pile up in columns 4-6, since a left-side Wild almost
+        # always connects); larger keeps the placement and redraws the symbols, so Wild columns look natural
+        self.heroic_dead_symbol_tries = 1
+        self.heroic_dead_wild_col_weights = []  # per column, e.g. [3, 3, 3, 1, 1, 1]; [] = uniform
         self.base_global_into_bonus = False  # Q25
         # Q27 (answered): placeholder 50/50; tune only inside [0.2, 0.8].
         # Heroic and Treasure hunt may have DIFFERENT means (designer 2026-10-07);
