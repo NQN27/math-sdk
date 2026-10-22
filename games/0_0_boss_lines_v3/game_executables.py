@@ -669,8 +669,12 @@ class GameExecutables(GameCalculations):
                 break
             # (1)/(2) symbols appear on empty lit cells
             new = []
+            round_mult = self.weights("treasure_round_kind_mult")
             for c, r in [x for x in cells if self.board[x[0]][x[1]] is None]:
                 weights = dict(self.weights("treasure_kind_weights"))
+                for k, ms in round_mult.items():  # e.g. Clover held back in the first round(s)
+                    if k in weights:
+                        weights[k] *= ms[min(rounds - 1, len(ms) - 1)]
                 if self.no_scatter_spin or (cfg.treasure_scatter_capped and not self.scatter_allowed(c, r)):
                     weights.pop("scatter", None)
                 if sum(1 for x in cells if kinds.get(x) == "coin") < cfg.magnet_min_coins:

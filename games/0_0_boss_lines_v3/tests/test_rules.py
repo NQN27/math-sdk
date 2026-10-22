@@ -682,6 +682,24 @@ def test_no_display_wilds_in_heroic(gs, cfg):
         cfg.wild_skin_chance, cfg.feature_heroic_chance, cfg.heroic_dead_spin_chance = saved
 
 
+def test_treasure_round_kind_mult_holds_clover_back(gs, cfg):
+    old = cfg.treasure_round_kind_mult
+    try:
+        cfg.treasure_round_kind_mult = {"clover": [0, 1], "golden": [0, 1]}
+        gs.betmode, gs.criteria = "feature", "basegame"
+        saved = cfg.feature_heroic_chance
+        cfg.feature_heroic_chance = 0.0
+        for i in range(40):
+            random.seed(4900 + i)
+            gs.reset_book()
+            gs.run_feature_spin(gs.get_current_distribution_conditions())
+            first = next(e for e in gs.book.events if e["type"] == "treasureSymbols")
+            assert not any(c["kind"] in ("clover", "golden") for c in first["cells"])
+        cfg.feature_heroic_chance = saved
+    finally:
+        cfg.treasure_round_kind_mult = old
+
+
 def test_heroic_line_mult(gs, cfg):
     old = cfg.heroic_line_mult_weights
     saved = cfg.feature_heroic_chance
