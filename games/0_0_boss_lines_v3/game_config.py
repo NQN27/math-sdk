@@ -254,6 +254,9 @@ class GameConfig(Config):
         # cells lit during the spin that cleared the stage. The Scatter cells that triggered the
         # Bonus are lit for the first spin only. Empty = Q23 as answered (lit for the whole Bonus).
         self.lit_reset_each_spin_tiers = ()
+        # Bonus tiers whose lit cells all go dark after each Treasure (stage clear), event "litReset"
+        # (designer 2026-10-23: Normal). () = lit cells accumulate over the whole Bonus.
+        self.lit_reset_after_treasure_tiers = ()
         # Which cells light (designer 2026-10-20, NOT approved into config yet):
         #  "symbols": every destroyed copy of a connected symbol (basic symbols, not Wild) - as built so far;
         #  "lines":   only the cells of the winning lines' positions (Wilds included; not the other copies of the

@@ -177,34 +177,43 @@ class GameExecutables(GameCalculations):
     def lit_steer_cfg(self):
         return self.config.lit_steer.get(self.bonus_tier if self.in_bonus else ("heroic" if self.heroic else None))
 
-    def lit_steer_score(self):
-        """(connects, new cells its connections would light) for the current board."""
-        new = {(p["reel"], p["row"]) for w in self.evaluate_lines() for p in w["positions"]}
-        return bool(new), len(new - self.lit)
+    def lit_steer_score(self, share=False):
+        """(connects, new cells its connections would light) for the current board; share=True: the new cells
+        as a share of all connected cells (compares draws without favouring small connections)."""
+        cells = {(p["reel"], p["row"]) for w in self.evaluate_lines() for p in w["positions"]}
+        new = len(cells - self.lit)
+        return bool(cells), (new / len(cells) if cells else 0.0) if share else new
 
     def lit_steer_pick(self, st, draw, snapshot, restore) -> None:
         """lit_steer (designer 2026-10-22): every connected cell still lights (rule unchanged), but a draw whose
-        connections would light many NEW cells is kept only with chance decay ** max(0, lit + new - free); else
-        it is redrawn (up to `tries` draws). A draw that connects is only replaced by another that connects, so
-        how often boards connect stays the same - connections just lean onto cells that are already lit. If no
-        draw is kept, the connecting draw lighting the fewest new cells is used."""
-        conn0, new = self.lit_steer_score()
+        connections would light new cells may be redrawn (up to `tries` draws) so connections lean onto cells that
+        are already lit. A draw that connects is only replaced by another that connects (how often boards connect
+        stays the same). mode "count": keep with chance decay ** max(0, lit + new - free), fall back to the fewest
+        new cells. mode "share" (default): once lit > free, keep with chance decay ** ((lit - free) x new share)
+        and fall back to the lowest new share, so big connections are not penalised."""
+        share = st.get("mode", "share") == "share"
+        conn0, new = self.lit_steer_score(share)
         if not conn0 or not new:
             return
+        def keep(n):
+            if share:
+                return random.random() < st["decay"] ** (max(0, len(self.lit) - st["free"]) * n)
+            return random.random() < st["decay"] ** max(0, len(self.lit) + n - st["free"])
         best = (new, snapshot())
+        dead = 10 ** 6
         for _ in range(st["tries"] - 1):
-            if random.random() < st["decay"] ** max(0, len(self.lit) + new - st["free"]):
+            if new < dead and keep(new):
                 return
             draw()
-            conn, new = self.lit_steer_score()
+            conn, new = self.lit_steer_score(share)
             if not conn:
-                new = 10 ** 6  # never swap a connecting draw for a dead one
+                new = dead  # never swap a connecting draw for a dead one
                 continue
             if new < best[0]:
                 best = (new, snapshot())
             if not new:
                 return
-        if random.random() < st["decay"] ** max(0, len(self.lit) + new - st["free"]) and new < 10 ** 6:
+        if new < dead and keep(new):
             return
         restore(best[1])
 

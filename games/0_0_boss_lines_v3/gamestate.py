@@ -89,6 +89,9 @@ class GameState(GameStateOverride):
             self.open_chests()
         if not self.wincap_triggered and self.stage_cleared:
             self.run_treasure(self.treasure_cells(), self.current_min_coin())
+            if self.in_bonus and self.bonus_tier in self.config.lit_reset_after_treasure_tiers:
+                self.lit = set()  # designer 2026-10-23: the next stage lights up from scratch
+                emit(self, "litReset", cause="treasure")
         self.emit_spin_end()
 
     def play_dead_heroic_spin(self) -> None:

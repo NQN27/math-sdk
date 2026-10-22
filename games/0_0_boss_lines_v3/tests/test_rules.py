@@ -803,6 +803,28 @@ def test_transform_wilds_fire_rarely_in_bonus(gs, cfg):
         cfg.power_wild_event_chance, cfg.wild_event_chance = saved
 
 
+def test_lit_reset_after_treasure(gs, cfg):
+    import os, sys
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tuning"))
+    import tune_harness as H
+    saved = cfg.lit_reset_after_treasure_tiers
+    try:
+        cfg.lit_reset_after_treasure_tiers = ("bonus",)
+        seen = 0
+        for i in range(40):
+            H._one(gs, cfg, "bonus", i)
+            ev = gs.book.events
+            for k, e in enumerate(ev):
+                if e["type"] == "treasureEnd" and k + 1 < len(ev) and ev[k + 1]["type"] == "litReset":
+                    seen += 1
+            if not gs.wincap_triggered:  # one reset per stage clear (Treasure ran, even on no lit cells)
+                assert sum(e["type"] == "litReset" for e in ev) == sum(
+                    1 for e in ev if e["type"] == "spinEnd" and e["stageCleared"])
+        assert seen > 0
+    finally:
+        cfg.lit_reset_after_treasure_tiers = saved
+
+
 def test_lit_decay_one_tier(gs, cfg):
     old = cfg.lit_decay
     cells = [(c, r) for c in range(6) for r in range(5)]
