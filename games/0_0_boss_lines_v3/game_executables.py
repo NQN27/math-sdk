@@ -338,6 +338,12 @@ class GameExecutables(GameCalculations):
                      if self.is_wild(self.board[p["reel"]][p["row"]])}
         acted = False
         chance = 1.0 if (self.heroic or getattr(self, "force_wincap", False)) else self.weights("wild_event_chance")
+        group = [] if self.heroic else None  # Heroic: every Wild of the pass fires at once, one grouped event
+        def out(**data):
+            if group is None:
+                emit(self, "wildEvent", **data)
+            else:
+                group.append(data)
         for cell in [x for x in self.all_cells() if x in connected]:
             if random.random() >= chance:
                 continue
@@ -352,19 +358,21 @@ class GameExecutables(GameCalculations):
             if kind == "multiplier":
                 f = get_random_outcome(self.weights("wild_mult_weights"))
                 self.wild_mult[cell] = f
-                emit(self, "wildEvent", event="multiplier", position=pos(self, c, r), factor=f)
+                out(event="multiplier", position=pos(self, c, r), factor=f)
             elif kind == "coin":
                 v = self.draw_coin(max(self.current_min_coin(), self.weights("wild_coin_min_value")),
                                    table=self.weights("wild_coin_value_weights"))
                 g = self.global_factor() if self.config.wild_coin_uses_global else 1
                 paid = self.award(v * g)
-                emit(self, "wildEvent", event="coin", position=pos(self, c, r), value=v, globalMult=g, paid=paid)
+                out(event="coin", position=pos(self, c, r), value=v, globalMult=g, paid=paid)
             else:
                 p = self.pick_power()
                 self.reserve[p] += 1
-                emit(self, "wildEvent", event="power", position=pos(self, c, r), power=p)
+                out(event="power", position=pos(self, c, r), power=p)
             if self.wincap_triggered:
                 break
+        if group:
+            emit(self, "wildEvents", wilds=group)
         return acted
 
     # =========================================================================

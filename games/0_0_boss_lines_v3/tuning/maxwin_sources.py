@@ -69,7 +69,7 @@ def worker(args):
         H._one(gs, cfg, tier, i)
         w = gs.win_manager.running_bet_win
         if w >= big:
-            out.append({"win": w, "maxwin": gs.wincap_triggered, "src": classify(gs.book.events, w, cfg.wincap)})
+            out.append({"win": w, "maxwin": gs.wincap_triggered, "src": classify(list(__import__("game_events").flat_events(gs.book.events)), w, cfg.wincap)})
     return out
 
 

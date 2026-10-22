@@ -27,7 +27,8 @@ def worker(args):
     for i in range(start, start + n):
         H._one(gs, cfg, tier, i)
         stage, seen, acc = "opening", {"opening"}, 0.0
-        for e in gs.book.events:
+        from game_events import flat_events
+        for e in flat_events(gs.book.events):
             t = e["type"]
             if t == "freeSpinStart":
                 stage = str(e["stage"])

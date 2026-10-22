@@ -24,6 +24,16 @@ def emit(gs, etype, **data):
     gs.book.add_event({"index": len(gs.book.events), "type": etype, **data})
 
 
+def flat_events(events):
+    """Events with each grouped Heroic "wildEvents" expanded back into single "wildEvent" dicts (for stats)."""
+    for e in events:
+        if e["type"] == "wildEvents":
+            for w in e["wilds"]:
+                yield {"type": "wildEvent", **w}
+        else:
+            yield e
+
+
 def boss_state_event(gs):
     emit(gs, "bossState", stage=gs.stage_label(), bosses=[
         {"id": b["id"], "reels": list(b["zone"]), "hp": b["hp"], "hpMax": b["hp_max"],

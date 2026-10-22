@@ -617,7 +617,7 @@ def test_heroic_dead_spin_pays_zero(gs, cfg):
             assert len(wilds) == cfg.heroic_min_wild_or_weapon
             left += any(c < 3 for c, _ in wilds)
             assert not any(gs.is_weapon(gs.board[c][r]) for c in range(6) for r in range(5))
-            assert not any(e["type"] in ("lineWins", "weapon", "wildEvent", "chestOpened") for e in gs.book.events)
+            assert not any(e["type"] in ("lineWins", "weapon", "wildEvent", "wildEvents", "chestOpened") for e in gs.book.events)
         assert left > 0  # Wilds also land in columns 1-3
     finally:
         cfg.heroic_dead_spin_chance, cfg.feature_heroic_chance = saved
@@ -646,6 +646,26 @@ def test_heroic_dead_spin_natural_wilds(gs, cfg):
     finally:
         (cfg.heroic_dead_spin_chance, cfg.feature_heroic_chance, cfg.heroic_dead_symbol_tries,
          cfg.heroic_dead_wild_col_weights) = saved
+
+
+def test_heroic_wild_events_fire_together(gs, cfg):
+    saved = (cfg.feature_heroic_chance, cfg.heroic_dead_spin_chance)
+    try:
+        cfg.feature_heroic_chance, cfg.heroic_dead_spin_chance = 1.0, 0.0
+        gs.betmode, gs.criteria = "feature", "basegame"
+        grouped = 0
+        for i in range(20):
+            random.seed(3900 + i)
+            gs.reset_book()
+            gs.run_feature_spin(gs.get_current_distribution_conditions())
+            assert not any(e["type"] == "wildEvent" for e in gs.book.events)  # never one by one in Heroic
+            for e in gs.book.events:
+                if e["type"] == "wildEvents":
+                    grouped += 1
+                    assert e["wilds"] and all(w["event"] in ("multiplier", "coin", "power") for w in e["wilds"])
+        assert grouped > 0
+    finally:
+        cfg.feature_heroic_chance, cfg.heroic_dead_spin_chance = saved
 
 
 def test_no_display_wilds_in_heroic(gs, cfg):

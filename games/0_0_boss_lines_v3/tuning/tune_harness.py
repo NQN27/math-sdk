@@ -154,7 +154,8 @@ def worker(args):
     diag = _diag_new()
     for i in range(start, start + n):
         _one(gs, cfg, tier, i)
-        ev = gs.book.events
+        from game_events import flat_events
+        ev = list(flat_events(gs.book.events))
         src = {"lines": 0.0, "wildcoin": 0.0, "chest": 0.0, "treasure": 0.0}
         stage, spins, treasures = None, 0, 0
         for e in ev:

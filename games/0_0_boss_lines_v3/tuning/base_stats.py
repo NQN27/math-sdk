@@ -26,7 +26,8 @@ def worker(args):
         gs.betmode, gs.criteria = mode, "basegame"
         gs.reset_book()
         gs.run_base_spin(gs.get_current_distribution_conditions())
-        ev = gs.book.events
+        from game_events import flat_events
+        ev = list(flat_events(gs.book.events))
         tier, nsc = gs.scatter_tier()
         src = {"lines": 0.0, "wildcoin": 0.0, "chest": 0.0}
         for e in ev:
