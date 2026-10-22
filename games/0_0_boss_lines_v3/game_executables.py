@@ -175,17 +175,36 @@ class GameExecutables(GameCalculations):
     def lit_steer_cfg(self):
         return self.config.lit_steer.get(self.bonus_tier if self.in_bonus else ("heroic" if self.heroic else None))
 
-    def lit_steer_accepts(self) -> bool:
-        """lit_steer (designer 2026-10-22): every connected cell still lights (rule unchanged), but a board whose
-        connections would light many NEW cells is kept only with chance decay ** max(0, lit + new - free), so
-        connections lean onto cells that are already lit. True = keep this board."""
-        st = self.lit_steer_cfg()
-        if not st:
-            return True
-        new = {(p["reel"], p["row"]) for w in self.evaluate_lines() for p in w["positions"]} - self.lit
-        if not new:
-            return True
-        return random.random() < st["decay"] ** max(0, len(self.lit) + len(new) - st["free"])
+    def lit_steer_score(self):
+        """(connects, new cells its connections would light) for the current board."""
+        new = {(p["reel"], p["row"]) for w in self.evaluate_lines() for p in w["positions"]}
+        return bool(new), len(new - self.lit)
+
+    def lit_steer_pick(self, st, draw, snapshot, restore) -> None:
+        """lit_steer (designer 2026-10-22): every connected cell still lights (rule unchanged), but a draw whose
+        connections would light many NEW cells is kept only with chance decay ** max(0, lit + new - free); else
+        it is redrawn (up to `tries` draws). A draw that connects is only replaced by another that connects, so
+        how often boards connect stays the same - connections just lean onto cells that are already lit. If no
+        draw is kept, the connecting draw lighting the fewest new cells is used."""
+        conn0, new = self.lit_steer_score()
+        if not conn0 or not new:
+            return
+        best = (new, snapshot())
+        for _ in range(st["tries"] - 1):
+            if random.random() < st["decay"] ** max(0, len(self.lit) + new - st["free"]):
+                return
+            draw()
+            conn, new = self.lit_steer_score()
+            if not conn:
+                new = 10 ** 6  # never swap a connecting draw for a dead one
+                continue
+            if new < best[0]:
+                best = (new, snapshot())
+            if not new:
+                return
+        if random.random() < st["decay"] ** max(0, len(self.lit) + new - st["free"]) and new < 10 ** 6:
+            return
+        restore(best[1])
 
     def refill(self) -> list:
         """Fill every empty cell in place, in cell-priority order."""
@@ -195,11 +214,14 @@ class GameExecutables(GameCalculations):
                 self.board[c][r] = self.draw_symbol_for(c, r)
                 filled.append((c, r))
         st = self.lit_steer_cfg() if filled else None
-        for _ in range(st["tries"] - 1 if st else 0):  # lit_steer: redraw the new symbols a few times
-            if self.lit_steer_accepts():
-                break
-            for c, r in filled:
-                self.board[c][r] = self.draw_symbol_for(c, r)
+        if st:  # lit_steer: redraw the new symbols a few times
+            def draw():
+                for c, r in filled:
+                    self.board[c][r] = self.draw_symbol_for(c, r)
+            def restore(snap):
+                for (c, r), sym in snap.items():
+                    self.board[c][r] = sym
+            self.lit_steer_pick(st, draw, lambda: {x: self.board[x[0]][x[1]] for x in filled}, restore)
         if filled:
             board_cells_event(self, "refill", filled)
             self.mark_wild_skins(filled)

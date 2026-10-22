@@ -65,15 +65,23 @@ class GameState(GameStateOverride):
     def play_one_spin(self, reel, force_scatters=None, min_wild_weapon=0, min_weapons=0) -> None:
         """Opening board -> steps (1)-(9) -> Treasure. (Hold and Spin removed by the designer 2026-10-07.)"""
         self.begin_spin()
-        st = self.lit_steer_cfg()
-        for _ in range(st["tries"] if st else 1):  # lit_steer: redraw boards that would light many new cells
+        def draw():
             self.draw_board(reel, force_scatters)
             if min_wild_weapon:
                 self._guarantee_wild_or_weapon(min_wild_weapon)
             if min_weapons:
                 self._guarantee_wild_or_weapon(min_weapons, weapons_only=True)
-            if self.lit_steer_accepts():
-                break
+        draw()
+        st = self.lit_steer_cfg()
+        if st:  # lit_steer: redraw opening boards whose connections would light many new cells
+            def snapshot():
+                return ([col[:] for col in self.board], self.reel_positions, getattr(self, "top_symbols", None), getattr(self, "bottom_symbols", None))
+            def restore(snap):
+                self.board = [col[:] for col in snap[0]]
+                self.reel_positions = self.padding_position = snap[1]
+                self.top_symbols, self.bottom_symbols = snap[2], snap[3]
+                self.get_special_symbols_on_board()
+            self.lit_steer_pick(st, draw, snapshot, restore)
         reveal(self)
         self.mark_wild_skins(list(self.all_cells()))
         self.resolve_actions()
