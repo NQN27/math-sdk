@@ -270,6 +270,9 @@ class GameConfig(Config):
         # lit_decay): {tier or "heroic": {"free": n, "decay": d, "tries": k}}. A board / refill whose connections would
         # light new cells past `free` is kept with chance d ** (lit + new - free), else redrawn (up to k draws). {} = off.
         self.lit_steer = {}
+        # Event chance of a Wild made by the Transform power, in a Bonus only (Heroic keeps 1.0); per tier via
+        # tier_weights. Designer 2026-10-22: 0.05. None = same as any Wild (wild_event_chance).
+        self.power_wild_event_chance = None
         self.epic_min_coin = 5  # N6: no Dong coins during Epic free spins
         self.epic_opening_treasure_stage = 2  # N5: Epic starts with a Treasure "as if stage 2 was cleared"
         # Per-Bonus-tier replacements for the weight tables above (coin_value_weights,

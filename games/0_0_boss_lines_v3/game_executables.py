@@ -40,6 +40,7 @@ class GameExecutables(GameCalculations):
     def begin_spin(self) -> None:
         self.enhance = [[0] * 5 for _ in range(6)]
         self.wild_mult = {}
+        self.power_wilds = set()  # cells turned into Wild by the Transform power this spin
         self.darkened = set()
         self.spin_had_scatter = False
         for b in self.bosses:
@@ -165,6 +166,7 @@ class GameExecutables(GameCalculations):
         for c, r in cells:
             self.board[c][r] = None
             self.enhance[c][r] = 0
+            getattr(self, "power_wilds", set()).discard((c, r))
         decay = self.config.lit_decay.get(self.bonus_tier if self.in_bonus else ("heroic" if self.heroic else None))
         for cell in lit_cells:
             if decay and cell not in self.lit:
@@ -305,6 +307,7 @@ class GameExecutables(GameCalculations):
         cells = random.sample(cand, n)
         for c, r in cells:
             self.board[c][r] = self.make_symbol("W")
+        self.power_wilds.update(cells)
         board_cells_event(self, "powerActivated", cells, power="transform")
 
     def _replace_eligible(self):
@@ -387,8 +390,12 @@ class GameExecutables(GameCalculations):
                 emit(self, "wildEvent", **data)
             else:
                 group.append(data)
+        power_chance = (self.weights("power_wild_event_chance")
+                        if self.in_bonus and not getattr(self, "force_wincap", False) else None)
         for cell in [x for x in self.all_cells() if x in connected]:
-            if random.random() >= chance:
+            # designer 2026-10-22: in a Bonus, a Wild made by the Transform power fires an event only this often
+            ch = power_chance if power_chance is not None and cell in getattr(self, "power_wilds", ()) else chance
+            if random.random() >= ch:
                 continue
             weights = dict(self.weights("wild_event_weights"))
             if getattr(self, "force_wincap", False):

@@ -779,6 +779,30 @@ def test_lit_steer_keeps_rule_but_fewer_new_lit_cells(gs, cfg):
         cfg.lit_steer, cfg.lit_decay = saved
 
 
+def test_transform_wilds_fire_rarely_in_bonus(gs, cfg):
+    """Designer 2026-10-22: in a Bonus a Wild made by the Transform power fires an event only with
+    power_wild_event_chance; ordinary Wilds keep wild_event_chance."""
+    saved = (cfg.power_wild_event_chance, cfg.wild_event_chance)
+    try:
+        cfg.power_wild_event_chance, cfg.wild_event_chance = 0.0, 1.0
+        gs.in_bonus, gs.heroic, gs.bonus_tier = True, False, "bonus"
+        gs.spawn_stage(3)
+        gs.begin_spin()
+        set_board(gs, ["W W W L1 L2 L3"] + FILLER[1:])
+        wins = gs.evaluate_lines()
+        gs.power_wilds = {(0, 0)}
+        n0 = len(gs.book.events)
+        gs.wild_events(wins)
+        fired = [e["position"] for e in gs.book.events[n0:] if e["type"] == "wildEvent"]
+        assert fired and all(not (p["reel"] == 0 and p["row"] == 1) for p in fired)  # (0,0) = the Transform Wild
+        gs.in_bonus = False  # outside a Bonus the Transform Wild fires like any Wild
+        n0 = len(gs.book.events)
+        gs.wild_events(wins)
+        assert any(e["type"] == "wildEvent" and e["position"]["reel"] == 0 for e in gs.book.events[n0:])
+    finally:
+        cfg.power_wild_event_chance, cfg.wild_event_chance = saved
+
+
 def test_lit_decay_one_tier(gs, cfg):
     old = cfg.lit_decay
     cells = [(c, r) for c in range(6) for r in range(5)]
