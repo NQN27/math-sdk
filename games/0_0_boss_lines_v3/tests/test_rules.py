@@ -700,6 +700,32 @@ def test_treasure_round_kind_mult_holds_clover_back(gs, cfg):
         cfg.treasure_round_kind_mult = old
 
 
+def test_treasure_clover_vanishes_and_cell_refills(gs, cfg):
+    old = cfg.treasure_clover_vanishes
+    saved = cfg.feature_heroic_chance
+    try:
+        cfg.treasure_clover_vanishes, cfg.feature_heroic_chance = True, 0.0
+        gs.betmode, gs.criteria = "feature", "basegame"
+        refilled = 0
+        for i in range(300):
+            random.seed(5900 + i)
+            gs.reset_book()
+            gs.run_feature_spin(gs.get_current_distribution_conditions())
+            gone = set()
+            for e in gs.book.events:
+                if e["type"] == "treasureClover":
+                    gone |= {(c["reel"], c["row"]) for c in e["clovers"]}
+                elif e["type"] == "treasureGoldenClover":
+                    gone.add((e["position"]["reel"], e["position"]["row"]))
+                elif e["type"] == "treasureSymbols":
+                    refilled += len(gone & {(c["reel"], c["row"]) for c in e["cells"]})
+                elif e["type"] == "treasureEnd":
+                    break
+        assert refilled > 0  # an activated Clover's cell gets a new symbol in the next round
+    finally:
+        cfg.treasure_clover_vanishes, cfg.feature_heroic_chance = old, saved
+
+
 def test_heroic_line_mult(gs, cfg):
     old = cfg.heroic_line_mult_weights
     saved = cfg.feature_heroic_chance

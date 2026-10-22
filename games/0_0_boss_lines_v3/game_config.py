@@ -244,6 +244,9 @@ class GameConfig(Config):
         # Treasure symbol weight factors by round, {kind: [round 1, round 2, ...]} (last repeats); per tier via
         # tier_weights (designer 2026-10-22 trial for Treasure hunt: no early Clover, more Magnets). {} = off.
         self.treasure_round_kind_mult = {}
+        # Activated Clover / Golden clover leave their cell empty for the next round (Proposal Treasure step 2),
+        # instead of staying inactive (N10, 2026-10-07). Per tier via tier_weights (designer 2026-10-22: Treasure hunt).
+        self.treasure_clover_vanishes = False
         self.treasure_hunt_min_coin = 1
         self.treasure_skips_scatter_cells = True  # Q28 (answered) / N7
         # Q23 trial (designer idea 2026-10-11, NOT approved yet): Bonus tiers listed here clear

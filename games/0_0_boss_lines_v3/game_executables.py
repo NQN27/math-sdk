@@ -731,6 +731,11 @@ class GameExecutables(GameCalculations):
                                                        for c, r in clovers],
                      cells=[{**pos(self, c, r), "factor": f} for (c, r), f in mult.items()])
                 used_clovers.update(clovers)  # N10: stays on the board, inactive
+                if self.weights("treasure_clover_vanishes"):  # Proposal step 2: the cell empties and refills
+                    for x in clovers:
+                        self.board[x[0]][x[1]] = None
+                        kinds.pop(x, None)
+                        used_clovers.discard(x)  # a new Clover landing here later fires again
             # (5) Golden clovers, one after another: x every reward cell on the board
             for c, r in [x for x in cells if kinds.get(x) == "golden" and x not in used_clovers]:
                 f = self.board[c][r].prize
@@ -740,6 +745,10 @@ class GameExecutables(GameCalculations):
                 used_clovers.add((c, r))  # N10: stays on the board, inactive
                 emit(self, "treasureGoldenClover", position=pos(self, c, r), factor=f,
                      cells=[pos(self, *x) for x in hit])
+                if self.weights("treasure_clover_vanishes"):
+                    self.board[c][r] = None
+                    kinds.pop((c, r), None)
+                    used_clovers.discard((c, r))
             if self._treasure_maxwin_check(cells, kinds):
                 return self.win_manager.running_bet_win - start_win
             # (6) next magnet in cell order; then back to (2)
