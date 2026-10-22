@@ -108,6 +108,46 @@ def test_stage_hp_ranges_and_multiple_of_5(gs, cfg):
             assert [b["zone"] for b in gs.bosses] == [(0, 1), (2, 3), (4, 5)]
 
 
+def test_boss_hp_offset(gs, cfg):
+    old = cfg.boss_hp_offset
+    try:
+        cfg.boss_hp_offset = {"boss3": {1: -5, 2: -5, 3: -5, 4: -10, 5: -10}}
+        random.seed(2)
+        for stage in range(1, 6):
+            for _ in range(40):
+                gs.spawn_stage(stage)
+                lo, hi = cfg.stage_hp_range[stage]
+                d = cfg.boss_hp_offset["boss3"][stage]
+                hp = {b["id"]: b["hp"] for b in gs.bosses}
+                assert lo <= hp["boss1"] <= hi and lo <= hp["boss2"] <= hi
+                assert lo + d <= hp["boss3"] <= hi + d and hp["boss3"] % 5 == 0
+                assert gs.bosses[2]["hp_max"] == hp["boss3"]
+    finally:
+        cfg.boss_hp_offset = old
+
+
+def test_weapon_hp_bias_follows_boss_hp(gs, cfg):
+    old = cfg.weapon_hp_bias
+    try:
+        cfg.weapon_hp_bias = {"bonus": 0.0}
+        gs.in_bonus, gs.bonus_tier = True, "bonus"
+        gs.spawn_stage(3)
+        b1, b2, b3 = gs.bosses
+        b1["hp"] = 0; b1["alive"] = False
+        b2["hp"] = b2["hp_max"] // 2
+        assert gs.weapon_keep_chance(0) == 0 and gs.weapon_keep_chance(5) == 1
+        assert gs.weapon_keep_chance(2) == pytest.approx(b2["hp"] / b2["hp_max"])
+        set_board(gs, FILLER)
+        gs.reel_name = "BON_S1"
+        random.seed(3)
+        drawn = [gs.draw_symbol_for(c, 0).name for c in (0, 1) for _ in range(300)]
+        assert not any(n in cfg.weapon_symbols for n in drawn)  # floor 0: no weapon over a dead boss
+        gs.bonus_tier = "super"  # tier not listed: no bias
+        assert gs.weapon_keep_chance(0) is None
+    finally:
+        cfg.weapon_hp_bias = old
+
+
 # ---- weapons -------------------------------------------------------------------
 def test_bomb_area_clipped_at_corner(gs):
     set_board(gs, ["BM H1 L1 L1 L1 L1", "H2 SC L1 L1 L1 L1"] + FILLER[2:])

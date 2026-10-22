@@ -49,6 +49,9 @@ class GameState(GameStateOverride):
             return
         cand = [(c, r) for c, r in self.all_cells() if self.is_basic(self.board[c][r])]
         random.shuffle(cand)
+        if weapons_only and self.weapon_keep_chance(0) is not None:  # weapon_hp_bias: favour high-HP bosses' cells
+            keys = {x: random.random() ** (1 / max(1e-9, self.weapon_keep_chance(x[0]))) for x in cand}
+            cand.sort(key=lambda x: -keys[x])
         for c, r in cand:
             if have >= minimum:
                 break

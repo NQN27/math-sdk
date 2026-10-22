@@ -91,6 +91,7 @@ class GameExecutables(GameCalculations):
         for bid, zone in zones.items():
             if stage != ENDLESS:
                 hp = self._roll_hp(*self.config.stage_hp_range[stage])
+                hp += self.config.boss_hp_offset.get(bid, {}).get(stage, 0)
             self.bosses.append({"id": bid, "zone": zone, "hp": hp, "hp_max": hp, "alive": True,
                                 "chest": self._roll_chest(stage), "killed_this_spin": False,
                                 "chest_opened": False})

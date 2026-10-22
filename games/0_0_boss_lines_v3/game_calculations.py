@@ -69,6 +69,21 @@ class GameCalculations(Executables):
                 return label
         return "maxwin"
 
+    def weapon_keep_chance(self, c: int):
+        """weapon_hp_bias (designer 2026-10-22): in the listed Bonus tiers a weapon drawn in column `c` is kept
+        with chance floor + (1 - floor) x the remaining-HP share of that column's boss (dead boss: floor),
+        so weapons favour columns whose boss still has the most HP. None = no bias (every weapon kept)."""
+        floor = self.config.weapon_hp_bias.get(getattr(self, "bonus_tier", None)) if getattr(self, "in_bonus", False) else None
+        if floor is None:
+            return None
+        b = next((x for x in getattr(self, "bosses", []) if c in x["zone"]), None)
+        share = b["hp"] / b["hp_max"] if b is not None and b["alive"] and b["hp_max"] else 0.0
+        return floor + (1 - floor) * share
+
+    def _weapon_dropped(self, name: str, c: int) -> bool:
+        keep = self.weapon_keep_chance(c) if name in self.config.weapon_symbols else None
+        return keep is not None and random.random() >= keep
+
     def draw_symbol_for(self, c: int, r: int):
         """Fresh symbol for one cell from the current reel's column `c`."""
         strip = self.config.reels[self.reel_name][c]
@@ -77,6 +92,8 @@ class GameCalculations(Executables):
             if name == "SC" and not self.scatter_allowed(c, r):
                 continue
             if name in self.config.weapon_symbols and not self.weapon_allowed(name, c):
+                continue
+            if self._weapon_dropped(name, c):
                 continue
             return self.make_symbol(name)
         raise RuntimeError("could not draw a symbol")
@@ -108,6 +125,10 @@ class GameCalculations(Executables):
                             break
                         positions[c] = random.randrange(len(strip))
         self.board = [[self.make_symbol(n) for n in self._window(reels[c], positions[c])] for c in range(n_cols)]
+        for c in range(n_cols):  # weapon_hp_bias: weapons over low-HP / dead bosses are redrawn
+            for r in range(5):
+                if self._weapon_dropped(self.board[c][r].name, c):
+                    self.board[c][r] = self.draw_symbol_for(c, r)
         if self.no_scatter_spin:
             for c in range(n_cols):
                 for r in range(5):

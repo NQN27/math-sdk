@@ -126,6 +126,9 @@ class GameConfig(Config):
         self.stage_hp_range = {0: (25, 25), 1: (30, 40), 2: (35, 50), 3: (45, 65),
                                4: (65, 90), 5: (85, 120), ENDLESS: (350, 400)}
         self.hp_round = 5
+        # Per-boss HP change added to the stage draw, {boss id: {stage: delta}} (designer 2026-10-22 trial:
+        # boss3 over columns 5-6 takes the least line damage, e.g. {"boss3": {1: -5, 2: -5, 3: -5, 4: -10, 5: -10}}).
+        self.boss_hp_offset = {}
         # Q9: later Endless bosses: previous HP + one of these.
         self.endless_hp_step_choices = list(range(0, 55, 5))
         # Q7: number of low symbols removed AT each stage (cumulative, by stage).
@@ -302,6 +305,10 @@ class GameConfig(Config):
         # Weapons guaranteed on each free spin's opening board (designer 2026-10-07;
         # was 3 Wild-or-weapon for both, which drove Super to ~1068x vs 240x).
         self.bonus_min_weapons = {"super": 1, "epic": 2}
+        # Weapons favour bosses with HP left (designer 2026-10-22), per Bonus tier: {tier: floor}. A weapon drawn in
+        # column c is kept with chance floor + (1 - floor) x HP share left of that column's boss (dead: floor),
+        # else redrawn; guaranteed weapons pick their cells with the same weights. {} = off.
+        self.weapon_hp_bias = {}
         # Trial (designer 2026-10-21: fewer but stronger weapons): {tier: chance} that a free spin gets the full
         # guarantee above; otherwise it guarantees one weapon fewer. Empty = always the full guarantee.
         self.bonus_min_weapons_chance = {}
