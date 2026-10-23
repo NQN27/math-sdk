@@ -174,9 +174,11 @@ class OptimizationSetup:
             plan, _ = tier_fences(cfg, prob, cost[mode], mw_tiers=tuple(t for t in cfg.base_maxwin_fence_tiers
                                                                          if have is None or t in have))
             conds = _conditions(plan, cost[mode], cap)
+            # tier fences before "0": a Bonus that pays 0x (rare) must stay in its tier fence, else the
+            # "0" fence takes it and the tier's share/mean drift (f17: base Normal 1 in 339, mean 88)
             conds = {**{k: v for k, v in conds.items() if k.startswith("wincap")},
-                     "0": ConstructConditions(rtp=0, av_win=0, search_conditions=0).return_dict(),
-                     **{k: v for k, v in conds.items() if not k.startswith("wincap")}}
+                     **{k: v for k, v in conds.items() if not k.startswith("wincap")},
+                     "0": ConstructConditions(rtp=0, av_win=0, search_conditions=0).return_dict()}
             # base game proper (line wins, Treasure at stage 0) pays the rest - the designer's "gap"
             conds["basegame"] = ConstructConditions(hr=3.5, rtp=0.0).return_dict()
             opt[mode] = {
