@@ -104,7 +104,8 @@ def test_stage_hp_ranges_and_multiple_of_5(gs, cfg):
             gs.spawn_stage(stage)
             lo, hi = cfg.stage_hp_range[stage]
             for b in gs.bosses:
-                assert lo <= b["hp"] <= hi and b["hp"] % 5 == 0
+                d = cfg.boss_hp_offset.get(b["id"], {}).get(stage, 0)  # f17: boss3 -5 / -10
+                assert lo + d <= b["hp"] <= hi + d and b["hp"] % 5 == 0
             assert [b["zone"] for b in gs.bosses] == [(0, 1), (2, 3), (4, 5)]
 
 
@@ -206,8 +207,8 @@ def test_weapon_factor_multiplies_damage(gs):
     gs.board[0][1].prize = 4
     gs.refill = lambda: []
     gs.step_weapons()
-    # bomb at (0,1) hits (0,0) H3, (1,0) H3, (1,1) H5, (0,2) L2, (1,2) L1 -> boss1
-    assert gs.bosses[0]["hp"] == 500 - 4 * (2 + 2 + 3 + 1 + 1)
+    # bomb at (0,1) hits (0,0) H3, (1,0) H3, (1,1) H5, (0,2) L2, (1,2) L1 -> boss1, plus its own cell's damage
+    assert gs.bosses[0]["hp"] == 500 - 4 * (2 + 2 + 3 + 1 + 1) - gs.config.weapon_self_damage
 
 
 def test_arrow_formula_and_endless_divided_by_3(gs):
@@ -473,12 +474,17 @@ def test_coin_labels(gs):
 
 
 def test_lit_rule_basic_only(gs):
-    gs.spawn_stage(1)
-    set_board(gs, board_with_top("H2 H2 W H2 L1 L2"))
-    gs.refill = lambda: []
-    gs.step_connect()
-    assert (2, 0) not in gs.lit  # connected Wild: destroyed but not lit
-    assert (0, 0) in gs.lit and (1, 0) in gs.lit
+    old = gs.config.lit_rule
+    try:
+        gs.config.lit_rule = "symbols"  # f17 uses "lines" (test_lit_rule_lines)
+        gs.spawn_stage(1)
+        set_board(gs, board_with_top("H2 H2 W H2 L1 L2"))
+        gs.refill = lambda: []
+        gs.step_connect()
+        assert (2, 0) not in gs.lit  # connected Wild: destroyed but not lit
+        assert (0, 0) in gs.lit and (1, 0) in gs.lit
+    finally:
+        gs.config.lit_rule = old
 
 
 def test_lit_rule_lines(gs, cfg):
@@ -574,8 +580,11 @@ def test_tier_stage_min_coin_overrides_one_tier(gs, cfg):
         cfg.tier_stage_min_coin = old
 
 def test_wild_skin_is_display_only(gs, cfg):
-    """Display-only Wilds sit on cells of already-winning lines and change no outcome."""
+    """Display-only Wilds sit on cells of already-winning lines and change no outcome (with wild_skin_damage
+    None; f17 gives them Wild damage 3, which changes boss damage on purpose)."""
     old = cfg.wild_skin_chance
+    old_dmg = cfg.wild_skin_damage
+    cfg.wild_skin_damage = None
     try:
         res, skins = {}, 0
         for ch in (0.0, 0.6):
@@ -599,6 +608,7 @@ def test_wild_skin_is_display_only(gs, cfg):
         assert res[0.0] == res[0.6] and skins > 0
     finally:
         cfg.wild_skin_chance = old
+        cfg.wild_skin_damage = old_dmg
 
 
 def test_heroic_dead_spin_pays_zero(gs, cfg):

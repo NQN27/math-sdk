@@ -34,26 +34,25 @@ ARROW_BOOST_COLS = {3: 1.4, 4: 1.4, 5: 1.4}
 # Bonus reels: 1 Scatter per column (0.34%). At 1% (3 per column) a Bonus
 # spin collected ~1.38 extra spins on average (every refilled cell can draw a
 # Scatter), so the Bonus never ran out of spins - see README.
-REEL_SPECS = {
-    "BR0": dict(removed=0, wild=5.0, sc=1.4, weapon=1.5),
-    "ANTE": dict(removed=0, wild=5.0, sc=3.0, weapon=1.5),
-    "HERO": dict(removed=4, wild=8.0, sc=0.0, weapon=3.0),  # Heroic fights stage 5 -> no L
-    "BON_S1": dict(removed=0, wild=6.0, sc=0.34, weapon=2.0),
-    "BON_S2": dict(removed=1, wild=5.5, sc=0.34, weapon=2.0),
-    "BON_S3": dict(removed=2, wild=5.0, sc=0.34, weapon=2.0),
-    "BON_S4": dict(removed=3, wild=4.5, sc=0.34, weapon=2.0),
-    "BON_S5": dict(removed=4, wild=4.0, sc=0.34, weapon=2.0),
-    "BON_E": dict(removed=4, wild=4.0, sc=0.34, weapon=2.5),
-    # Super / Epic get their own stage reels so each tier tunes independently (2026-10-08)
-    "SUP_S2": dict(removed=1, wild=5.5, sc=0.34, weapon=2.0),
-    "SUP_S3": dict(removed=2, wild=5.0, sc=0.34, weapon=2.0),
-    "SUP_S4": dict(removed=3, wild=4.5, sc=0.34, weapon=2.0),
-    "SUP_S5": dict(removed=4, wild=4.0, sc=0.34, weapon=2.0),
-    "SUP_E": dict(removed=4, wild=4.0, sc=0.34, weapon=2.5),
-    "EPI_S3": dict(removed=2, wild=5.0, sc=0.34, weapon=2.0),
-    "EPI_S4": dict(removed=3, wild=4.5, sc=0.34, weapon=2.0),
-    "EPI_S5": dict(removed=4, wild=4.0, sc=0.34, weapon=2.0),
-    "EPI_E": dict(removed=4, wild=4.0, sc=0.34, weapon=2.5),
+REEL_SPECS = {  # accepted candidate f17 (designer 2026-10-25); Super / Epic own stage reels since 2026-10-08
+    "BR0": dict(removed=0, wild=2.0, sc=0.9, weapon=0.6, shape={'L1': 50, 'L2': 48, 'L3': 46, 'L4': 44, 'H1': 22, 'H2': 17, 'H3': 12, 'H4': 8, 'H5': 5}),
+    "ANTE": dict(removed=0, wild=2.0, sc=2.0, weapon=0.6, shape={'L1': 50, 'L2': 48, 'L3': 46, 'L4': 44, 'H1': 22, 'H2': 17, 'H3': 12, 'H4': 8, 'H5': 5}),
+    "HERO": dict(removed=4, wild=1.5, sc=0.0, weapon=0.0),
+    "BON_S1": dict(removed=0, wild=2.0, sc=0.34, weapon=4.0, shape={'L1': 40, 'L2': 40, 'L3': 40, 'L4': 40, 'H1': 24, 'H2': 23, 'H3': 21, 'H4': 19, 'H5': 16}),
+    "BON_S2": dict(removed=1, wild=1.8, sc=0.34, weapon=0.1),
+    "BON_S3": dict(removed=2, wild=1.2, sc=0.34, weapon=0.05),
+    "BON_S4": dict(removed=3, wild=0.8, sc=0.34, weapon=0.0),
+    "BON_S5": dict(removed=4, wild=0.8, sc=0.34, weapon=0.0),
+    "BON_E": dict(removed=4, wild=0.8, sc=0.34, weapon=0.0),
+    "SUP_S2": dict(removed=1, wild=1.8, sc=0.34, weapon=0.1),
+    "SUP_S3": dict(removed=2, wild=1.2, sc=0.34, weapon=0.05),
+    "SUP_S4": dict(removed=3, wild=0.3, sc=0.34, weapon=0.0),
+    "SUP_S5": dict(removed=4, wild=0.3, sc=0.34, weapon=0.0),
+    "SUP_E": dict(removed=4, wild=0.3, sc=0.34, weapon=0.0),
+    "EPI_S3": dict(removed=2, wild=2.0, sc=0.34, weapon=0.0, shape={'L1': 30, 'L2': 30, 'L3': 30, 'L4': 30, 'H1': 28, 'H2': 26, 'H3': 24, 'H4': 22, 'H5': 20}),
+    "EPI_S4": dict(removed=3, wild=1.6, sc=0.34, weapon=0.0, shape={'L1': 30, 'L2': 30, 'L3': 30, 'L4': 30, 'H1': 28, 'H2': 26, 'H3': 24, 'H4': 22, 'H5': 20}),
+    "EPI_S5": dict(removed=4, wild=1.6, sc=0.34, weapon=0.0, shape={'L1': 30, 'L2': 30, 'L3': 30, 'L4': 30, 'H1': 28, 'H2': 26, 'H3': 24, 'H4': 22, 'H5': 20}),
+    "EPI_E": dict(removed=4, wild=1.6, sc=0.34, weapon=0.0, shape={'L1': 30, 'L2': 30, 'L3': 30, 'L4': 30, 'H1': 28, 'H2': 26, 'H3': 24, 'H4': 22, 'H5': 20}),
 }
 
 

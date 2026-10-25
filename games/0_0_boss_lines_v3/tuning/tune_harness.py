@@ -62,7 +62,9 @@ def _setup(overrides):
         return {num(k): autokeys(v) for k, v in table.items()}
     for k, v in overrides.items():
         cur = getattr(cfg, k)
-        if cur == {} and isinstance(v, dict):
+        def num_keys(t):  # does the config table use numeric keys anywhere (e.g. boss_hp_offset {"boss3": {1: -5}})?
+            return isinstance(t, dict) and any(isinstance(x, (int, float)) or num_keys(y) for x, y in t.items())
+        if isinstance(v, dict) and (cur == {} or num_keys(cur)):
             v = autokeys(v)
         if isinstance(cur, dict) and isinstance(v, dict):
             v = {(float(kk) if isinstance(next(iter(cur), None), (int, float)) and not isinstance(kk, (int, float))

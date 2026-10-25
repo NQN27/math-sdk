@@ -135,7 +135,9 @@ def test_mode_guarantees_and_bookkeeping(gs, tame, mode):
             reveal = seg["events"][0]
             tier, feat = seg["ctx"]["tier"], seg["ctx"]["feature"]
             if tier in ("super", "epic") and not seg["ctx"].get("opening", False):
-                assert _wild_weapon_count(reveal, cfg, weapons_only=True) >= cfg.bonus_min_weapons[tier]
+                # bonus_min_weapons_chance: a spin may guarantee one weapon fewer (designer 2026-10-21)
+                need = cfg.bonus_min_weapons[tier] - (1 if tier in cfg.bonus_min_weapons_chance else 0)
+                assert _wild_weapon_count(reveal, cfg, weapons_only=True) >= need
             if feat == "heroic" and tier is None:
                 assert _wild_weapon_count(reveal, cfg) >= cfg.heroic_min_wild_or_weapon
             opening = seg["ctx"].get("opening", False)
@@ -182,7 +184,9 @@ def test_lit_reset_each_spin_trial(gs, cfg, reset):
     """Q23 trial flag: with the tier listed, every Bonus spin after the first starts
     with no lit cells; without it lit cells only grow during a Bonus (Q23)."""
     old = cfg.lit_reset_each_spin_tiers
+    old_after = cfg.lit_reset_after_treasure_tiers
     cfg.lit_reset_each_spin_tiers = ("bonus",) if reset else ()
+    cfg.lit_reset_after_treasure_tiers = ()  # f17 resets Normal after a Treasure; this test is about accumulation
     seen = []
     orig = gs.play_one_spin
 
@@ -204,6 +208,7 @@ def test_lit_reset_each_spin_trial(gs, cfg, reset):
                 checked += 1
         assert checked > 20
     finally:
+        cfg.lit_reset_after_treasure_tiers = old_after
         cfg.lit_reset_each_spin_tiers = old
         gs.play_one_spin = orig
 
