@@ -109,24 +109,28 @@ def test_stage_hp_ranges_and_multiple_of_5(gs, cfg):
             assert [b["zone"] for b in gs.bosses] == [(0, 1), (2, 3), (4, 5)]
 
 
-def test_tier_boss_hp_offset(gs, cfg):
-    old = cfg.tier_boss_hp_offset
+def test_tier_hp_tilt(gs, cfg):
+    """The HP range is the same for every tier; tier_hp_tilt only changes how often each value comes up."""
+    old = cfg.tier_hp_tilt
     try:
-        cfg.tier_boss_hp_offset = {"super": {"boss1": {2: 0}, "boss2": {2: 0}, "boss3": {2: 0}}}
-        lo, hi = cfg.stage_hp_range[2]
-        gs.in_bonus, gs.bonus_tier = True, "super"
-        random.seed(5)
-        for _ in range(30):
-            gs.spawn_stage(2)
-            assert all(lo <= b["hp"] <= hi for b in gs.bosses)  # Super: no HP change at stage 2
-        gs.bonus_tier = "bonus"
-        for _ in range(30):
-            gs.spawn_stage(2)
-            for b in gs.bosses:
-                d = cfg.boss_hp_offset.get(b["id"], {}).get(2, 0)
-                assert lo + d <= b["hp"] <= hi + d
+        cfg.tier_hp_tilt = {"super": 1.0, "bonus": -1.0}
+        lo, hi = cfg.stage_hp_range[4]
+        gs.in_bonus = True
+        avg = {}
+        for tier in ("super", "bonus"):
+            gs.bonus_tier = tier
+            random.seed(6)
+            hps = []
+            for _ in range(300):
+                gs.spawn_stage(4)
+                b = gs.bosses[0]
+                d = cfg.boss_hp_offset.get("boss1", {}).get(4, 0)
+                assert lo + d <= b["hp"] <= hi + d and b["hp"] % 5 == 0
+                hps.append(b["hp"] - d)
+            avg[tier] = sum(hps) / len(hps)
+        assert avg["super"] > (lo + hi) / 2 + 3 and avg["bonus"] < (lo + hi) / 2 - 3
     finally:
-        cfg.tier_boss_hp_offset = old
+        cfg.tier_hp_tilt = old
         gs.in_bonus, gs.bonus_tier = False, None
 
 

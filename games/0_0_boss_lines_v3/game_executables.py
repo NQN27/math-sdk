@@ -64,8 +64,17 @@ class GameExecutables(GameCalculations):
     # Bosses
     # =========================================================================
     def _roll_hp(self, lo: int, hi: int) -> int:
+        """HP from lo..hi in hp_round steps. Uniform, or tilted by tier_hp_tilt[tier] (designer 2026-10-26: the
+        HP rule and range are the same for every Bonus tier, only how often each value comes up differs):
+        weight of the i-th of n values = 1 + t x (2i / (n - 1) - 1); t = +1 favours the top, -1 the bottom."""
         step = self.config.hp_round
-        return random.choice(list(range(lo, hi + 1, step)))
+        values = list(range(lo, hi + 1, step))
+        key = self.bonus_tier if getattr(self, "in_bonus", False) else ("heroic" if getattr(self, "heroic", False) else None)
+        t = self.config.tier_hp_tilt.get(key, 0)
+        if not t or len(values) < 2:
+            return random.choice(values)
+        n = len(values)
+        return random.choices(values, weights=[max(0.0, 1 + t * (2 * i / (n - 1) - 1)) for i in range(n)])[0]
 
     def _roll_chest(self, stage) -> str:
         order = self.config.chest_order
@@ -92,12 +101,7 @@ class GameExecutables(GameCalculations):
         for bid, zone in zones.items():
             if stage != ENDLESS:
                 hp = self._roll_hp(*self.config.stage_hp_range[stage])
-                offset = self.config.boss_hp_offset
-                if self.in_bonus and self.bonus_tier in self.config.tier_boss_hp_offset:
-                    offset = self.config.tier_boss_hp_offset[self.bonus_tier]  # this Bonus tier's own HP change
-                elif getattr(self, "heroic", False) and "heroic" in self.config.tier_boss_hp_offset:
-                    offset = self.config.tier_boss_hp_offset["heroic"]
-                hp += offset.get(bid, {}).get(stage, 0)
+                hp += self.config.boss_hp_offset.get(bid, {}).get(stage, 0)
             self.bosses.append({"id": bid, "zone": zone, "hp": hp, "hp_max": hp, "alive": True,
                                 "chest": self._roll_chest(stage), "killed_this_spin": False,
                                 "chest_opened": False})
