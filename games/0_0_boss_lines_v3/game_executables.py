@@ -92,7 +92,12 @@ class GameExecutables(GameCalculations):
         for bid, zone in zones.items():
             if stage != ENDLESS:
                 hp = self._roll_hp(*self.config.stage_hp_range[stage])
-                hp += self.config.boss_hp_offset.get(bid, {}).get(stage, 0)
+                offset = self.config.boss_hp_offset
+                if self.in_bonus and self.bonus_tier in self.config.tier_boss_hp_offset:
+                    offset = self.config.tier_boss_hp_offset[self.bonus_tier]  # this Bonus tier's own HP change
+                elif getattr(self, "heroic", False) and "heroic" in self.config.tier_boss_hp_offset:
+                    offset = self.config.tier_boss_hp_offset["heroic"]
+                hp += offset.get(bid, {}).get(stage, 0)
             self.bosses.append({"id": bid, "zone": zone, "hp": hp, "hp_max": hp, "alive": True,
                                 "chest": self._roll_chest(stage), "killed_this_spin": False,
                                 "chest_opened": False})

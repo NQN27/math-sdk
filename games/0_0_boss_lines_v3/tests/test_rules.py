@@ -109,6 +109,27 @@ def test_stage_hp_ranges_and_multiple_of_5(gs, cfg):
             assert [b["zone"] for b in gs.bosses] == [(0, 1), (2, 3), (4, 5)]
 
 
+def test_tier_boss_hp_offset(gs, cfg):
+    old = cfg.tier_boss_hp_offset
+    try:
+        cfg.tier_boss_hp_offset = {"super": {"boss1": {2: 0}, "boss2": {2: 0}, "boss3": {2: 0}}}
+        lo, hi = cfg.stage_hp_range[2]
+        gs.in_bonus, gs.bonus_tier = True, "super"
+        random.seed(5)
+        for _ in range(30):
+            gs.spawn_stage(2)
+            assert all(lo <= b["hp"] <= hi for b in gs.bosses)  # Super: no HP change at stage 2
+        gs.bonus_tier = "bonus"
+        for _ in range(30):
+            gs.spawn_stage(2)
+            for b in gs.bosses:
+                d = cfg.boss_hp_offset.get(b["id"], {}).get(2, 0)
+                assert lo + d <= b["hp"] <= hi + d
+    finally:
+        cfg.tier_boss_hp_offset = old
+        gs.in_bonus, gs.bonus_tier = False, None
+
+
 def test_boss_hp_offset(gs, cfg):
     old = cfg.boss_hp_offset
     try:

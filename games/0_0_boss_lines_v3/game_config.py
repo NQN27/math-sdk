@@ -129,6 +129,9 @@ class GameConfig(Config):
         # Per-boss HP change added to the stage draw, {boss id: {stage: delta}} (designer 2026-10-22 trial:
         # boss3 over columns 5-6 takes the least line damage, e.g. {"boss3": {1: -5, 2: -5, 3: -5, 4: -10, 5: -10}}).
         self.boss_hp_offset = {}
+        # Per Bonus tier (or "heroic") replacement of boss_hp_offset, {tier: {boss id: {stage: delta}}} (designer
+        # 2026-10-26: Normal can drop more HP than Super / Epic, which always get a weapon). {} = boss_hp_offset everywhere.
+        self.tier_boss_hp_offset = {}
         # Q9: later Endless bosses: previous HP + one of these.
         self.endless_hp_step_choices = list(range(0, 55, 5))
         # Q7: number of low symbols removed AT each stage (cumulative, by stage).
