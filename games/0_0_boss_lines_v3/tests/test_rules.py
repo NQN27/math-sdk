@@ -557,6 +557,27 @@ def test_tier_stage_min_coin_overrides_one_tier(gs, cfg):
     finally:
         cfg.tier_stage_min_coin = old
 
+def test_wild_skins_only_on_opening_board(gs, cfg):
+    """Designer 2026-10-25: display-only Wilds appear at the start of a spin only, never after a refill."""
+    old = cfg.wild_skin_chance
+    try:
+        cfg.wild_skin_chance = 1.0
+        seen = 0
+        for i in range(15):
+            random.seed(800 + i)
+            gs.betmode, gs.criteria = "buy3", "freegame"
+            gs.reset_book()
+            gs.run_bonus("bonus", {(0, 1), (2, 2), (4, 3)})
+            ev = gs.book.events
+            for k, e in enumerate(ev):
+                if e["type"] == "wildSkin":
+                    seen += 1
+                    assert ev[k - 1]["type"] == "reveal"  # right after the opening board, never after "refill"
+        assert seen > 0
+    finally:
+        cfg.wild_skin_chance = old
+
+
 def test_wild_skin_is_display_only(gs, cfg):
     """Display-only Wilds sit on cells of already-winning lines and change no outcome (with wild_skin_damage
     None; f17 gives them Wild damage 3, which changes boss damage on purpose)."""

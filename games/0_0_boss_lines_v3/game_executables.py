@@ -178,13 +178,15 @@ class GameExecutables(GameCalculations):
                 filled.append((c, r))
         if filled:
             board_cells_event(self, "refill", filled)
-            self.mark_wild_skins(filled)
+            # display-only Wilds appear on the opening board only (designer 2026-10-25), never on refills
+            self.skin_cells -= set(filled)
         return filled
 
     def mark_wild_skins(self, cells) -> None:
         """Display-only Wilds (wild_skin_chance): pick cells of already-winning lines among `cells` where a
         Wild would leave every line win unchanged, and emit them. Own RNG: the game's draws are untouched.
-        Never in Heroic (designer 2026-10-22): every Heroic Wild is real and always fires an event / multiplier."""
+        Never in Heroic (designer 2026-10-22): every Heroic Wild is real and always fires an event / multiplier.
+        Called for the opening board of a spin only (designer 2026-10-25: not on refills)."""
         self.skin_cells = set()
         chance = self.config.wild_skin_chance
         if chance <= 0 or getattr(self, "heroic", False):
