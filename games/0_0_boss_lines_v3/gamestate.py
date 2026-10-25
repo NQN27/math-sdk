@@ -49,9 +49,6 @@ class GameState(GameStateOverride):
             return
         cand = [(c, r) for c, r in self.all_cells() if self.is_basic(self.board[c][r])]
         random.shuffle(cand)
-        if weapons_only and self.weapon_keep_chance(0) is not None:  # weapon_hp_bias: favour high-HP bosses' cells
-            keys = {x: random.random() ** (1 / max(1e-9, self.weapon_keep_chance(x[0]))) for x in cand}
-            cand.sort(key=lambda x: -keys[x])
         for c, r in cand:
             if have >= minimum:
                 break
@@ -65,23 +62,11 @@ class GameState(GameStateOverride):
     def play_one_spin(self, reel, force_scatters=None, min_wild_weapon=0, min_weapons=0) -> None:
         """Opening board -> steps (1)-(9) -> Treasure. (Hold and Spin removed by the designer 2026-10-07.)"""
         self.begin_spin()
-        def draw():
-            self.draw_board(reel, force_scatters)
-            if min_wild_weapon:
-                self._guarantee_wild_or_weapon(min_wild_weapon)
-            if min_weapons:
-                self._guarantee_wild_or_weapon(min_weapons, weapons_only=True)
-        draw()
-        st = self.lit_steer_cfg()
-        if st:  # lit_steer: redraw opening boards whose connections would light many new cells
-            def snapshot():
-                return ([col[:] for col in self.board], self.reel_positions, getattr(self, "top_symbols", None), getattr(self, "bottom_symbols", None))
-            def restore(snap):
-                self.board = [col[:] for col in snap[0]]
-                self.reel_positions = self.padding_position = snap[1]
-                self.top_symbols, self.bottom_symbols = snap[2], snap[3]
-                self.get_special_symbols_on_board()
-            self.lit_steer_pick(st, draw, snapshot, restore)
+        self.draw_board(reel, force_scatters)
+        if min_wild_weapon:
+            self._guarantee_wild_or_weapon(min_wild_weapon)
+        if min_weapons:
+            self._guarantee_wild_or_weapon(min_weapons, weapons_only=True)
         reveal(self)
         self.mark_wild_skins(list(self.all_cells()))
         self.resolve_actions()
@@ -275,12 +260,8 @@ class GameState(GameStateOverride):
             if self.stage_cleared:
                 nxt = ENDLESS if self.stage in (5, ENDLESS) else self.stage + 1
                 self.spawn_stage(nxt)
-            lit_reset = spin_no > 1 and tier in cfg.lit_reset_each_spin_tiers
-            if lit_reset:
-                self.lit = set()  # Q23 trial: lit cells last one spin
             emit(self, "freeSpinStart", spin=spin_no, freeSpinsLeft=self.free_spins_left,
-                 stage=self.stage_label(), globalMult=self.global_factor(),
-                 **({"litReset": True} if lit_reset else {}))
+                 stage=self.stage_label(), globalMult=self.global_factor())
             n_weapons = cfg.bonus_min_weapons.get(tier, 0)
             chance = cfg.bonus_min_weapons_chance.get(tier)
             if n_weapons and chance is not None and random.random() >= chance:

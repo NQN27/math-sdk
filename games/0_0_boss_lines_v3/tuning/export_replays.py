@@ -22,7 +22,7 @@ def main():
     scale = float(sys.argv[3]) if len(sys.argv) > 3 else 1.0
     ov = json.load(open(ov_path))
     gs, cfg = H._setup(json.loads(json.dumps(ov)))
-    # Replay-only "lit" events: the cells each destroy actually lit (lit_rule / lit_decay make this impossible
+    # Replay-only "lit" events: the cells each destroy actually lit (lit_rule makes this impossible
     # to rebuild from the other events). No RNG is used, so sessions stay identical.
     from game_events import emit, pos
     real_destroy = type(gs).destroy_cells

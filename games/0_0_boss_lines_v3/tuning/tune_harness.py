@@ -61,6 +61,10 @@ def _setup(overrides):
         num = lambda k: (int(float(k)) if float(k).is_integer() else float(k)) if isinstance(k, str) and k.replace(".", "", 1).isdigit() else k
         return {num(k): autokeys(v) for k, v in table.items()}
     for k, v in overrides.items():
+        if not hasattr(cfg, k):  # a flag removed from the game (e.g. lit_decay / lit_steer, 2026-10-25)
+            if v not in ({}, [], (), None):
+                print(f"tune_harness: override {k} ignored - no such config value any more", file=sys.stderr)
+            continue
         cur = getattr(cfg, k)
         def num_keys(t):  # does the config table use numeric keys anywhere (e.g. boss_hp_offset {"boss3": {1: -5}})?
             return isinstance(t, dict) and any(isinstance(x, (int, float)) or num_keys(y) for x, y in t.items())

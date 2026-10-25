@@ -127,28 +127,6 @@ def test_boss_hp_offset(gs, cfg):
         cfg.boss_hp_offset = old
 
 
-def test_weapon_hp_bias_follows_boss_hp(gs, cfg):
-    old = cfg.weapon_hp_bias
-    try:
-        cfg.weapon_hp_bias = {"bonus": 0.0}
-        gs.in_bonus, gs.bonus_tier = True, "bonus"
-        gs.spawn_stage(3)
-        b1, b2, b3 = gs.bosses
-        b1["hp"] = 0; b1["alive"] = False
-        b2["hp"] = b2["hp_max"] // 2
-        assert gs.weapon_keep_chance(0) == 0 and gs.weapon_keep_chance(5) == 1
-        assert gs.weapon_keep_chance(2) == pytest.approx(b2["hp"] / b2["hp_max"])
-        set_board(gs, FILLER)
-        gs.reel_name = "BON_S1"
-        random.seed(3)
-        drawn = [gs.draw_symbol_for(c, 0).name for c in (0, 1) for _ in range(300)]
-        assert not any(n in cfg.weapon_symbols for n in drawn)  # floor 0: no weapon over a dead boss
-        gs.bonus_tier = "super"  # tier not listed: no bias
-        assert gs.weapon_keep_chance(0) is None
-    finally:
-        cfg.weapon_hp_bias = old
-
-
 # ---- weapons -------------------------------------------------------------------
 def test_bomb_area_clipped_at_corner(gs):
     set_board(gs, ["BM H1 L1 L1 L1 L1", "H2 SC L1 L1 L1 L1"] + FILLER[2:])
@@ -764,31 +742,6 @@ def test_heroic_line_mult(gs, cfg):
         cfg.feature_heroic_chance = saved
 
 
-def test_lit_steer_keeps_rule_but_fewer_new_lit_cells(gs, cfg):
-    """lit_steer redraws boards / refills that would light many new cells; every connected cell still lights."""
-    import os, sys
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tuning"))
-    import tune_harness as H
-    saved = (cfg.lit_steer, cfg.lit_decay)
-    def avg_cells():
-        tot = n = 0
-        for i in range(60):
-            H._one(gs, cfg, "bonus", i)
-            for e in gs.book.events:
-                if e["type"] == "treasureStart":
-                    tot += len(e["cells"]); n += 1
-        return tot / max(1, n)
-    try:
-        cfg.lit_decay = {}
-        cfg.lit_steer = {}
-        free = avg_cells()
-        cfg.lit_steer = {"bonus": {"free": 3, "decay": 0.5, "tries": 8}}
-        steered = avg_cells()
-        assert steered < free
-    finally:
-        cfg.lit_steer, cfg.lit_decay = saved
-
-
 def test_transform_wilds_fire_rarely_in_bonus(gs, cfg):
     """Designer 2026-10-22: in a Bonus a Wild made by the Transform power fires an event only with
     power_wild_event_chance; ordinary Wilds keep wild_event_chance."""
@@ -833,33 +786,6 @@ def test_lit_reset_after_treasure(gs, cfg):
         assert seen > 0
     finally:
         cfg.lit_reset_after_treasure_tiers = saved
-
-
-def test_lit_decay_one_tier(gs, cfg):
-    old = cfg.lit_decay
-    cells = [(c, r) for c in range(6) for r in range(5)]
-    try:
-        gs.treasure_hunt, gs.in_bonus = False, True
-        cfg.lit_decay = {"super": {"free": 3, "decay": 0.0}}  # decay 0: nothing past the free cells lights
-        gs.bonus_tier, gs.lit = "super", {(0, 0)}
-        gs.destroy_cells(cells[1:6], lit_cells=cells[1:6])
-        assert gs.lit == {(0, 0), (0, 1), (0, 2)}
-        cfg.lit_decay = {"super": {"free": 3, "decay": 0.8}}  # gradual: some but not all cells light
-        random.seed(1)
-        gs.lit = set()
-        gs.destroy_cells(cells, lit_cells=cells)
-        assert 3 < len(gs.lit) < 30
-        gs.bonus_tier, gs.lit = "bonus", set()  # other tiers light every connected cell
-        gs.destroy_cells(cells, lit_cells=cells)
-        assert len(gs.lit) == 30
-        cfg.lit_decay = {"heroic": {"free": 3, "decay": 0.0}}  # Heroic spin (not in a Bonus) has its own key
-        gs.in_bonus, gs.heroic, gs.lit = False, True, set()
-        gs.destroy_cells(cells, lit_cells=cells)
-        assert len(gs.lit) == 3
-    finally:
-        gs.heroic, gs.in_bonus = False, False
-        cfg.lit_decay = old
-        gs.lit = set()
 
 
 def test_treasure_hunt_spin_coins_at_least_1x(gs, cfg):

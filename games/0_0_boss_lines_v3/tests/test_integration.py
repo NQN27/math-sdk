@@ -179,14 +179,10 @@ def test_treasure_cells_skip_scatter(gs):
     assert gs.treasure_cells() == {(1, 0)}
 
 
-@pytest.mark.parametrize("reset", [False, True])
-def test_lit_reset_each_spin_trial(gs, cfg, reset):
-    """Q23 trial flag: with the tier listed, every Bonus spin after the first starts
-    with no lit cells; without it lit cells only grow during a Bonus (Q23)."""
-    old = cfg.lit_reset_each_spin_tiers
+def test_lit_cells_accumulate_without_reset(gs, cfg):
+    """Q23: without lit_reset_after_treasure_tiers, lit cells only grow during a Bonus."""
     old_after = cfg.lit_reset_after_treasure_tiers
-    cfg.lit_reset_each_spin_tiers = ("bonus",) if reset else ()
-    cfg.lit_reset_after_treasure_tiers = ()  # f17 resets Normal after a Treasure; this test is about accumulation
+    cfg.lit_reset_after_treasure_tiers = ()
     seen = []
     orig = gs.play_one_spin
 
@@ -201,15 +197,11 @@ def test_lit_reset_each_spin_trial(gs, cfg, reset):
             spins = [lit for tier, lit in seen if tier == "bonus"]
             seen.clear()
             for prev_end, lit in zip(spins, spins[1:]):
-                if reset:
-                    assert lit == set()
-                else:
-                    assert prev_end <= lit
+                assert prev_end <= lit
                 checked += 1
         assert checked > 20
     finally:
         cfg.lit_reset_after_treasure_tiers = old_after
-        cfg.lit_reset_each_spin_tiers = old
         gs.play_one_spin = orig
 
 

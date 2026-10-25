@@ -249,11 +249,6 @@ class GameConfig(Config):
         self.treasure_clover_vanishes = False
         self.treasure_hunt_min_coin = 1
         self.treasure_skips_scatter_cells = True  # Q28 (answered) / N7
-        # Q23 trial (designer idea 2026-10-11, NOT approved yet): Bonus tiers listed here clear
-        # the lit cells at the start of every free spin after the first, so a Treasure only uses
-        # cells lit during the spin that cleared the stage. The Scatter cells that triggered the
-        # Bonus are lit for the first spin only. Empty = Q23 as answered (lit for the whole Bonus).
-        self.lit_reset_each_spin_tiers = ()
         # Bonus tiers whose lit cells all go dark after each Treasure (stage clear), event "litReset"
         # (designer 2026-10-23: Normal). () = lit cells accumulate over the whole Bonus.
         self.lit_reset_after_treasure_tiers = ()
@@ -264,15 +259,6 @@ class GameConfig(Config):
         #             own cell when it fires, a Scatter collected in a Bonus, and the triggering Scatters at Bonus
         #             entry. Cells destroyed by weapons, Destroy or any other mechanic never light.
         self.lit_rule = "symbols"
-        # Trial (designer 2026-10-18, NOT approved yet; replaces a hard lit-cell cap): per Bonus tier (or "heroic")
-        # {"free": n, "decay": d}. A connected cell that is not lit yet lights with chance
-        # d ** max(0, lit + 1 - n), lit = cells already lit (the first n always light), so lighting gets gradually harder as the board fills.
-        # Empty = every connected cell lights (Q23).
-        self.lit_decay = {}
-        # Steer connections onto already-lit cells instead of dropping lit cells (designer 2026-10-22, replaces
-        # lit_decay): {tier or "heroic": {"free": n, "decay": d, "tries": k}}. A board / refill whose connections would
-        # light new cells past `free` is kept with chance d ** (lit + new - free), else redrawn (up to k draws). {} = off.
-        self.lit_steer = {}
         # Event chance of a Wild made by the Transform power, in a Bonus only (Heroic keeps 1.0); per tier via
         # tier_weights. Designer 2026-10-22: 0.05. None = same as any Wild (wild_event_chance).
         self.power_wild_event_chance = None
@@ -321,10 +307,6 @@ class GameConfig(Config):
         # Weapons guaranteed on each free spin's opening board (designer 2026-10-07;
         # was 3 Wild-or-weapon for both, which drove Super to ~1068x vs 240x).
         self.bonus_min_weapons = {"super": 1, "epic": 2}
-        # Weapons favour bosses with HP left (designer 2026-10-22), per Bonus tier: {tier: floor}. A weapon drawn in
-        # column c is kept with chance floor + (1 - floor) x HP share left of that column's boss (dead: floor),
-        # else redrawn; guaranteed weapons pick their cells with the same weights. {} = off.
-        self.weapon_hp_bias = {}
         # Trial (designer 2026-10-21: fewer but stronger weapons): {tier: chance} that a free spin gets the full
         # guarantee above; otherwise it guarantees one weapon fewer. Empty = always the full guarantee.
         self.bonus_min_weapons_chance = {}
@@ -634,9 +616,7 @@ class GameConfig(Config):
                                         'global_factor_weights': {2: 40, 3: 40, 5: 20}}}
         self.last_hit_base = 0.0
         self.feature_heroic_chance = 0.512
-        self.lit_reset_each_spin_tiers = []
         self.tier_stage_min_coin = {'super': {2: 0.2}}
-        self.lit_decay = {}
         self.heroic_line_mult_weights = {1: 45, 2: 20, 3: 15, 5: 12, 10: 8}
         self.heroic_dead_spin_chance = 0.3
         self.wild_skin_chance = 0.4
@@ -650,7 +630,6 @@ class GameConfig(Config):
         self.heroic_dead_symbol_tries = 20
         self.heroic_dead_wild_col_weights = [3, 3, 3, 1, 1, 1]
         self.boss_hp_offset = {'boss3': {1: -5, 2: -5, 3: -5, 4: -10, 5: -10}}
-        self.lit_steer = {}
         self.power_wild_event_chance = 0.05
         self.lit_reset_after_treasure_tiers = ['bonus']
 
