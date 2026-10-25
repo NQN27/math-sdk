@@ -140,6 +140,10 @@ class GameConfig(Config):
         # trial for Super, whose first clear lights ~all cells, so a 1x minimum puts every clear >= ~40x).
         # Empty = the proposal minimums above for every tier.
         self.tier_stage_min_coin = {}
+        # Treasure coin weights per Bonus tier and cleared stage, {tier: {stage: {coin: weight}}} (designer 2026-10-25:
+        # pay each stage's Treasure its own amount, so more stages can be cleared at the same mean). Same coin values
+        # as the proposal, only the weights differ. A missing tier / stage uses the tier's coin_value_weights.
+        self.stage_coin_value_weights = {}
         self.boss_zones = {"boss1": (0, 1), "boss2": (2, 3), "boss3": (4, 5)}
         self.endless_zone = {"endless": tuple(range(6))}
 

@@ -617,7 +617,7 @@ class GameExecutables(GameCalculations):
         names = {"coin": "TC", "magnet": "TM", "clover": "TV", "golden": "TV", "star": "TS",
                  "global": "TG", "scatter": "SC"}
         if kind == "coin":
-            v = self.draw_coin(min_coin)
+            v = self.draw_coin(min_coin, table=self.stage_coin_table())
         elif kind == "star":
             v = self.draw_coin(min_coin, table=self.weights("star_value_weights"))
         elif kind == "magnet":
@@ -633,6 +633,13 @@ class GameExecutables(GameCalculations):
         sym = self.make_symbol(names[kind])
         sym.prize = v
         return sym
+
+    def stage_coin_table(self):
+        """Treasure coin weights of the stage just cleared (stage_coin_value_weights[tier][stage]), else None
+        (the tier's coin table). Lets each stage's Treasure pay its own amount (designer 2026-10-25)."""
+        if not self.in_bonus:
+            return None
+        return self.config.stage_coin_value_weights.get(self.bonus_tier, {}).get(self.stage)
 
     def roll_treasure_kind(self, weights) -> str:
         return get_random_outcome(weights)
