@@ -22,7 +22,7 @@ import random
 
 from game_calculations import GameCalculations
 from game_config import ENDLESS
-from game_events import emit, pos, boss_state_event, board_cells_event
+from game_events import emit, pos, boss_state_event, board_cells_event, chest_name
 from src.calculations.statistics import get_random_outcome
 
 
@@ -37,7 +37,80 @@ class GameExecutables(GameCalculations):
     # =========================================================================
     # Per-spin state
     # =========================================================================
+    def draw_bag(self) -> float:
+        """Money bag value (x bet): chest_bag_value_weights, else the tier's coin table without coins below 1x."""
+        table = self.weights("chest_bag_value_weights") or self.weights("coin_value_weights")
+        return get_random_outcome({float(v): w for v, w in table.items() if float(v) >= 1 and w > 0})
+
+    def bag_kind(self, v) -> str:
+        """pinch 1-4x / small 5-15x / large 20-50x / chest 100x+ (designer 2026-10-31)."""
+        for top, name in self.config.bag_kinds:
+            if v <= top:
+                return name
+        return self.config.bag_kinds[-1][1]
+
+    def reset_tumble(self, cause: str) -> None:
+        """Clear the collected Wild multis and boss multis (tumble mode)."""
+        if self.tumble_wild or self.tumble_boss or getattr(self, "tumble_acc", 0):
+            emit(self, "tumbleReset", cause=cause)
+        self.tumble_wild, self.tumble_boss, self.tumble_acc = 0, [], 0
+
+    def tumble_scope(self) -> str:
+        """When the tumble multi resets: "spin" (Normal, base, Heroic), "stage" (Super), "bonus" (Epic)."""
+        return self.weights("tumble_reset_scope") if self.in_bonus else "spin"
+
+    def tumble_spin_part(self) -> float:
+        """tumble_combine "add": this spin's sum(Wild multis) (1 if none) x product(chest multis); 0 if neither."""
+        if not self.tumble_wild and not self.tumble_boss:
+            return 0
+        f = max(1, self.tumble_wild)
+        for m in self.tumble_boss:
+            f *= m
+        return f
+
+    def tumble_factor(self) -> float:
+        """Sum of the collected Wild multis (1 if none), times each boss multi, left to right.
+        tumble_combine "add": this spin's part + the Global accumulated earlier in the reset scope (at least 1)."""
+        cap = self.weights("tumble_factor_cap")
+        if isinstance(cap, dict):  # per stage {stage: cap}
+            cap = cap.get(self.stage, cap.get(str(self.stage), 0))
+        if self.config.tumble_combine == "add":
+            part = self.tumble_spin_part()
+            if self.weights("tumble_acc_rule") == "if2x" and part < 2:
+                f = max(1, part)  # Super: the accumulated Global joins only a spin with its own >= 2x
+            else:
+                f = max(1, getattr(self, "tumble_acc", 0) + part)
+        else:
+            f = max(1, self.tumble_wild)
+            for m in self.tumble_boss:
+                f *= m
+        return min(f, cap) if cap else f
+
+    def settle_tumble(self) -> None:
+        """Tumble mode, spin end: (the spin's line pay + its chest coins) x the tumble multi."""
+        base, self.tumble_base = self.tumble_base, 0.0
+        add = self.config.tumble_combine == "add"
+        f = self.tumble_factor()
+        if base > 0 and not self.wincap_triggered:
+            paid = self.award(base * f)
+            emit(self, "tumbleWin", base=round(base, 4), wildSum=self.tumble_wild, bossMults=list(self.tumble_boss),
+                 multi=f, paid=round(paid, 4), **({"globalBefore": self.tumble_acc} if add else {}))
+        if add:  # this spin's part joins the accumulated Global; the next spin collects afresh
+            part = self.tumble_spin_part()
+            if self.weights("tumble_acc_rule") == "if2x" and part < 2:
+                part = 0  # Super: a spin without its own >= 2x leaves the accumulated Global as it is
+            if part:
+                self.tumble_acc += part
+                emit(self, "globalAccumulated", added=part, total=self.tumble_acc)
+            self.tumble_wild, self.tumble_boss = 0, []
+
     def begin_spin(self) -> None:
+        self.tumble_base = 0.0
+        self.chain_passes = 0
+        if self.config.tumble_multi and self.tumble_scope() == "spin":
+            self.reset_tumble("spin")
+        elif self.config.tumble_combine == "add":  # Wild / chest multis are collected per spin (settled into tumble_acc)
+            self.tumble_wild, self.tumble_boss = 0, []
         self.enhance = [[0] * 5 for _ in range(6)]
         self.wild_mult = {}
         self.power_wilds = set()  # cells turned into Wild by the Transform power this spin
@@ -63,12 +136,20 @@ class GameExecutables(GameCalculations):
     # =========================================================================
     # Bosses
     # =========================================================================
-    def _roll_hp(self, lo: int, hi: int) -> int:
+    def _roll_hp(self, spec, stage=None) -> int:
         """HP from lo..hi in hp_round steps. Uniform, or tilted by tier_hp_tilt[tier] (designer 2026-10-26: the
         HP rule and range are the same for every Bonus tier, only how often each value comes up differs):
         weight of the i-th of n values = 1 + t x (2i / (n - 1) - 1); t = +1 favours the top, -1 the bottom."""
         step = self.config.hp_round
-        values = list(range(lo, hi + 1, step))
+        # (lo, hi) = every hp_round step in between; more than 2 values = exactly these (rule 3, 2026-11-02: stage 5
+        # is 90/95/100/110/120)
+        values = list(range(spec[0], spec[1] + 1, step)) if len(spec) == 2 else list(spec)
+        table = self.weights("stage_hp_weights") if stage is not None else None
+        table = table.get(stage, table.get(str(stage))) if table else None
+        if table:
+            pool = {int(k): w for k, w in table.items() if int(k) in values and w > 0}
+            if pool:
+                return get_random_outcome(pool)
         key = self.bonus_tier if getattr(self, "in_bonus", False) else ("heroic" if getattr(self, "heroic", False) else None)
         t = self.config.tier_hp_tilt.get(key, 0)
         if not t or len(values) < 2:
@@ -76,9 +157,16 @@ class GameExecutables(GameCalculations):
         n = len(values)
         return random.choices(values, weights=[max(0.0, 1 + t * (2 * i / (n - 1) - 1)) for i in range(n)])[0]
 
-    def _roll_chest(self, stage) -> str:
+    def _roll_chest(self, stage, guaranteed: bool = True) -> str:
+        """Chest tier for one boss. guaranteed=False (see stage_min_chest_count) = the stage minimum chest does not
+        apply, the draw starts from the lowest chest."""
         order = self.config.chest_order
-        base = order.index(self.config.stage_min_chest[stage])
+        base = order.index(self.config.stage_min_chest[stage]) if guaranteed else 0
+        table = self.config.stage_chest_weights.get(self.bonus_tier, {}).get(stage) if getattr(self, "in_bonus", False) else None
+        if table:  # own chest odds for this tier + stage; the stage minimum chest still holds
+            pool = {c: w for c, w in table.items() if order.index(c) >= base and w > 0}
+            if pool:
+                return get_random_outcome(pool)
         k = get_random_outcome({i: w for i, w in enumerate(self.weights("chest_tier_step_weights"))})
         return order[min(base + k, len(order) - 1)]
 
@@ -87,23 +175,41 @@ class GameExecutables(GameCalculations):
         self.stage = stage
         self.stage_cleared = False
         self.bosses = []
+        if self.config.tumble_multi and getattr(self, "in_bonus", False) and self.tumble_scope() == "stage":
+            self.reset_tumble("stage")
         if stage is None:
             return
         if stage == ENDLESS:
             if self.last_endless_hp is None:
-                hp = self._roll_hp(*self.config.stage_hp_range[ENDLESS])
+                hp = self._roll_hp(self.config.stage_hp_range[ENDLESS], ENDLESS)
             else:
-                hp = self.last_endless_hp + random.choice(self.config.endless_hp_step_choices)
+                hp = self.last_endless_hp + random.choice(self.weights("endless_hp_step_choices"))  # per tier via tier_weights
             self.last_endless_hp = hp
             zones = self.config.endless_zone
         else:
             zones = self.config.boss_zones
-        for bid, zone in zones.items():
+        n_min = self.config.stage_min_chest_count
+        if isinstance(n_min, dict):  # per stage, e.g. stage 5 / Endless: every boss (designer 2026-10-29)
+            n_min = n_min.get(stage, n_min.get(str(stage), 3))
+        sure = set(random.sample(list(zones), n_min)) if n_min < len(zones) else set(zones)
+        chest_set = None
+        if self.config.chest_rule == "v4":  # rule 3: the stage's fixed chest set, shuffled over the bosses
+            sets = self.config.stage_chest_sets
+            key = "heroic" if getattr(self, "heroic", False) else stage
+            chest_set = list(sets.get(key, sets.get(str(key), ["dong"] * 3)))
+            random.shuffle(chest_set)
+        for i, (bid, zone) in enumerate(zones.items()):
             if stage != ENDLESS:
-                hp = self._roll_hp(*self.config.stage_hp_range[stage])
+                hp = self._roll_hp(self.config.stage_hp_range[stage], stage)
                 hp += self.config.boss_hp_offset.get(bid, {}).get(stage, 0)
+                if stage >= 1:
+                    cut = self.weights("hp_cut_weights")
+                    if cut and all(isinstance(v, dict) for v in cut.values()):  # per stage {stage: {cut: w}} (2026-11-01)
+                        cut = cut.get(stage, cut.get(str(stage))) or {0: 1}
+                    hp -= get_random_outcome({int(k): w for k, w in cut.items()})
             self.bosses.append({"id": bid, "zone": zone, "hp": hp, "hp_max": hp, "alive": True,
-                                "chest": self._roll_chest(stage), "killed_this_spin": False,
+                                "chest": chest_set[i % len(chest_set)] if chest_set else self._roll_chest(stage, bid in sure),
+                                "killed_this_spin": False,
                                 "chest_opened": False})
         boss_state_event(self)
 
@@ -117,7 +223,7 @@ class GameExecutables(GameCalculations):
         b["alive"] = False
         b["hp"] = 0
         b["killed_this_spin"] = True
-        emit(self, "bossDefeated", boss=b["id"], reason=reason, chest=b["chest"])
+        emit(self, "bossDefeated", boss=b["id"], reason=reason, chest=chest_name(self, b["chest"]))
         if self.bosses and all(not x["alive"] for x in self.bosses):
             self.stage_cleared = True
 
@@ -176,7 +282,20 @@ class GameExecutables(GameCalculations):
             self.board[c][r] = None
             self.enhance[c][r] = 0
             getattr(self, "power_wilds", set()).discard((c, r))
+        new = [x for x in lit_cells if x not in self.lit]
         self.lit.update(lit_cells)
+        if new:  # client: these cells now light up (Treasure plays on lit cells)
+            emit(self, "litCells", cells=[pos(self, c, r) for c, r in sorted(new)])
+
+    def chain_block_roll(self) -> bool:
+        """chain_block: should this refill be forced to connect nothing?"""
+        cb = self.weights("chain_block") if getattr(self, "in_bonus", False) else None
+        spec = cb.get(self.stage, cb.get(str(self.stage))) if cb else None
+        if not spec:
+            return False
+        thr, step = spec
+        extra = getattr(self, "chain_passes", 0) - thr
+        return extra > 0 and random.random() < min(1.0, step * extra)
 
     def refill(self) -> list:
         """Fill every empty cell in place, in cell-priority order."""
@@ -185,6 +304,13 @@ class GameExecutables(GameCalculations):
             if self.board[c][r] is None:
                 self.board[c][r] = self.draw_symbol_for(c, r)
                 filled.append((c, r))
+        if filled and self.chain_block_roll():
+            for _ in range(50):  # redraw the refilled cells until nothing connects
+                if not self.evaluate_lines():
+                    emit(self, "chainBlock", passes=self.chain_passes)
+                    break
+                for c, r in filled:
+                    self.board[c][r] = self.draw_symbol_for(c, r)
         if filled:
             board_cells_event(self, "refill", filled)
             # display-only Wilds appear on the opening board only (designer 2026-10-25), never on refills
@@ -197,7 +323,9 @@ class GameExecutables(GameCalculations):
         Never in Heroic (designer 2026-10-22): every Heroic Wild is real and always fires an event / multiplier.
         Called for the opening board of a spin only (designer 2026-10-25: not on refills)."""
         self.skin_cells = set()
-        chance = self.config.wild_skin_chance
+        chance = self.weights("wild_skin_chance")  # per tier via tier_weights (designer 2026-10-28)
+        if isinstance(chance, dict):  # per stage {stage: chance} (designer 2026-10-29: fewer lit cells early)
+            chance = chance.get(self.stage, chance.get(str(self.stage), 0.0))
         if chance <= 0 or getattr(self, "heroic", False):
             return
         wins = self.evaluate_lines()
@@ -208,8 +336,14 @@ class GameExecutables(GameCalculations):
         fresh = set(cells)
         rng = self.skin_rng
         skins = []
+        bias = self.weights("wild_skin_lit_bias") if self.in_bonus else 0  # designer 2026-10-29
         for w in wins:
-            if rng.random() >= chance:
+            ch = chance
+            if bias:  # lines already mostly lit are likelier to show a display Wild (fewer new lit cells)
+                cells = [(p["reel"], p["row"]) for p in w["positions"]]
+                frac = sum(x in self.lit for x in cells) / len(cells)
+                ch = min(1.0, chance * ((1 - bias) + bias * 2 * frac))
+            if rng.random() >= ch:
                 continue
             cand = [(p["reel"], p["row"]) for p in w["positions"]
                     if (p["reel"], p["row"]) in fresh and self.is_basic(self.board[p["reel"]][p["row"]])
@@ -230,10 +364,18 @@ class GameExecutables(GameCalculations):
     # =========================================================================
     # Powers
     # =========================================================================
-    def pick_power(self):
-        """Random power whose reserve is below the cap (None if all are full)."""
+    def pick_power(self, new_only: bool = False):
+        """Random power whose reserve is below the cap (None if all are full). new_only: only powers with nothing
+        in reserve (chest gifts, designer 2026-10-29: a power already stored never drops from a chest)."""
+        cap = 1 if new_only else self.config.power_reserve_cap
         open_ = {p: w for p, w in self.weights("power_pick_weights").items()
-                 if w > 0 and self.reserve[p] < self.config.power_reserve_cap}
+                 if w > 0 and self.reserve[p] < cap}
+        by_alive = self.weights("destroy_weight_by_alive")
+        if by_alive and "destroy" in open_:
+            n = sum(1 for b in getattr(self, "bosses", []) if b["alive"])
+            open_["destroy"] *= by_alive.get(n, by_alive.get(str(n), 1))
+            if open_["destroy"] <= 0:
+                del open_["destroy"]
         return get_random_outcome(open_) if open_ else None
 
     def _basic_names_on_board(self):
@@ -251,6 +393,59 @@ class GameExecutables(GameCalculations):
         emit(self, "powerActivated", power="enhance", symbol=name, factor=f,
              cells=[pos(self, c, r) for c, r in cells])
 
+    def _win_signature(self):
+        """(number of winning lines, cells in winning lines) of the current board."""
+        wins = self.evaluate_lines()
+        return len(wins), sum(len(w["positions"]) for w in wins)
+
+    def power_shuffle_doc(self) -> None:
+        """Document rule 3: every cell not in a winning line (Scatter stays) is shuffled; the shuffle must give a new
+        line or a longer one if it can (shuffle_tries random tries, best kept); every shuffled cell gets a Shuffle
+        Multiplier (kept in the cell's Enhance slot: added up per line, gone when the cell is destroyed)."""
+        connected = {(p["reel"], p["row"]) for w in self.evaluate_lines() for p in w["positions"]}
+        cells = [(c, r) for c, r in self.all_cells()
+                 if (c, r) not in connected and self.board[c][r] is not None and not self.is_scatter(self.board[c][r])]
+        syms = [self.board[c][r] for c, r in cells]
+        base = self._win_signature()
+        best, best_sig = None, None
+        for _ in range(max(1, self.config.shuffle_tries)):
+            order = syms[:]
+            random.shuffle(order)
+            for (c, r), s in zip(cells, order):
+                self.board[c][r] = s
+            sig = self._win_signature()
+            if best_sig is None or sig > best_sig:
+                best, best_sig = order, sig
+            if sig > base:
+                break
+        for (c, r), s in zip(cells, best):
+            self.board[c][r] = s
+        mults = []
+        for c, r in cells:
+            f = get_random_outcome(self.weights("shuffle_mult_weights"))
+            self.enhance[c][r] += f
+            mults.append({**pos(self, c, r), "factor": f})
+        board_cells_event(self, "powerActivated", cells, power="shuffle", mults=mults,
+                          improved=bool(best_sig and best_sig > base))
+
+    def power_shuffle(self) -> None:
+        if self.config.shuffle_rule == "doc":
+            return self.power_shuffle_doc()
+        """Rule 3 (2026-11-02): the basic symbols swap places at random (Wild, weapons, Scatter stay), then 1-3 basic
+        cells get a multi (kept in the cell's Enhance slot: added up per line, gone when the cell is destroyed)."""
+        cells = [(c, r) for c, r in self.all_cells() if self.is_basic(self.board[c][r])]
+        syms = [self.board[c][r] for c, r in cells]
+        random.shuffle(syms)
+        for (c, r), s in zip(cells, syms):
+            self.board[c][r] = s
+        n = min(len(cells), get_random_outcome(self.weights("shuffle_cell_count_weights")))
+        mults = []
+        for c, r in random.sample(cells, n):
+            f = get_random_outcome(self.weights("shuffle_mult_weights"))
+            self.enhance[c][r] += f
+            mults.append({**pos(self, c, r), "factor": f})
+        board_cells_event(self, "powerActivated", cells, power="shuffle", mults=mults)
+
     def power_upgrade(self) -> None:
         names = self._basic_names_on_board()
         if not names:
@@ -263,13 +458,15 @@ class GameExecutables(GameCalculations):
         board_cells_event(self, "powerActivated", cells, power="upgrade", fromSymbol=name, toSymbol=target)
 
     def power_transform(self) -> None:
+        skip_w = self.config.transform_skips_weapons
         cand = [(c, r) for c, r in self.all_cells()
-                if not self.is_wild(self.board[c][r]) and not self.is_weapon(self.board[c][r])
+                if not self.is_wild(self.board[c][r]) and not (skip_w and self.is_weapon(self.board[c][r]))
                 and (self.in_bonus or not self.is_scatter(self.board[c][r]))]
         n = min(len(cand), random.randint(*self.weights("transform_count_range")))
         cells = random.sample(cand, n)
         for c, r in cells:
             self.board[c][r] = self.make_symbol("W")
+            self.board[c][r].flash = False  # designer 2026-11-01: a Wild made by a power never flashes
         self.power_wilds.update(cells)
         board_cells_event(self, "powerActivated", cells, power="transform")
 
@@ -331,7 +528,8 @@ class GameExecutables(GameCalculations):
             min_value = max(min_value, self.config.epic_min_coin)  # N6
         if min_tier is not None:
             min_value = max(min_value, self.config.coin_tiers[min_tier][0])
-        pool = {v: w for v, w in (table or self.weights("coin_value_weights")).items() if v >= min_value}
+        excl = self.config.coin_excluded_values
+        pool = {v: w for v, w in (table or self.weights("coin_value_weights")).items() if v >= min_value and v not in excl}
         if not pool and table:  # an own table with nothing at this minimum falls back to the coin table
             return self.draw_coin(min_value)
         return get_random_outcome(pool)
@@ -355,6 +553,31 @@ class GameExecutables(GameCalculations):
                 group.append(data)
         power_chance = (self.weights("power_wild_event_chance")
                         if self.in_bonus and not getattr(self, "force_wincap", False) else None)
+        if self.weights("wild_multi_weights") and not getattr(self, "force_wincap", False):
+            # designer 2026-10-29: no Wild events any more. Every Wild carries its multiplier from the moment it
+            # appears (mostly 1x); connecting, it multiplies its lines and drops a power with a small chance.
+            drop = self.weights("wild_power_drop_chance")
+            for cell in [x for x in self.all_cells() if x in connected]:
+                c, r = cell
+                f = getattr(self.board[c][r], "prize", 0) or 1
+                if f > 1 and self.config.tumble_multi:  # collected into the tumble multi (summed)
+                    self.tumble_wild += f
+                    out(event="collect", position=pos(self, c, r), factor=f, total=self.tumble_wild)
+                    acted = True
+                elif f > 1:
+                    self.wild_mult[cell] = f
+                    out(event="multiplier", position=pos(self, c, r), factor=f)
+                    acted = True
+                flash = getattr(self.board[c][r], "flash", False)
+                if flash or (drop and random.random() < drop):  # flashing Wild: a power, for sure (if room)
+                    p = self.pick_power()
+                    if p is not None:
+                        self.reserve[p] += 1
+                        out(event="power", position=pos(self, c, r), power=p)
+                        acted = True
+            if group:
+                emit(self, "wildEvents", wilds=group)
+            return acted
         for cell in [x for x in self.all_cells() if x in connected]:
             # designer 2026-10-22: in a Bonus, a Wild made by the Transform power fires an event only this often
             ch = power_chance if power_chance is not None and cell in getattr(self, "power_wilds", ()) else chance
@@ -424,6 +647,7 @@ class GameExecutables(GameCalculations):
         wins = self.evaluate_lines()
         if not wins:
             return False
+        self.chain_passes = getattr(self, "chain_passes", 0) + 1  # chain_block bookkeeping
         self.wild_events(wins)
         if self.wincap_triggered:
             return True
@@ -446,7 +670,19 @@ class GameExecutables(GameCalculations):
         emit(self, "destroy", cause="connect", cells=[pos(self, c, r) for c, r in cells],
              scatters=[pos(self, c, r) for c, r in dark])
         if self.config.lit_rule == "lines":  # only the winning lines' cells (Wilds too) + collected Scatters
-            lit = list(dict.fromkeys((p["reel"], p["row"]) for w in wins for p in w["positions"])) + dark
+            lit_wins = wins
+            mode = self.weights("lit_wild_lines_only")
+            if mode == "cells":  # rule 4 (2026-11-02): only the connected Wild cells (display Wilds too)
+                win_cells = {(p["reel"], p["row"]) for w in wins for p in w["positions"]}
+                lit_wins = []
+                wild_lit = [x for x in self.all_cells() if x in wild_cells or (x in self.skin_cells and x in win_cells)]
+            elif mode:  # designer 2026-10-28 trial: only lines with a Wild light up ("real": display Wilds don't count)
+                skins = set() if mode == "real" else self.skin_cells
+                lit_wins = [w for w in wins if any((p["reel"], p["row"]) in wild_cells
+                                                   or (p["reel"], p["row"]) in skins for p in w["positions"])]
+            lit = list(dict.fromkeys((p["reel"], p["row"]) for w in lit_wins for p in w["positions"])) + dark
+            if mode == "cells":
+                lit = wild_lit + dark
         else:
             lit = [(c, r) for c, r in cells if (c, r) not in wild_cells]  # basic symbols only
         self.destroy_cells(cells + dark, lit_cells=lit)
@@ -463,7 +699,7 @@ class GameExecutables(GameCalculations):
         while not self.wincap_triggered and self.actions < self.config.max_actions_per_spin:
             self.actions += 1
             a1 = self.step_scatters()
-            a2 = self.step_reserved_powers()
+            a2 = self.step_reserved_powers() if self.config.action_order != "doc" else False
             a3 = self.step_connect()
             if not (a1 or a2 or a3):
                 break
@@ -506,6 +742,15 @@ class GameExecutables(GameCalculations):
         return []
 
     def arrow_damage(self, b) -> int:
+        if self.config.arrow_rule == "table":
+            vals = self.weights("arrow_damage_values")
+            lo, hi = self.config.arrow_hp_range
+            lvl = min(1.0, max(0.0, (b["hp_max"] - lo) / (hi - lo)))
+            ratio = b["hp"] / b["hp_max"] if b["hp_max"] else 0
+            t = self.weights("arrow_tilt_max") * (2 * lvl - 1) + self.weights("arrow_tilt_ratio") * (2 * ratio - 1)
+            t = max(-1.0, min(1.0, t))
+            n = len(vals)
+            return random.choices(vals, weights=[max(0.0, 1 + t * (2 * i / (n - 1) - 1)) for i in range(n)])[0]
         k = random.choice(self.weights("arrow_k_choices"))
         dmg = self.config.arrow_base + b["hp_max"] * k
         if self.stage == ENDLESS:
@@ -553,13 +798,56 @@ class GameExecutables(GameCalculations):
     # =========================================================================
     # Full action loop (1)-(8)
     # =========================================================================
-    def resolve_actions(self) -> None:
+    def fire_powers_doc(self) -> bool:
+        """Section 8 step 8: each reserved power fires once, in the order Upgrade, Transform, Replace, Shuffle; the
+        screen is held between them (no connect / destroy in between)."""
+        acted = False
+        for name, fn in (("upgrade", self.power_upgrade), ("transform", self.power_transform),
+                         ("replace", self.power_replace), ("shuffle", self.power_shuffle)):
+            if self.reserve.get(name, 0) <= 0 or self.wincap_triggered:
+                continue
+            if name == "replace" and not self._replace_eligible():
+                continue  # nothing to replace: it stays in reserve
+            self.reserve[name] -= 1
+            fn()
+            acted = True
+        return acted
+
+    def resolve_actions_doc(self) -> None:
+        """Section 8 order: (1)-(5) lines until nothing connects, (6) weapons, (7) open the chests of killed bosses
+        left to right, (8) Upgrade/Transform/Replace/Shuffle, (9) Destroy; each acting step goes back to (1)."""
         self.actions = 0
         while not self.wincap_triggered and self.actions < self.config.max_actions_per_spin:
             self.run_cycle()
             if self.wincap_triggered:
                 break
             if self.step_weapons():
+                continue
+            self.open_chests()
+            if self.wincap_triggered:
+                break
+            if self.fire_powers_doc():
+                continue
+            if self.reserve["destroy"] > 0:
+                self.reserve["destroy"] -= 1
+                self.power_destroy()
+                self.refill()
+                continue
+            break
+
+    def resolve_actions(self) -> None:
+        if self.config.action_order == "doc":
+            return self.resolve_actions_doc()
+        self.actions = 0
+        while not self.wincap_triggered and self.actions < self.config.max_actions_per_spin:
+            self.run_cycle()
+            if self.wincap_triggered:
+                break
+            if self.step_weapons():
+                continue
+            if self.reserve.get("shuffle", 0) > 0:  # rule 3: Shuffle fires once the weapons are done
+                self.reserve["shuffle"] -= 1
+                self.power_shuffle()
                 continue
             if self.reserve["destroy"] > 0:
                 self.reserve["destroy"] -= 1
@@ -571,28 +859,88 @@ class GameExecutables(GameCalculations):
     # =========================================================================
     # Step (9): chests
     # =========================================================================
+    def open_chest_v4(self, b) -> None:
+        """Rule 3 (2026-11-02): tier up while the upgrade roll hits (up to chest_open_upgrade_max times, never past red),
+        then one money bag of the chest's own
+        kind, plus independently a power and a chest multi (Bonus / Heroic only)."""
+        cfg = self.config
+        tier, upgraded, order = b["chest"], None, cfg.chest_order_v4
+        ups, cap = 0, cfg.chest_open_upgrade_max  # designer 2026-11-02: a chest may go up several times
+        while (order.index(tier) < len(order) - 1 and (cap is None or ups < cap)
+               and random.random() < self.weights("chest_open_upgrade_chance").get(tier, 0)):
+            tier = upgraded = order[order.index(tier) + 1]
+            ups += 1
+        gifts = []
+        v = get_random_outcome({float(k): w for k, w in self.weights("chest_tier_bags")[tier].items() if w > 0})
+        if getattr(self, "force_wincap", False):
+            v = 25000.0
+        bag = cfg.chest_tier_bag_names.get(tier, self.bag_kind(v))
+        if cfg.tumble_multi:
+            self.tumble_base += v
+            gifts.append({"kind": "bag", "bag": bag, "value": v, "pending": True})
+        else:
+            gifts.append({"kind": "bag", "bag": bag, "value": v, "paid": self.award(v)})
+        got_power = False
+        if (self.in_bonus or getattr(self, "heroic", False)) and not self.wincap_triggered:
+            if random.random() < self.weights("chest_gift_power_chance").get(tier, 0):
+                p = self.pick_power(new_only=cfg.chest_power_new_only)
+                if p is not None:  # no room: the power is simply lost (the bag was already given)
+                    self.reserve[p] += 1
+                    got_power = True
+                    gifts.append({"kind": "power", "power": p})
+            if cfg.tumble_multi and random.random() < self.weights("chest_gift_multi_chance").get(tier, 0):
+                cap = cfg.chest_multi_cap.get(tier, 10)
+                m = get_random_outcome({v: w for v, w in self.band_table("chest_multi_weights").items() if v <= cap})
+                self.tumble_boss.append(m)
+                gifts.append({"kind": "multi", "factor": m, "bossMults": list(self.tumble_boss)})
+        extra = 0
+        if got_power and self.in_bonus and self.free_spins_left <= 0 and not cfg.chest_power_immediate:
+            self.free_spins_left += 1
+            extra = 1
+        b["chest_opened"] = True
+        emit(self, "chestOpened", boss=b["id"], chest=chest_name(self, b["chest"]), upgradedTo=chest_name(self, upgraded),
+             gifts=gifts, extraSpin=extra, freeSpinsLeft=self.free_spins_left if self.in_bonus else None)
+
     def open_chest(self, b) -> None:
         cfg = self.config
+        if cfg.chest_rule == "v4":
+            return self.open_chest_v4(b)
         tier = b["chest"]
         upgraded = None
         order = cfg.chest_order
         if random.random() < self.weights("chest_upgrade_chance") and order.index(tier) < len(order) - 1:
-            upgraded = random.choice(order[order.index(tier) + 1:])
+            higher = order[order.index(tier) + 1:]
+            w = self.weights("chest_upgrade_tier_weights")  # designer 2026-10-29: fewer upgrades straight to diamond
+            pool = {c: w.get(c, 0) for c in higher} if w else {}
+            upgraded = get_random_outcome(pool) if sum(pool.values()) > 0 else random.choice(higher)
             tier = upgraded
         n = get_random_outcome(self.weights("chest_gift_count_weights")[tier])
         kinds = []
+        gifts_ok = self.in_bonus or getattr(self, "heroic", False)  # designer 2026-10-30: Heroic chests too
+        mchance = self.weights("chest_gift_multi_chance").get(tier, 0) if (gifts_ok and cfg.tumble_multi) else 0
+        pch = self.weights("chest_gift_power_chance")[tier] if (self.in_bonus or (gifts_ok and cfg.tumble_multi)) else 0
         for _ in range(n):
-            if self.in_bonus and random.random() < self.weights("chest_gift_power_chance")[tier]:
+            x = random.random()
+            if x < pch:
                 kinds.append("power")
+            elif x < pch + mchance:
+                kinds.append("multi")  # boss multi (designer 2026-10-30)
             else:
                 kinds.append("coin")
-        if order.index(tier) >= order.index("vang") and "coin" not in kinds:
+        sure = tier in cfg.chest_sure_coin_tiers  # these chests always hold a coin (designer 2026-10-29: diamond only)
+        if sure and "coin" not in kinds:
             kinds[0] = "coin"
         g = self.global_factor()
         gifts, got_power = [], False
         for kind in kinds:
+            if kind == "multi":
+                cap = cfg.chest_multi_cap.get(tier, 10)
+                m = get_random_outcome({v: w for v, w in self.band_table("chest_multi_weights").items() if v <= cap})
+                self.tumble_boss.append(m)
+                gifts.append({"kind": "multi", "factor": m, "bossMults": list(self.tumble_boss)})
+                continue
             if kind == "power":
-                p = self.pick_power()
+                p = self.pick_power(new_only=cfg.chest_power_new_only)
                 if p is not None:
                     self.reserve[p] += 1
                     got_power = True
@@ -600,17 +948,38 @@ class GameExecutables(GameCalculations):
                     continue
                 if not cfg.chest_power_overflow_to_coin:
                     continue
-            v = self.draw_coin(0, min_tier=tier)
+            if cfg.chest_bags:  # designer 2026-10-31: chest coins are money bags, >= 1x, no stage / chest floor
+                v = self.draw_bag()
+                bag = self.bag_kind(v)
+                if cfg.tumble_multi:
+                    self.tumble_base += v
+                    gifts.append({"kind": "bag", "bag": bag, "value": v, "pending": True})
+                    continue
+                paid = self.award(v)
+                gifts.append({"kind": "bag", "bag": bag, "value": v, "paid": paid})
+                if self.wincap_triggered:
+                    break
+                continue
+            mode = cfg.chest_coin_min
+            if mode == "tier" or (mode == "sure_only" and sure):
+                v = self.draw_coin(0, min_tier=tier)
+                sure = False  # "sure_only": only the guaranteed coin keeps the chest tier's floor
+            else:
+                v = self.draw_coin(self.current_min_coin())
+            if cfg.tumble_multi:  # designer 2026-10-30: chest coins join the spin's line pay, x the tumble multi
+                self.tumble_base += v
+                gifts.append({"kind": "coin", "value": v, "pending": True})
+                continue
             paid = self.award(v * g)
             gifts.append({"kind": "coin", "value": v, "globalMult": g, "paid": paid})
             if self.wincap_triggered:
                 break
         extra = 0
-        if got_power and self.in_bonus and self.free_spins_left <= 0:
+        if got_power and self.in_bonus and self.free_spins_left <= 0 and not cfg.chest_power_immediate:
             self.free_spins_left += 1
             extra = 1
         b["chest_opened"] = True
-        emit(self, "chestOpened", boss=b["id"], chest=b["chest"], upgradedTo=upgraded, gifts=gifts,
+        emit(self, "chestOpened", boss=b["id"], chest=chest_name(self, b["chest"]), upgradedTo=chest_name(self, upgraded), gifts=gifts,
              extraSpin=extra, freeSpinsLeft=self.free_spins_left if self.in_bonus else None)
 
     def open_chests(self) -> None:

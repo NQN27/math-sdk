@@ -35,7 +35,35 @@ class GameCalculations(Executables):
         sym = self.create_symbol(name)
         if name in ("BM", "SW", "LT"):
             sym.prize = get_random_outcome(self.weights("weapon_factor_weights"))
+        elif name == "W":
+            table = self.band_table("wild_multi_weights")  # designer 2026-10-29: every Wild is a Multi Wild
+            if table:
+                sym.prize = get_random_outcome(table)
+                fl = self.weights("wild_flash_chance")  # designer 2026-10-31: flashing Wild = sure power
+                if fl and random.random() < fl and (not self.config.wild_flash_needs_room or self.power_room()):
+                    sym.flash = True
         return sym
+
+    def tumble_band(self) -> int:
+        """0 small / 1 mid / 2 big: the spin's tumble win so far against tumble_band_bounds."""
+        b1, b2 = self.weights("tumble_band_bounds")
+        v = getattr(self, "tumble_base", 0.0)
+        return 0 if v < b1 else (1 if v < b2 else 2)
+
+    def band_table(self, name: str):
+        """Weight table `name`, swapped for its tumble-band table when one is set (tumble_band_tables)."""
+        bands = self.weights("tumble_band_tables")
+        alt = bands.get(name) if bands else None
+        if alt:
+            t = alt[self.tumble_band()]
+            if t:
+                return {(int(k) if str(k).isdigit() else float(k)): w for k, w in t.items()}
+        return self.weights(name)
+
+    def power_room(self) -> bool:
+        """Some power can still be stored (no random draw)."""
+        cap = self.config.power_reserve_cap
+        return any(w > 0 and self.reserve.get(p, 0) < cap for p, w in self.weights("power_pick_weights").items())
 
     def all_cells(self):
         return self.config.cells_by_priority
@@ -133,7 +161,10 @@ class GameCalculations(Executables):
         return Lines.get_lines(self.board, self.config)["wins"]
 
     def global_factor(self) -> float:
-        """Global multiplier counter starts at 0x but pays as 1x."""
+        """Global multiplier counter starts at 0x but pays as 1x. Tumble mode (designer 2026-10-30): the old Global
+        is gone (no Global cells, nothing multiplied by it); line pay is multiplied at spin end instead."""
+        if self.config.tumble_multi:
+            return 1
         return self.global_mult if self.global_mult > 0 else 1
 
     def line_factor(self, win) -> tuple:
@@ -141,7 +172,7 @@ class GameCalculations(Executables):
         enh = [self.enhance[c][r] for c, r in cells if self.enhance[c][r] > 0]
         enhance_f = sum(enh) if enh else 1
         wms = [self.wild_mult[cell] for cell in cells if cell in self.wild_mult]
-        if not wms:
+        if not wms or self.config.tumble_multi:  # tumble mode: Wild multis are collected, not per line
             wild_f = 1
         elif self.config.wild_mult_combine == "add":
             wild_f = sum(wms)
@@ -164,6 +195,10 @@ class GameCalculations(Executables):
             out.append({"line": w["meta"]["lineIndex"], "symbol": w["symbol"], "kind": w["kind"],
                         "base": w["win"], "enhance": ef, "wildMult": wf, "globalMult": g, "lineMult": lm, "win": amount,
                         "positions": [pos(self, p["reel"], p["row"]) for p in w["positions"]]})
+        if self.config.tumble_multi:  # paid at spin end x the tumble multi (settle_tumble)
+            self.tumble_base += total
+            emit(self, "lineWins", wins=out, total=round(total, 4), pending=True)
+            return 0.0
         paid = self.award(total)
         emit(self, "lineWins", wins=out, total=round(paid, 4))  # drop float noise (0.44999999999999996)
         return paid

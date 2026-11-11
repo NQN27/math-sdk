@@ -111,9 +111,12 @@ def main():
     # ---- fixed numbers ----
     L += ["## 5. Số cố định (proposal)", "", "| Chặng | HP | HP boss 3 |", "|---|---|---|"]
     off = cfg.boss_hp_offset.get("boss3", {})
-    for s, (lo, hi) in cfg.stage_hp_range.items():
+    for s, spec in cfg.stage_hp_range.items():
         d = off.get(s, 0)
-        L.append(f"| {s} | {lo}–{hi} | {lo + d}–{hi + d} |" if d else f"| {s} | {lo}–{hi} | {lo}–{hi} |")
+        txt = lambda x: f"{spec[0] + x}–{spec[1] + x}" if len(spec) == 2 else "/".join(str(v + x) for v in spec)
+        L.append(f"| {s} | {txt(0)} | {txt(d)} |")
+    if any(t.get("hp_cut_weights") not in (None, {0: 1}) for t in cfg.tier_weights.values()):
+        L += ["", "HP trên là trước khi cắt: mỗi boss chặng 1-5 bị trừ thêm một lượng rút theo `hp_cut_weights` (mục 3)."]
     L += ["", "Sát thương mỗi ô bị phá: " + ", ".join(f"{k} {v}" for k, v in cfg.symbol_damage.items()) + ".", ""]
 
     if res and os.path.exists(res):

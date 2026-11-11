@@ -1,6 +1,9 @@
 import os
 import sys
 
+# rule tests check mechanics on the rule defaults, not on the accepted tuning (game_config.accepted_tuning_*)
+os.environ["BL3_RULE_DEFAULTS"] = "1"
+
 import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))

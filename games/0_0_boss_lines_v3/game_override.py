@@ -15,7 +15,10 @@ class GameStateOverride(GameExecutables):
         self.treasure_hunt = False
         self.no_scatter_spin = False
         self.force_wincap = False
+        self.bonus_below_floor = False  # bonus_min_total_win_mode "reject": this Bonus ended under the floor
         self.global_mult = 0
+        self.tumble_base, self.tumble_wild, self.tumble_boss = 0.0, 0, []  # tumble multi (designer 2026-10-30)
+        self.tumble_acc = 0  # tumble_combine "add": Global accumulated by earlier spins of the reset scope
         self.line_mult = 1  # Heroic random line multiplier (heroic_line_mult_weights)
         self.skin_cells = set()  # display-only Wilds on the current board
         self.skin_rng = random.Random(self.book_id * 1_000_003 + 7)  # display-only Wilds (wild_skin_chance)
@@ -43,7 +46,7 @@ class GameStateOverride(GameExecutables):
         if self.repeat:
             return
         win_criteria = self.get_current_betmode_distributions().get_win_criteria()
-        if self.accidental_bonus:
+        if self.accidental_bonus or self.bonus_below_floor:
             self.repeat = True
         elif (self.config.reject_wincap_outside_wincap_fence and self.criteria != "wincap"
               and self.final_win >= self.config.wincap):

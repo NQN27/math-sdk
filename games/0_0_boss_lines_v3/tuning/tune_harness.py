@@ -39,7 +39,8 @@ def _setup(overrides):
     if reel_specs:  # rebuild reels in memory with modified gen_reels specs
         import gen_reels
         for name, spec in reel_specs.items():
-            full = {**gen_reels.REEL_SPECS[name], **spec}
+            # a new reel name copies the spec of spec["from"] (e.g. a Super stage-1 reel built from BON_S1)
+            full = {**gen_reels.REEL_SPECS[spec.get("from", name)], **{k: v for k, v in spec.items() if k != "from"}}
             cfg.reels[name] = [gen_reels.build_column(name, c, full) for c in range(6)]
     def numkeys(base, table):  # JSON keys are strings; match the base table's key types (recursively)
         if not (isinstance(base, dict) and isinstance(table, dict)):
@@ -96,16 +97,22 @@ def _one(gs, cfg, tier, i):
         gs.run_feature_spin(gs.get_current_distribution_conditions())
         return
     n = {"bonus": 3, "super": 4, "epic": 5}[tier]
-    cols = random.sample(range(6), n)
-    trigger = {(c, random.randrange(5)) for c in cols}
-    gs.run_bonus(tier, trigger)
+    gs.floor_rerolls = 0
+    for _ in range(10000):  # bonus_min_total_win_mode "reject": a Bonus under the floor is simulated again
+        cols = random.sample(range(6), n)
+        trigger = {(c, random.randrange(5)) for c in cols}
+        gs.run_bonus(tier, trigger)
+        if not getattr(gs, "bonus_below_floor", False):
+            return
+        gs.rejected = getattr(gs, "rejected", 0) + 1
+        gs.reset_book()
 
 
 def _diag_new():
     return {"conn_hist": {}, "conn_zero": {}, "spins": 0, "zero_spins": 0, "zero_streak_hist": {},
             "stage_clears_hist": {}, "treasure_kinds": {}, "clover_factor": {}, "golden_factor": {},
             "global_factor": {}, "treasure_paid": [], "topups": 0, "topup_paid": 0.0, "maxwin_src": {},
-            "wild_events": {}, "chest_tiers": {}, "wildmult_extra": 0.0}
+            "wild_events": {}, "chest_tiers": {}, "wildmult_extra": 0.0, "rejected": 0}
 
 
 def _bump(d, k, v=1):
@@ -164,14 +171,26 @@ def worker(args):
         ev = list(flat_events(gs.book.events))
         src = {"lines": 0.0, "wildcoin": 0.0, "chest": 0.0, "treasure": 0.0}
         stage, spins, treasures = None, 0, 0
+        pend_lines = pend_bags = 0.0
         for e in ev:
             t = e["type"]
-            if t == "lineWins":
+            if t == "lineWins" and e.get("pending"):  # tumble mode: paid later x the Global (tumbleWin)
+                pend_lines += e["total"]
+            elif t == "lineWins":
                 src["lines"] += e["total"]
+            elif t == "tumbleWin":  # split the spin's Global-multiplied pay between its line pay and its money bags
+                b = pend_lines + pend_bags
+                if b > 0:
+                    src["lines"] += e["paid"] * pend_lines / b
+                    src["chest"] += e["paid"] * pend_bags / b
+                pend_lines = pend_bags = 0.0
+            elif t == "spinEnd":
+                pend_lines = pend_bags = 0.0
             elif t == "wildEvent" and e["event"] == "coin":
                 src["wildcoin"] += e["paid"]
             elif t == "chestOpened":
                 src["chest"] += sum(g.get("paid", 0) for g in e["gifts"])
+                pend_bags += sum(g.get("value", 0) for g in e["gifts"] if g.get("pending"))
             elif t == "treasureStart":
                 treasures += 1
             elif t == "freeSpinStart":
@@ -186,6 +205,7 @@ def worker(args):
         if gs.wincap_triggered:
             from maxwin_sources import classify
             _bump(diag["maxwin_src"], classify(ev, gs.win_manager.running_bet_win, cfg.wincap))
+    diag["rejected"] = getattr(gs, "rejected", 0)  # Bonuses thrown away under the floor (reject mode)
     return out, diag
 
 

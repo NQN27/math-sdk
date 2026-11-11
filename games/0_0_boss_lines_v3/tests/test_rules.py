@@ -134,6 +134,28 @@ def test_tier_hp_tilt(gs, cfg):
         gs.in_bonus, gs.bonus_tier = False, None
 
 
+def test_hp_cut_weights(gs, cfg):
+    """The HP cut is a per-boss draw (no cut stays possible); only its odds differ per tier."""
+    old = dict(cfg.tier_weights)
+    try:
+        cfg.tier_weights = {**old, "super": {**old.get("super", {}), "hp_cut_weights": {0: 1, 10: 3}}}
+        gs.in_bonus, gs.bonus_tier = True, "super"
+        lo, hi = cfg.stage_hp_range[2]
+        random.seed(3)
+        cuts = set()
+        for _ in range(200):
+            gs.spawn_stage(2)
+            b = gs.bosses[0]
+            assert lo - 10 <= b["hp"] <= hi and b["hp"] % 5 == 0
+            cuts.add(b["hp"] < lo)
+        assert cuts == {True, False}
+        gs.spawn_stage(0)
+        assert all(b["hp"] == cfg.stage_hp_range[0][0] for b in gs.bosses)
+    finally:
+        cfg.tier_weights = old
+        gs.in_bonus, gs.bonus_tier = False, None
+
+
 def test_boss_hp_offset(gs, cfg):
     old = cfg.boss_hp_offset
     try:
@@ -535,6 +557,318 @@ def test_epic_free_spin_coins_have_no_dong(gs):
     assert min(gs.draw_coin(0.2) for _ in range(500)) < 5
 
 
+def test_chest_coin_min_stage(gs, cfg):
+    """chest_coin_min = "stage": a gold chest's coins only respect the stage minimum, not the gold tier floor."""
+    old = cfg.chest_coin_min
+    try:
+        cfg.chest_coin_min = "stage"
+        gs.in_bonus, gs.bonus_tier, gs.stage = True, "bonus", 2
+        floor = gs.current_min_coin()
+        random.seed(5)
+        vals = []
+        for _ in range(300):
+            gs.reserve = {p: cfg.power_reserve_cap for p in cfg.power_names}  # no room -> every gift is a coin
+            gs.book.events.clear()
+            gs.open_chest({"id": "boss1", "chest": "vang", "chest_opened": False})
+            vals += [g["value"] for g in gs.book.events[-1]["gifts"] if g["kind"] == "coin"]
+            gs.win_manager.reset_end_round_wins()
+            gs.wincap_triggered = False
+        assert vals and min(vals) >= floor and min(vals) < cfg.coin_tiers["vang"][0]
+    finally:
+        cfg.chest_coin_min = old
+        gs.in_bonus, gs.bonus_tier = False, None
+
+
+def test_stage_chest_weights(gs, cfg):
+    """Per tier + stage chest odds; the stage minimum chest still holds."""
+    old = cfg.stage_chest_weights
+    try:
+        cfg.stage_chest_weights = {"bonus": {2: {"dong": 1, "vang": 1}, 3: {"dong": 5, "bac": 1}}}
+        gs.in_bonus, gs.bonus_tier = True, "bonus"
+        random.seed(2)
+        seen2 = {gs._roll_chest(2) for _ in range(200)}
+        seen3 = {gs._roll_chest(3) for _ in range(200)}
+        assert seen2 == {"dong", "vang"} and seen3 == {"bac"}
+        gs.bonus_tier = "super"  # no own table -> step weights from the stage minimum
+        assert all(cfg.chest_order.index(gs._roll_chest(3)) >= 1 for _ in range(100))
+    finally:
+        cfg.stage_chest_weights = old
+        gs.in_bonus, gs.bonus_tier = False, None
+
+
+def test_stage_min_chest_count(gs, cfg):
+    """stage_min_chest_count = 1: exactly one boss per stage is sure to get the stage minimum chest."""
+    old = cfg.stage_min_chest_count
+    try:
+        cfg.stage_min_chest_count = 1
+        random.seed(4)
+        low = 0
+        for _ in range(200):
+            gs.spawn_stage(4)
+            idx = [cfg.chest_order.index(b["chest"]) for b in gs.bosses]
+            assert max(idx) >= cfg.chest_order.index("vang")
+            low += sum(i < cfg.chest_order.index("vang") for i in idx)
+        assert low > 200
+    finally:
+        cfg.stage_min_chest_count = old
+
+
+def test_tumble_multi(gs, cfg):
+    """Tumble mode (designer 2026-10-30): connecting Wild multis add up, boss multis from chests multiply the sum,
+    and the spin's line pay x that multi is paid at spin end; no old Global; per-tier reset scope."""
+    old = (cfg.tumble_multi, dict(cfg.tier_weights), cfg.chest_gift_multi_chance, cfg.chest_upgrade_chance)
+    try:
+        cfg.tumble_multi = True
+        cfg.tier_weights = {**old[1], "bonus": {**old[1].get("bonus", {}), "wild_multi_weights": {3: 1},
+                                                "wild_power_drop_chance": 0.0, "tumble_reset_scope": "spin"}}
+        gs.in_bonus, gs.bonus_tier = True, "bonus"
+        gs.global_mult = 4
+        assert gs.global_factor() == 1  # the old Global no longer multiplies anything
+        gs.spawn_stage(1)
+        gs.begin_spin()
+        gs.refill = lambda: []
+        rows = board_with_top("H2 H2 W H2 L1 L2")
+        set_board(gs, rows)
+        gs.board[2][0] = gs.make_symbol("W")  # a 3x Multi Wild
+        gs.book.events.clear()
+        gs.step_connect()
+        base = gs.tumble_base
+        assert base > 0 and gs.tumble_wild == 3 and gs.win_manager.spin_win == 0  # nothing paid yet
+        gs.tumble_boss = [2, 5]  # two boss multis multiply, left to right
+        gs.settle_tumble()
+        ev = [e for e in gs.book.events if e["type"] == "tumbleWin"][-1]
+        assert ev["multi"] == 30 and abs(ev["paid"] - round(base * 30, 4)) < 1e-6
+        gs.begin_spin()  # Normal: resets every spin
+        assert gs.tumble_wild == 0 and gs.tumble_boss == []
+        # chest boss multis respect the chest cap (bronze <= 3x)
+        cfg.chest_gift_multi_chance = {"dong": 1.0, "bac": 1.0, "vang": 1.0}
+        cfg.chest_upgrade_chance = 0.0
+        random.seed(12)
+        for _ in range(100):
+            gs.tumble_boss = []
+            gs.reserve = {p: 0 for p in cfg.power_names}
+            gs.book.events.clear()
+            gs.open_chest({"id": "boss1", "chest": "dong", "chest_opened": False})
+            assert all(m <= 3 for m in gs.tumble_boss)
+            gs.win_manager.reset_end_round_wins()
+            gs.wincap_triggered = False
+        # chest coins join the spin's pay and wait for the tumble multi
+        cfg.chest_gift_multi_chance = {}
+        gs.tumble_base = 0.0
+        gs.reserve = {p: cfg.power_reserve_cap for p in cfg.power_names}  # no power room -> coins
+        gs.book.events.clear()
+        gs.open_chest({"id": "boss1", "chest": "bac", "chest_opened": False})
+        assert gs.tumble_base > 0 and gs.win_manager.spin_win == 0
+    finally:
+        cfg.tumble_multi, cfg.tier_weights, cfg.chest_gift_multi_chance, cfg.chest_upgrade_chance = old
+        gs.in_bonus, gs.bonus_tier = False, None
+        gs.global_mult = 0
+        gs.tumble_wild, gs.tumble_boss, gs.tumble_base = 0, [], 0.0
+        del gs.refill
+
+
+def test_money_bags_flash_wild_chest_names(gs, cfg):
+    """Designer 2026-10-31: chest coins are money bags (>= 1x, named pinch/small/large/chest); a flashing Wild
+    always gives a power when it connects, other Wilds none; chests show as green/blue/purple in events."""
+    old = (cfg.chest_bags, cfg.chest_display_names, dict(cfg.tier_weights), cfg.chest_upgrade_chance, cfg.tumble_multi)
+    try:
+        cfg.chest_bags, cfg.tumble_multi = True, False
+        cfg.chest_display_names = {"dong": "green", "bac": "blue", "vang": "purple"}
+        cfg.chest_upgrade_chance = 0.0
+        gs.in_bonus, gs.bonus_tier, gs.stage = True, "bonus", 1
+        random.seed(21)
+        kinds = set()
+        for _ in range(300):
+            gs.reserve = {p: cfg.power_reserve_cap for p in cfg.power_names}  # no power room -> bags
+            gs.book.events.clear()
+            gs.open_chest({"id": "boss1", "chest": "bac", "chest_opened": False})
+            ev = gs.book.events[-1]
+            assert ev["chest"] == "blue"
+            for g in ev["gifts"]:
+                assert g["kind"] == "bag" and g["value"] >= 1
+                assert g["bag"] == gs.bag_kind(g["value"])
+                kinds.add(g["bag"])
+            gs.win_manager.reset_end_round_wins()
+            gs.wincap_triggered = False
+        assert {"pinch", "small"} <= kinds
+        assert gs.bag_kind(4) == "pinch" and gs.bag_kind(5) == "small" and gs.bag_kind(50) == "large" and gs.bag_kind(100) == "chest"
+        # flashing Wild
+        cfg.tier_weights = {**old[2], "bonus": {**old[2].get("bonus", {}), "wild_multi_weights": {1: 1},
+                                                "wild_power_drop_chance": 0.0, "wild_flash_chance": 1.0}}
+        w = gs.make_symbol("W")
+        assert getattr(w, "flash", False)
+        gs.spawn_stage(1)
+        gs.refill = lambda: []
+        gs.reserve = {p: 0 for p in cfg.power_names}
+        set_board(gs, board_with_top("H2 H2 W H2 L1 L2"))
+        gs.board[2][0] = w
+        gs.book.events.clear()
+        gs.step_connect()
+        assert sum(gs.reserve.values()) == 1
+        cfg.tier_weights = {**old[2], "bonus": {**old[2].get("bonus", {}), "wild_multi_weights": {1: 1},
+                                                "wild_power_drop_chance": 0.0, "wild_flash_chance": 0.0}}
+        gs.reserve = {p: 0 for p in cfg.power_names}
+        set_board(gs, board_with_top("H2 H2 W H2 L1 L2"))
+        gs.board[2][0] = gs.make_symbol("W")
+        gs.step_connect()
+        assert sum(gs.reserve.values()) == 0  # a Wild that does not flash gives no power
+        gs.win_manager.reset_end_round_wins()
+    finally:
+        cfg.chest_bags, cfg.chest_display_names, cfg.tier_weights, cfg.chest_upgrade_chance, cfg.tumble_multi = old
+        gs.in_bonus, gs.bonus_tier = False, None
+        gs.wincap_triggered = False
+        if "refill" in gs.__dict__:
+            del gs.refill
+
+
+def test_multi_wild(gs, cfg):
+    """Multi Wild mode: a Wild carries its multiplier from creation; connecting multiplies its line, no coin event."""
+    old = dict(cfg.tier_weights)
+    try:
+        cfg.tier_weights = {**old, "bonus": {**old.get("bonus", {}), "wild_multi_weights": {3: 1},
+                                             "wild_power_drop_chance": 0.0}}
+        gs.in_bonus, gs.bonus_tier = True, "bonus"
+        w = gs.make_symbol("W")
+        assert w.prize == 3
+        gs.spawn_stage(1)
+        gs.refill = lambda: []
+        set_board(gs, board_with_top("H2 H2 W H2 L1 L2"))
+        gs.board[2][0] = w
+        gs.book.events.clear()
+        gs.step_connect()
+        ev = [e for e in gs.book.events if e["type"] == "wildEvent"]
+        assert ev and all(e["event"] == "multiplier" and e["factor"] == 3 for e in ev)
+        lw = [e for e in gs.book.events if e["type"] == "lineWins"][0]
+        assert any(x["wildMult"] == 3 for x in lw["wins"])
+        gs.win_manager.reset_end_round_wins()
+    finally:
+        cfg.tier_weights = old
+        gs.in_bonus, gs.bonus_tier = False, None
+        del gs.refill
+
+
+def test_wild_lit_bias(gs, cfg):
+    """wild_lit_bias = 1: a Wild on an unlit cell moves to a lit basic cell of its column (Bonus only)."""
+    old = cfg.wild_lit_bias
+    try:
+        cfg.wild_lit_bias = 1.0
+        gs.in_bonus, gs.bonus_tier = True, "bonus"
+        gs.board = [[gs.make_symbol("L1") for _ in range(5)] for _ in range(6)]
+        gs.board[1][4] = gs.make_symbol("W")
+        gs.lit = {(1, 2)}
+        gs.steer_weapons_to_lit()
+        assert gs.board[1][2].name == "W" and gs.board[1][4].name == "L1"
+    finally:
+        cfg.wild_lit_bias = old
+        gs.in_bonus, gs.bonus_tier = False, None
+
+
+def test_lit_wild_lines_only(gs, cfg):
+    """lit_wild_lines_only: a winning line without a Wild lights nothing; a line with a Wild lights as before."""
+    old = (cfg.lit_rule, cfg.lit_wild_lines_only)
+    try:
+        cfg.lit_rule, cfg.lit_wild_lines_only = "lines", True
+        gs.spawn_stage(1)
+        gs.skin_cells = set()
+        gs.refill = lambda: []
+        set_board(gs, board_with_top("H2 H2 H2 H2 L1 L2"))
+        gs.lit = set()
+        gs.step_connect()
+        assert gs.lit == set()
+        set_board(gs, board_with_top("H2 H2 W H2 L1 L2"))
+        gs.step_connect()
+        assert {(0, 0), (1, 0), (2, 0), (3, 0)} <= gs.lit
+        # a display Wild counts by default, not with "real"
+        for mode, lights in ((True, True), ("real", False)):
+            cfg.lit_wild_lines_only = mode
+            set_board(gs, board_with_top("H2 H2 H2 H2 L1 L2"))
+            gs.skin_cells = {(2, 0)}
+            gs.lit = set()
+            gs.step_connect()
+            assert bool(gs.lit) == lights
+        gs.skin_cells = set()
+    finally:
+        cfg.lit_rule, cfg.lit_wild_lines_only = old
+        del gs.refill
+
+
+def test_weapon_lit_bias(gs, cfg):
+    """weapon_lit_bias = 1: a weapon on an unlit cell moves to a lit basic cell of its own column."""
+    old = cfg.weapon_lit_bias
+    try:
+        cfg.weapon_lit_bias = 1.0
+        gs.in_bonus, gs.bonus_tier = True, "bonus"
+        gs.board = [[gs.make_symbol("L1") for _ in range(5)] for _ in range(6)]
+        gs.board[2][0] = gs.make_symbol("BM")
+        gs.lit = {(2, 3), (4, 0)}
+        gs.steer_weapons_to_lit()
+        assert gs.board[2][3].name == "BM" and gs.board[2][0].name == "L1"
+        gs.board[2][3], gs.board[2][0] = gs.make_symbol("L1"), gs.make_symbol("SW")
+        gs.lit = {(4, 0)}  # nothing lit in column 2 -> stays
+        gs.steer_weapons_to_lit()
+        assert gs.board[2][0].name == "SW"
+        cfg.weapon_lit_bias = 0
+        gs.lit = {(2, 3)}
+        gs.steer_weapons_to_lit()
+        assert gs.board[2][0].name == "SW"
+    finally:
+        cfg.weapon_lit_bias = old
+        gs.in_bonus, gs.bonus_tier = False, None
+
+
+def test_chest_rules_2026_10_29(gs, cfg):
+    """Designer 2026-10-29: only diamond chests are sure to hold a coin, and only that coin keeps the tier floor
+    ("sure_only"); a chest power is always one with nothing in reserve, otherwise the gift is a coin."""
+    old = (cfg.chest_sure_coin_tiers, cfg.chest_coin_min, cfg.chest_power_new_only, cfg.chest_upgrade_chance,
+           cfg.chest_gift_power_chance)
+    try:
+        cfg.chest_sure_coin_tiers, cfg.chest_coin_min, cfg.chest_power_new_only = ["kimcuong"], "sure_only", True
+        cfg.chest_upgrade_chance = 0.0
+        cfg.chest_gift_power_chance = {"dong": 1.0, "bac": 1.0, "vang": 1.0, "kimcuong": 1.0}
+        gs.in_bonus, gs.bonus_tier, gs.stage = True, "super", 3
+        random.seed(8)
+        for tier in ("vang", "kimcuong"):
+            gs.reserve = {p: 0 for p in cfg.power_names}
+            gs.book.events.clear()
+            gs.open_chest({"id": "boss1", "chest": tier, "chest_opened": False})
+            gifts = gs.book.events[-1]["gifts"]
+            coins = [g for g in gifts if g["kind"] == "coin"]
+            if tier == "vang":
+                assert not coins  # gold may be all powers now
+            else:
+                assert len(coins) == 1 and coins[0]["value"] >= cfg.coin_tiers["kimcuong"][0]
+            powers = [g["power"] for g in gifts if g["kind"] == "power"]
+            assert len(powers) == len(set(powers))  # never a power already in reserve
+            gs.win_manager.reset_end_round_wins()
+        gs.reserve = {p: 1 for p in cfg.power_names}  # every power stored -> coins only
+        gs.book.events.clear()
+        gs.open_chest({"id": "boss1", "chest": "bac", "chest_opened": False})
+        gifts = gs.book.events[-1]["gifts"]
+        assert gifts and all(g["kind"] == "coin" for g in gifts)
+        assert all(g["value"] >= gs.current_min_coin() for g in gifts)
+        gs.win_manager.reset_end_round_wins()
+    finally:
+        (cfg.chest_sure_coin_tiers, cfg.chest_coin_min, cfg.chest_power_new_only, cfg.chest_upgrade_chance,
+         cfg.chest_gift_power_chance) = old
+        gs.in_bonus, gs.bonus_tier = False, None
+        gs.wincap_triggered = False
+
+
+def test_chest_upgrade_tier_weights(gs, cfg):
+    old = (cfg.chest_upgrade_chance, cfg.chest_upgrade_tier_weights)
+    try:
+        cfg.chest_upgrade_chance, cfg.chest_upgrade_tier_weights = 1.0, {"bac": 1, "vang": 0, "kimcuong": 0}
+        random.seed(9)
+        for _ in range(50):
+            gs.book.events.clear()
+            gs.open_chest({"id": "boss1", "chest": "dong", "chest_opened": False})
+            assert gs.book.events[-1]["upgradedTo"] == "bac"
+            gs.win_manager.reset_end_round_wins()
+            gs.wincap_triggered = False
+    finally:
+        cfg.chest_upgrade_chance, cfg.chest_upgrade_tier_weights = old
+
+
 def test_chest_power_share_rises_with_tier(cfg):
     p = cfg.chest_gift_power_chance
     assert p["dong"] < p["bac"] < p["vang"] < p["kimcuong"]
@@ -887,3 +1221,426 @@ def test_star_value_weights_own_table_and_fallback(gs, cfg):
         assert gs._treasure_cell("coin", 1).prize in cfg.coin_value_weights  # coins unaffected
     finally:
         cfg.star_value_weights = old
+
+
+# ---- Unified rules 1-7 ("LUAT HOP NHAT", designer 2026-11-02) ----------------------------------------------
+def test_v4_hp_explicit_values(gs, cfg):
+    """Rule 3: a stage HP spec with more than 2 values is the exact list (stage 5: 90/95/100/110/120)."""
+    old = cfg.stage_hp_range
+    try:
+        cfg.stage_hp_range = {**old, 0: (10, 20), 5: [90, 95, 100, 110, 120]}
+        random.seed(3)
+        seen0, seen5 = set(), set()
+        for _ in range(300):
+            seen0.add(gs._roll_hp(cfg.stage_hp_range[0]))
+            seen5.add(gs._roll_hp(cfg.stage_hp_range[5]))
+        assert seen0 == {10, 15, 20} and seen5 == {90, 95, 100, 110, 120}
+    finally:
+        cfg.stage_hp_range = old
+
+
+def test_v4_chest_sets_and_open(gs, cfg):
+    """Rule 3: fixed chest set per stage (Heroic 3 red); one bag of the chest's own kind; at most one upgrade
+    (never from red); power and chest multi come independently with the bag; multi capped per chest."""
+    old = (cfg.chest_rule, cfg.chest_open_upgrade_chance, cfg.chest_gift_power_chance, cfg.chest_gift_multi_chance,
+           cfg.tumble_multi)
+    try:
+        cfg.chest_rule, cfg.tumble_multi = "v4", True
+        random.seed(5)
+        for stage, want in cfg.stage_chest_sets.items():
+            if stage == "heroic":
+                continue
+            gs.spawn_stage(stage)
+            got = sorted(b["chest"] for b in gs.bosses)
+            assert got == sorted(want[:len(got)]) if stage != ENDLESS else got[0] in want
+        gs.heroic = True
+        gs.spawn_stage(5)
+        assert [b["chest"] for b in gs.bosses] == ["do"] * 3
+        gs.heroic = False
+        # several upgrades in one open (designer 2026-11-02): green can reach red
+        cfg.chest_open_upgrade_chance = {"dong": 1.0, "bac": 1.0, "vang": 1.0}
+        gs.in_bonus, gs.bonus_tier, gs.stage = True, "bonus", 1
+        gs.reserve = {p: 0 for p in cfg.power_names}
+        gs.open_chest({"id": "boss1", "chest": "dong", "chest_opened": False})
+        assert [e for e in gs.book.events if e["type"] == "chestOpened"][-1]["upgradedTo"] == "do"
+        cfg.chest_open_upgrade_max = 1
+        gs.open_chest({"id": "boss1", "chest": "dong", "chest_opened": False})
+        assert [e for e in gs.book.events if e["type"] == "chestOpened"][-1]["upgradedTo"] == "bac"
+        cfg.chest_open_upgrade_max = None
+        bands = {"dong": (1, 4), "bac": (5, 15), "vang": (20, 50), "do": (100, 25000)}
+        cfg.chest_open_upgrade_chance = {"dong": 0.5, "bac": 0.5, "vang": 0.5}
+        cfg.chest_gift_power_chance = {"dong": 1.0, "bac": 1.0, "vang": 1.0, "do": 1.0}
+        cfg.chest_gift_multi_chance = {"dong": 1.0, "bac": 1.0, "vang": 1.0, "do": 1.0}
+        gs.in_bonus, gs.bonus_tier, gs.stage = True, "bonus", 1
+        order = cfg.chest_order_v4
+        for tier in order:
+            for _ in range(150):
+                gs.tumble_boss, gs.tumble_base = [], 0.0
+                gs.reserve = {p: 0 for p in cfg.power_names}
+                gs.book.events.clear()
+                gs.open_chest({"id": "boss1", "chest": tier, "chest_opened": False})
+                ev = gs.book.events[-1]
+                end = tier if ev["upgradedTo"] is None else ev["upgradedTo"]
+                assert order.index(end) >= order.index(tier)
+                assert tier != "do" or ev["upgradedTo"] is None
+                bags = [g for g in ev["gifts"] if g["kind"] == "bag"]
+                assert len(bags) == 1 and bands[end][0] <= bags[0]["value"] <= bands[end][1]
+                assert bags[0]["bag"] == cfg.chest_tier_bag_names[end]
+                assert {g["kind"] for g in ev["gifts"]} == {"bag", "power", "multi"}
+                assert all(m <= cfg.chest_multi_cap[end] for m in gs.tumble_boss)
+                assert gs.tumble_base == bags[0]["value"]  # the bag waits for the Global
+    finally:
+        (cfg.chest_rule, cfg.chest_open_upgrade_chance, cfg.chest_gift_power_chance, cfg.chest_gift_multi_chance,
+         cfg.tumble_multi) = old
+        gs.in_bonus, gs.bonus_tier, gs.heroic = False, None, False
+        gs.tumble_boss, gs.tumble_base = [], 0.0
+
+
+def test_v4_global_accumulates_additively(gs, cfg):
+    """Rule 5: Global = sum(Wild) x product(chest multis) of this spin + what earlier spins of the scope added."""
+    old = (cfg.tumble_multi, cfg.tumble_combine, dict(cfg.tier_weights))
+    try:
+        cfg.tumble_multi, cfg.tumble_combine = True, "add"
+        cfg.tier_weights = {**old[2], "epic": {**old[2].get("epic", {}), "tumble_reset_scope": "bonus"}}
+        gs.in_bonus, gs.bonus_tier = True, "epic"
+        gs.reset_tumble("bonus")
+        gs.begin_spin()
+        gs.tumble_wild, gs.tumble_boss, gs.tumble_base = 3, [2], 1.0
+        gs.settle_tumble()  # spin 1: 3 x 2 = 6
+        assert gs.tumble_acc == 6 and gs.win_manager.spin_win == 6
+        gs.win_manager.reset_end_round_wins()
+        gs.begin_spin()
+        assert gs.tumble_wild == 0 and gs.tumble_boss == [] and gs.tumble_acc == 6
+        gs.tumble_wild, gs.tumble_base = 4, 1.0
+        gs.settle_tumble()  # spin 2: 6 + 4 = 10
+        assert gs.win_manager.spin_win == 10 and gs.tumble_acc == 10
+        gs.win_manager.reset_end_round_wins()
+        gs.begin_spin()
+        gs.tumble_base = 1.0
+        gs.settle_tumble()  # spin 3: nothing new, Global 10 stays
+        assert gs.win_manager.spin_win == 10 and gs.tumble_acc == 10
+        gs.reset_tumble("bonus")
+        assert gs.tumble_acc == 0
+    finally:
+        cfg.tumble_multi, cfg.tumble_combine, cfg.tier_weights = old
+        gs.in_bonus, gs.bonus_tier = False, None
+        gs.win_manager.reset_end_round_wins()
+        gs.tumble_wild, gs.tumble_boss, gs.tumble_base, gs.tumble_acc = 0, [], 0.0, 0
+
+
+def test_v4_shuffle_power(gs, cfg):
+    """Rule 3: Shuffle keeps Wild / weapons / Scatter in place, permutes the basic symbols and puts 1-3 multis
+    (2-10x) on basic cells; the multis add up on a line."""
+    gs.spawn_stage(1)
+    gs.begin_spin()
+    rows = ["W L1 H1 AR L2 H2", "L3 H3 L4 H4 L1 SC", "H5 L2 H1 L3 H2 L4", "L1 L2 L3 L4 H1 H2", "H3 H4 H5 L1 L2 L3"]
+    set_board(gs, rows)
+    fixed = {(c, r): gs.board[c][r].name for c, r in gs.all_cells() if not gs.is_basic(gs.board[c][r])}
+    before = sorted(gs.board[c][r].name for c, r in gs.all_cells() if gs.is_basic(gs.board[c][r]))
+    random.seed(8)
+    gs.power_shuffle()
+    assert {x: gs.board[x[0]][x[1]].name for x in fixed} == fixed
+    assert sorted(gs.board[c][r].name for c, r in gs.all_cells() if gs.is_basic(gs.board[c][r])) == before
+    mult_cells = [(c, r) for c, r in gs.all_cells() if gs.enhance[c][r]]
+    assert 1 <= len(mult_cells) <= 3 and all(gs.is_basic(gs.board[c][r]) for c, r in mult_cells)
+    assert all(gs.enhance[c][r] in cfg.shuffle_mult_weights for c, r in mult_cells)
+    # fires after the weapons, from reserve
+    gs.reserve = {p: 0 for p in cfg.power_names}
+    gs.reserve["shuffle"] = 1
+    gs.bosses = []  # no bosses: nothing to damage
+    gs.resolve_actions()
+    assert gs.reserve["shuffle"] == 0
+    gs.reserve = {p: 0 for p in cfg.power_names}
+
+
+def test_v4_lit_only_connected_wild_cells(gs, cfg):
+    """Rule 4: lit_wild_lines_only = "cells": only the connected Wild cells light up, not their whole line."""
+    old = (cfg.lit_rule, cfg.lit_wild_lines_only)
+    try:
+        cfg.lit_rule, cfg.lit_wild_lines_only = "lines", "cells"
+        gs.spawn_stage(1)
+        gs.begin_spin()
+        gs.lit = set()
+        gs.refill = lambda: []
+        set_board(gs, board_with_top("H2 W H2 H2 L1 L2"))
+        gs.step_connect()
+        assert gs.lit == {(1, 0)}
+    finally:
+        cfg.lit_rule, cfg.lit_wild_lines_only = old
+        del gs.refill
+
+
+def test_v4_coin_excluded_values(gs, cfg):
+    old = cfg.coin_excluded_values
+    try:
+        cfg.coin_excluded_values = [6]
+        random.seed(1)
+        assert all(gs.draw_coin(5, table={5: 1, 6: 100, 8: 1}) != 6 for _ in range(200))
+    finally:
+        cfg.coin_excluded_values = old
+
+
+def test_heroic_at_least_five_wilds(gs, cfg):
+    """Rule 6: every Heroic spin starts with >= 5 Wilds (all x2+)."""
+    assert cfg.heroic_min_wild_or_weapon >= 5
+    assert set(cfg.tier_weights["heroic"]["guarantee_symbol_weights"]) == {"W"}
+    assert min(cfg.tier_weights["heroic"]["wild_mult_weights"]) >= 2
+
+
+def test_stage_hp_weights(gs, cfg):
+    """Designer 2026-11-02: HP odds per stage over the rule's own values; values outside the range never come up."""
+    old = cfg.stage_hp_weights
+    try:
+        cfg.stage_hp_weights = {1: {20: 3, 25: 1, 99: 50}}
+        random.seed(2)
+        got = [gs._roll_hp((20, 35), 1) for _ in range(4000)]
+        assert set(got) == {20, 25} and 0.7 < got.count(20) / len(got) < 0.8
+        assert set(gs._roll_hp((35, 50), 2) for _ in range(300)) == {35, 40, 45, 50}  # stage without a table: uniform
+    finally:
+        cfg.stage_hp_weights = old
+
+
+def test_tumble_band_tables(gs, cfg):
+    """Trial 2026-11-02: Wild / chest multi odds follow the spin's tumble win (small / mid / big band)."""
+    old = (cfg.tumble_band_bounds, cfg.tumble_band_tables)
+    try:
+        cfg.tumble_band_bounds = [2, 10]
+        cfg.tumble_band_tables = {"wild_multi_weights": [{5: 1}, None, {2: 1}]}
+        gs.tumble_base = 0.0
+        assert gs.tumble_band() == 0 and gs.band_table("wild_multi_weights") == {5: 1}
+        gs.tumble_base = 5.0
+        assert gs.tumble_band() == 1 and gs.band_table("wild_multi_weights") == gs.weights("wild_multi_weights")
+        gs.tumble_base = 10.0
+        assert gs.tumble_band() == 2 and gs.band_table("wild_multi_weights") == {2: 1}
+        assert gs.band_table("chest_multi_weights") == gs.weights("chest_multi_weights")
+    finally:
+        cfg.tumble_band_bounds, cfg.tumble_band_tables = old
+        gs.tumble_base = 0.0
+
+
+def test_destroy_weight_by_alive(gs, cfg):
+    """Trial 2026-11-03: Destroy is likelier the more bosses are alive."""
+    old = (cfg.destroy_weight_by_alive, cfg.power_pick_weights)
+    try:
+        cfg.power_pick_weights = {"destroy": 1, "upgrade": 1}
+        cfg.destroy_weight_by_alive = {3: 3, 1: 0}
+        gs.reserve = {p: 0 for p in cfg.power_names}
+        gs.spawn_stage(1)
+        random.seed(6)
+        picks = [gs.pick_power() for _ in range(4000)]
+        assert 0.7 < picks.count("destroy") / len(picks) < 0.8  # 3 alive: 3:1
+        gs.bosses[0]["alive"] = gs.bosses[1]["alive"] = False
+        assert all(gs.pick_power() == "upgrade" for _ in range(200))  # 1 alive: never Destroy
+    finally:
+        cfg.destroy_weight_by_alive, cfg.power_pick_weights = old
+        gs.reserve = {p: 0 for p in cfg.power_names}
+
+
+def test_guarantee_line(gs, cfg):
+    """Dead-spin guard "line" (2026-11-03): a board that connects nothing gets a sure 3-symbol line."""
+    gs.spawn_stage(1)
+    gs.begin_spin()
+    set_board(gs, FILLER)
+    assert not gs.evaluate_lines()
+    random.seed(3)
+    gs.guarantee_line()
+    assert gs.evaluate_lines()
+
+
+# ---- Complete unified document (designer 2026-11-03) ------------------------------------------------------------
+def test_doc_power_order_after_weapons(gs, cfg):
+    """Section 8: reserved powers fire only after lines and weapons, in the order Upgrade, Transform, Replace, Shuffle."""
+    old = cfg.action_order
+    try:
+        cfg.action_order = "doc"
+        gs.spawn_stage(1)
+        gs.begin_spin()
+        set_board(gs, FILLER)
+        gs.reserve = {p: 0 for p in cfg.power_names}
+        for p in ("shuffle", "upgrade", "transform"):
+            gs.reserve[p] = 1
+        gs.book.events.clear()
+        random.seed(2)
+        gs.resolve_actions()
+        fired = [e["power"] for e in gs.book.events if e["type"] == "powerActivated"]
+        assert fired[:3] == ["upgrade", "transform", "shuffle"]
+        assert all(gs.reserve[p] == 0 for p in ("shuffle", "upgrade", "transform"))
+    finally:
+        cfg.action_order = old
+        gs.reserve = {p: 0 for p in cfg.power_names}
+
+
+def test_doc_shuffle(gs, cfg):
+    """Doc Shuffle: every non-connected cell (Scatter stays) moves and gets a multiplier; a line appears if possible."""
+    old = cfg.shuffle_rule
+    try:
+        cfg.shuffle_rule = "doc"
+        gs.spawn_stage(1)
+        gs.begin_spin()
+        rows = ["H1 L2 H1 L4 SC L2", "L3 L1 H1 L2 L3 L4", "L2 L1 L4 L3 L2 L1", "L4 L3 L2 L1 L4 L3", "L1 L2 L3 L4 L1 L2"]
+        set_board(gs, rows)
+        assert not gs.evaluate_lines()
+        random.seed(5)
+        gs.power_shuffle()
+        assert gs.board[4][0].name == "SC"
+        assert gs.evaluate_lines()  # a line could be made, so it was
+        n_mult = sum(1 for c, r in gs.all_cells() if gs.enhance[c][r] > 0)
+        assert n_mult == 29  # every cell but the Scatter
+    finally:
+        cfg.shuffle_rule = old
+
+
+def test_transform_may_hit_weapons(gs, cfg):
+    old = cfg.transform_skips_weapons
+    try:
+        cfg.transform_skips_weapons = False
+        gs.spawn_stage(1)
+        gs.begin_spin()
+        rows = ["AR AR AR AR AR AR"] * 5
+        set_board(gs, rows)
+        gs.power_transform()
+        assert any(gs.is_wild(gs.board[c][r]) for c, r in gs.all_cells())
+    finally:
+        cfg.transform_skips_weapons = old
+
+
+def test_super_global_if2x(gs, cfg):
+    """Super: the accumulated Global joins only a spin with its own >= 2x; otherwise x1 and the accumulation stays."""
+    old = (cfg.tumble_multi, cfg.tumble_combine, dict(cfg.tier_weights))
+    try:
+        cfg.tumble_multi, cfg.tumble_combine = True, "add"
+        cfg.tier_weights = {**old[2], "super": {**old[2].get("super", {}), "tumble_reset_scope": "bonus",
+                                                "tumble_acc_rule": "if2x"}}
+        gs.in_bonus, gs.bonus_tier = True, "super"
+        gs.reset_tumble("bonus")
+        gs.begin_spin(); gs.tumble_wild, gs.tumble_base = 3, 1.0; gs.settle_tumble()   # 3x, acc 3
+        assert gs.win_manager.spin_win == 3 and gs.tumble_acc == 3
+        gs.win_manager.reset_end_round_wins()
+        gs.begin_spin(); gs.tumble_base = 1.0; gs.settle_tumble()                     # no multi: x1, acc stays 3
+        assert gs.win_manager.spin_win == 1 and gs.tumble_acc == 3
+        gs.win_manager.reset_end_round_wins()
+        gs.begin_spin(); gs.tumble_wild, gs.tumble_base = 2, 1.0; gs.settle_tumble()   # 2 + 3 = 5, acc 5
+        assert gs.win_manager.spin_win == 5 and gs.tumble_acc == 5
+    finally:
+        cfg.tumble_multi, cfg.tumble_combine, cfg.tier_weights = old
+        gs.in_bonus, gs.bonus_tier = False, None
+        gs.win_manager.reset_end_round_wins()
+        gs.tumble_wild, gs.tumble_boss, gs.tumble_base, gs.tumble_acc = 0, [], 0.0, 0
+
+
+def test_legendary_bonus(gs, cfg):
+    """Document section 9: 6 Scatters -> Legendary: 10 spins from stage 5, >= 5 multi Wilds each spin, all lit."""
+    old = (dict(cfg.scatter_to_tier), cfg.max_scatters_on_board, dict(cfg.bonus_min_multi_wilds), list(cfg.full_lit_tiers))
+    try:
+        cfg.scatter_to_tier = {**old[0], 6: "legendary"}
+        cfg.max_scatters_on_board = 6
+        cfg.bonus_min_multi_wilds = {"legendary": 5}
+        cfg.full_lit_tiers = ["epic", "legendary"]
+        gs.reset_book()
+        random.seed(9)
+        starts = []
+        orig = gs.play_one_spin
+        def spy(reel, **kw):
+            starts.append(kw.get("min_multi_wilds"))
+            orig(reel, **kw)
+        gs.play_one_spin = spy
+        gs.run_bonus("legendary")
+        ev = gs.book.events
+        assert next(e for e in ev if e["type"] == "bonusStart")["stage"] == 5
+        assert next(e for e in ev if e["type"] == "bonusStart")["freeSpins"] == 10
+        assert starts and all(s == 5 for s in starts)
+        reveals = [e for e in ev if e["type"] == "reveal"]
+        def multi_wilds(board):
+            return sum(1 for col in board for s in col if s.get("name") == "W" and s.get("value", 0) >= 2)
+        assert all(multi_wilds(e["board"]) >= 5 for e in reveals)
+    finally:
+        cfg.scatter_to_tier, cfg.max_scatters_on_board, cfg.bonus_min_multi_wilds, cfg.full_lit_tiers = old
+        del gs.play_one_spin
+        gs.reset_book()
+
+
+def test_doc_shuffle_keeps_lines_made_by_earlier_powers(gs, cfg):
+    """Powers fire back to back with no payout in between: a line made by an earlier power (here Transform) is kept
+    in place by Shuffle and only counts as the baseline - Shuffle must add a line or lengthen one on top of it."""
+    old = (cfg.shuffle_rule, cfg.action_order)
+    try:
+        cfg.shuffle_rule, cfg.action_order = "doc", "doc"
+        gs.spawn_stage(1)
+        gs.begin_spin()
+        set_board(gs, FILLER)
+        for c in range(3):  # as if Transform just made a 3-Wild line on line 1
+            gs.board[c][0] = gs.make_symbol("W")
+        before = gs.evaluate_lines()
+        kept = {(p["reel"], p["row"]) for w in before for p in w["positions"]}
+        assert kept
+        syms = {x: gs.board[x[0]][x[1]] for x in kept}
+        base = gs._win_signature()
+        random.seed(4)
+        gs.power_shuffle()
+        assert all(gs.board[c][r] is syms[(c, r)] for c, r in kept)  # connected cells did not move
+        assert all(gs.enhance[c][r] == 0 for c, r in kept)            # and got no Shuffle Multiplier
+        assert gs._win_signature() > base                             # more / longer lines than before
+    finally:
+        cfg.shuffle_rule, cfg.action_order = old
+
+
+def test_arrow_table_damage(gs, cfg):
+    """Designer 2026-11-04: Arrow damage 10-35 in steps of 5, likelier high for a boss with more (max and remaining) HP."""
+    old = cfg.arrow_rule
+    try:
+        cfg.arrow_rule = "table"
+        random.seed(1)
+        weak = {"hp": 5, "hp_max": 20}
+        strong = {"hp": 120, "hp_max": 120}
+        dw = [gs.arrow_damage(weak) for _ in range(3000)]
+        ds = [gs.arrow_damage(strong) for _ in range(3000)]
+        assert set(dw) <= {10, 15, 20, 25, 30, 35} and set(ds) <= {10, 15, 20, 25, 30, 35}
+        assert sum(ds) / len(ds) > 27 and sum(dw) / len(dw) < 18
+    finally:
+        cfg.arrow_rule = old
+
+
+def test_bonus_min_win_reject_mode():
+    """bonus_min_total_win_mode "reject": an Epic under the floor is flagged for a re-run, nothing is topped up."""
+    from gamestate import GameState
+    from game_config import GameConfig
+    cfg = GameConfig()
+    gs = GameState(cfg)
+    gs.reset_book()
+    gs.bonus_min_total_win_mode_saved = cfg.bonus_min_total_win_mode
+    try:
+        cfg.bonus_min_total_win_mode = "reject"
+        gs.win_manager.freegame_wins = 100.0
+        gs.bonus_min_win_topup("epic")
+        assert gs.bonus_below_floor
+        assert gs.win_manager.freegame_wins == 100.0
+        gs.reset_book()
+        assert not gs.bonus_below_floor
+        cfg.bonus_min_total_win_mode = "topup"
+        gs.win_manager.freegame_wins = 100.0
+        gs.bonus_min_win_topup("epic")
+        assert not gs.bonus_below_floor
+    finally:
+        cfg.bonus_min_total_win_mode = gs.bonus_min_total_win_mode_saved
+
+
+def test_bonus_min_win_reroll_limit():
+    """bonus_min_total_win_rerolls: after the allowed re-runs the floor is topped up instead."""
+    from gamestate import GameState
+    from game_config import GameConfig
+    cfg = GameConfig()
+    gs = GameState(cfg)
+    saved = (cfg.bonus_min_total_win_mode, cfg.bonus_min_total_win_rerolls)
+    try:
+        cfg.bonus_min_total_win_mode, cfg.bonus_min_total_win_rerolls = "reject", 1
+        gs.reset_book()
+        gs.floor_rerolls = 0
+        gs.win_manager.freegame_wins = 100.0
+        gs.bonus_min_win_topup("epic")
+        assert gs.bonus_below_floor and gs.floor_rerolls == 1
+        gs.reset_book()
+        gs.win_manager.freegame_wins = 100.0
+        gs.bonus_min_win_topup("epic")
+        assert not gs.bonus_below_floor  # second time: topped up
+    finally:
+        cfg.bonus_min_total_win_mode, cfg.bonus_min_total_win_rerolls = saved

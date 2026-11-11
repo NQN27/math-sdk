@@ -22,6 +22,7 @@ class GameState(GameStateOverride):
 
     def run_spin(self, sim, simulation_seed=None):
         self.reset_seed(sim)
+        self.floor_rerolls = 0  # Bonus re-runs under bonus_min_total_win (reject mode) for this book
         self.repeat = True
         while self.repeat:
             self.reset_book()
@@ -59,7 +60,54 @@ class GameState(GameStateOverride):
             self.board[c][r] = self.make_symbol(get_random_outcome(weights))
             have += 1
 
-    def play_one_spin(self, reel, force_scatters=None, min_wild_weapon=0, min_weapons=0) -> None:
+    def steer_weapons_to_lit(self) -> None:
+        """weapon_lit_bias (Bonus only, designer 2026-10-28): each weapon of the opening board on an unlit cell
+        swaps, with this chance, with a basic symbol on an already lit cell of the same column, so firing it
+        lights no new cell. Same column = the column's symbols and the Arrow's boss stay the same."""
+        if not self.in_bonus:
+            return
+        pw, pwild = self.weights("weapon_lit_bias"), self.weights("wild_lit_bias")  # wild_lit_bias: 2026-10-29
+        if not (pw or pwild):
+            return
+        for c, r in self.all_cells():
+            s = self.board[c][r]
+            p = pw if self.is_weapon(s) else (pwild if self.is_wild(s) else 0)
+            if not p or (c, r) in self.lit or random.random() >= p:
+                continue
+            spots = [rr for rr in range(5) if (c, rr) in self.lit and self.is_basic(self.board[c][rr])]
+            if spots:
+                rr = random.choice(spots)
+                self.board[c][r], self.board[c][rr] = self.board[c][rr], self.board[c][r]
+
+    def guarantee_multi_wilds(self, n: int) -> None:
+        """Turn basic cells into Wilds carrying a >= 2x multiplier until the board has `n` of them."""
+        have = sum(1 for c, r in self.all_cells() if self.is_wild(self.board[c][r]) and (self.board[c][r].prize or 1) >= 2)
+        cand = [(c, r) for c, r in self.all_cells() if self.is_basic(self.board[c][r])]
+        random.shuffle(cand)
+        table = {k: w for k, w in self.weights("wild_multi_weights").items() if k >= 2} or {2: 1}
+        for c, r in cand[:max(0, n - have)]:
+            sym = self.make_symbol("W")
+            sym.prize = get_random_outcome(table)
+            self.board[c][r] = sym
+
+    def guarantee_line(self) -> None:
+        """Dead-spin guard "line": if the opening board connects nothing, the first 3 cells of a random payline
+        (basic symbols or Wilds only) become one random allowed basic symbol."""
+        if self.evaluate_lines():
+            return
+        lines = list(self.config.paylines.values())
+        random.shuffle(lines)
+        sym = random.choice(self.allowed_basic_symbols())
+        for rows in lines:
+            cells = [(c, rows[c]) for c in range(3)]
+            if all(self.is_basic(self.board[c][r]) or self.is_wild(self.board[c][r]) for c, r in cells):
+                for c, r in cells:
+                    if self.is_basic(self.board[c][r]):
+                        self.board[c][r] = self.make_symbol(sym)
+                return
+
+    def play_one_spin(self, reel, force_scatters=None, min_wild_weapon=0, min_weapons=0, sure_line=False,
+                      min_multi_wilds=0) -> None:
         """Opening board -> steps (1)-(9) -> Treasure. (Hold and Spin removed by the designer 2026-10-07.)"""
         self.begin_spin()
         self.draw_board(reel, force_scatters)
@@ -67,11 +115,31 @@ class GameState(GameStateOverride):
             self._guarantee_wild_or_weapon(min_wild_weapon)
         if min_weapons:
             self._guarantee_wild_or_weapon(min_weapons, weapons_only=True)
+        if sure_line:
+            self.guarantee_line()
+        if min_multi_wilds:
+            self.guarantee_multi_wilds(min_multi_wilds)
+        self.steer_weapons_to_lit()
         reveal(self)
         self.mark_wild_skins(list(self.all_cells()))
         self.resolve_actions()
         if not self.wincap_triggered:
             self.open_chests()
+        loops = 0
+        while (self.config.chest_power_immediate and self.config.action_order != "doc" and not self.wincap_triggered
+               and loops < 20
+               and any(v > 0 for v in self.reserve.values())):
+            # designer 2026-10-30: chest powers act in the same spin (they may connect, kill and open more chests)
+            loops += 1
+            emit(self, "chestPowersResolve", reserve=dict(self.reserve))
+            before = dict(self.reserve)
+            self.resolve_actions()
+            if not self.wincap_triggered:
+                self.open_chests()
+            if self.reserve == before:  # nothing could fire
+                break
+        if self.config.tumble_multi:
+            self.settle_tumble()  # after the chests: their boss multis count for this spin
         if not self.wincap_triggered and self.stage_cleared:
             self.run_treasure(self.treasure_cells(), self.current_min_coin())
             if self.in_bonus and self.bonus_tier in self.config.lit_reset_after_treasure_tiers:
@@ -221,6 +289,12 @@ class GameState(GameStateOverride):
         won = self.win_manager.freegame_wins
         if not floor or self.wincap_triggered or won >= floor:
             return
+        limit = self.config.bonus_min_total_win_rerolls
+        if (self.config.bonus_min_total_win_mode == "reject" and (limit is None or getattr(self, "floor_rerolls", 0) < limit)
+                and random.random() < self.config.bonus_min_total_win_reroll_chance):
+            self.bonus_below_floor = True  # thrown away and simulated again (check_repeat)
+            self.floor_rerolls = getattr(self, "floor_rerolls", 0) + 1
+            return
         self.win_manager.reset_spin_win()
         paid = self.award(floor - won)
         emit(self, "bonusMinWin", tier=tier, floor=floor, topUp=round(paid, 2))
@@ -241,18 +315,27 @@ class GameState(GameStateOverride):
         self.gametype = cfg.freegame_type
         if not cfg.base_global_into_bonus:
             self.global_mult = 0
+        if cfg.tumble_multi:
+            self.reset_tumble("bonus")
         self.reserve = {p: 0 for p in cfg.power_names}
         # Q25: lit cells reset, except the Scatter cells that triggered the Bonus
-        self.lit = set(self.all_cells()) if tier == "epic" else set(trigger_cells)
+        self.lit = set(self.all_cells()) if tier in cfg.full_lit_tiers else set(trigger_cells)
         self.last_endless_hp = None
         spec = cfg.bonus_tiers[tier]
         self.free_spins_left = spec["spins"]
         emit(self, "bonusStart", tier=tier, freeSpins=self.free_spins_left, stage=spec["start_stage"],
              triggerCells=[pos(self, c, r) for c, r in sorted(trigger_cells)])
+        if self.lit:
+            emit(self, "litCells", cells=[pos(self, c, r) for c, r in sorted(self.lit)])
         self.spawn_stage(spec["start_stage"])
-        if tier == "epic":
+        if tier == "epic" and cfg.epic_opening_treasure_on:
             self.epic_opening_treasure()
+        big = cfg.bonus_big_spins.get(tier)
+        burst_left, bursts = 0, 0
+        rescue = cfg.bonus_rescue_scatter.get(tier)
+        rescues = 0
         spin_no = 0
+        dead_streak = 0  # free spins in a row that paid nothing and dealt no damage (dead_spin_guard_after)
         while self.free_spins_left > 0 and not self.wincap_triggered:
             spin_no += 1
             self.free_spins_left -= 1
@@ -266,7 +349,45 @@ class GameState(GameStateOverride):
             chance = cfg.bonus_min_weapons_chance.get(tier)
             if n_weapons and chance is not None and random.random() >= chance:
                 n_weapons -= 1  # this spin guarantees one weapon fewer (designer 2026-10-21: fewer weapons)
-            self.play_one_spin(self.stage_reel(), min_weapons=n_weapons)
+            guard = self.weights("dead_spin_guard_after")
+            sure_line = False
+            if guard and dead_streak >= guard:
+                mode = self.weights("dead_spin_guard_mode")
+                if mode == "either":
+                    mode = "line" if random.random() < 0.5 else "weapon1"
+                if mode == "line":
+                    sure_line = True
+                else:
+                    n_weapons = max(n_weapons, 1 if mode == "weapon1" else self.weights("dead_spin_guard_weapons"))
+                emit(self, "deadSpinGuard", streak=dead_streak, mode=mode, weapons=n_weapons)
+            reel, min_mw = self.stage_reel(), cfg.bonus_min_multi_wilds.get(tier, 0)
+            if (big and burst_left == 0 and bursts < big.get("max_bursts", 1) and spin_no >= big.get("from_spin", 1)
+                    and self.win_manager.freegame_wins < big["pace"] * spin_no / spec["spins"]
+                    and random.random() < big.get("chance", 1.0)):
+                burst_left = get_random_outcome({int(k): w for k, w in big["burst_weights"].items()})
+                bursts += 1
+            if burst_left > 0:
+                burst_left -= 1
+                kind = get_random_outcome(big["type_weights"])
+                if kind == "wilds":
+                    min_mw = max(min_mw, big.get("min_multi_wilds", 3))
+                elif kind == "weapons":
+                    n_weapons = max(n_weapons, big.get("min_weapons", 2))
+                else:  # "line"
+                    sure_line = True
+                    min_mw = max(min_mw, 1)
+                emit(self, "bigSpin", spin=spin_no, boost=kind, burstLeft=burst_left)
+            force_sc = None
+            if (rescue and self.free_spins_left <= rescue["spins_left"] and rescues < rescue["max"]
+                    and self.win_manager.freegame_wins < rescue["below"]):
+                force_sc = 1
+                rescues += 1
+                emit(self, "rescueScatter", spin=spin_no, won=round(self.win_manager.freegame_wins, 2))
+            hp_before = sum(b["hp"] for b in self.bosses)
+            self.play_one_spin(reel, force_scatters=force_sc, min_weapons=n_weapons, sure_line=sure_line,
+                               min_multi_wilds=min_mw)
+            dead = self.win_manager.spin_win <= 0 and sum(b["hp"] for b in self.bosses) == hp_before and not self.stage_cleared
+            dead_streak = dead_streak + 1 if dead else 0
             self.win_manager.update_gametype_wins(self.gametype)
         self.bonus_min_win_topup(tier)
         # optimizer fences per tier (designer 2026-10-12: tier means exact in the published tables)
