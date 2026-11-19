@@ -402,6 +402,21 @@ class GameConfig(Config):
         # instead of staying inactive (N10, 2026-10-07). Per tier via tier_weights (designer 2026-10-22: Treasure hunt).
         self.treasure_clover_vanishes = False
         self.treasure_hunt_min_coin = 1
+        # Designer 2026-11-18, Treasure hunt only (set via tier_weights["treasure_hunt"]): {n Scatters: weight} rolled
+        # before the board and placed one per column; {} = Scatters rolled per cell as before.
+        self.treasure_hunt_scatter_count_weights = {}
+        # {"min": coin value, "factor": f, "floor": lowest, "kinds": [...]}: each coin >= min on the board multiplies
+        # the weights of `kinds` (default Clover/Golden/Magnet) by f, not below floor. {} = off.
+        self.treasure_big_coin_damp = {}
+        self.treasure_hunt_scatter_refill_chance = 0.0
+        # Most Treasure symbols of a kind per Treasure, e.g. {"golden": 2}; per tier via tier_weights. {} = no cap.
+        self.treasure_kind_max = {}
+        # {"min": coin value, "factor": f}: a cell next to a coin >= min rolls Clover with weight x f. {} = off.
+        self.treasure_clover_near_big = {}
+        # Clover weight x this on a cell next to a not-yet-fired Clover, so Clovers land in clusters (0 = off).
+        self.treasure_clover_cluster = 0
+        # Treasure hunt Scatter count -> Bonus tier ({} = scatter_to_tier, max 5); designer 2026-11-18: 6 = Legendary.
+        self.treasure_hunt_scatter_to_tier = {}
         self.treasure_skips_scatter_cells = True  # Q28 (answered) / N7
         # Bonus tiers whose lit cells all go dark after each Treasure (stage clear), event "litReset"
         # (designer 2026-10-23: Normal). () = lit cells accumulate over the whole Bonus.
@@ -502,6 +517,11 @@ class GameConfig(Config):
         # {factor: weight} (2x-10x) that multiplies its line wins only, to raise the lines' share of Heroic pay
         # (~5% -> ~20%). Empty = off.
         self.heroic_line_mult_weights = {}
+        # Designer 2026-11-15: Heroic chests drawn per boss from heroic_chest_weights ({} = stage_chest_sets["heroic"]),
+        # boss HP from heroic_chest_hp[chest] = [lo, hi] ({} = the stage HP), Treasure coins >= heroic_min_coin (0 = stage min).
+        self.heroic_chest_weights = {}
+        self.heroic_chest_hp = {}
+        self.heroic_min_coin = 0
         # Trial (designer 2026-10-20, NOT approved yet): display-only Wilds. On a fresh board (opening board or
         # refill), each winning line shows one of its symbols as a Wild with this chance, only where a real
         # Wild there would give exactly the same line wins (no new or longer line). The cell keeps its real
@@ -836,6 +856,7 @@ class GameConfig(Config):
         # defaults instead (tests/conftest.py sets BL3_RULE_DEFAULTS=1): they check mechanics on hand-built boards.
         if os.environ.get("BL3_RULE_DEFAULTS") != "1":
             self.accepted_tuning_2026_11_11()
+            self.accepted_tuning_2026_11_19()
 
         # ---- Bet modes ----------------------------------------------------------------
         def cond(base_reel, **extra):
@@ -960,3 +981,22 @@ class GameConfig(Config):
         self.epic_min_coin = 0
         # Max Win books per tier = gap to the tier mean (LH8 90.3 -> 91, SP17 240.2 -> 245, EP34 1904 -> 2045); long-run check pending
         self.tier_maxwin_rate = {'bonus': 2.8e-05, 'super': 0.000194, 'epic': 0.00611}
+
+    def accepted_tuning_2026_11_19(self) -> None:
+        """Feature mode chosen 2026-11-19 (user 'chot'): Heroic HR30 + Treasure hunt TR101. Source:
+        tuning/overrides/final_2026_11_19.json, summary tuning/results/feature_chot_2026-11-19.md. HERO reel in
+        gen_reels.REEL_SPECS. Measured: Heroic 426.6 (35% zero), Treasure hunt 571.9 -> p_heroic 0.608, 483.5x."""
+        self.heroic_chest_hp = {'bac': [60, 75], 'vang': [75, 90], 'do': [90, 110]}
+        self.tier_hp_tilt = {'super': 0, 'epic': 0, 'heroic': 0}
+        self.heroic_min_coin = 5.0
+        self.heroic_chest_weights = {'bac': 50, 'vang': 40, 'do': 10}
+        self.heroic_min_wild_or_weapon = 5
+        self.heroic_line_mult_weights = {1: 1}
+        self.treasure_hunt_scatter_to_tier = {3: 'bonus', 4: 'super', 5: 'epic', 6: 'legendary'}
+        self.treasure_hunt_min_coin = 1
+        self.tier_weights['heroic'] = {'wild_mult_weights': {2: 45, 3: 30, 4: 15, 5: 8, 10: 2}, 'wild_event_weights': {'multiplier': 45, 'coin': 35, 'power': 20}, 'chest_gift_count_weights': {'dong': {1: 1}, 'bac': {2: 1}, 'vang': {3: 1}, 'kimcuong': {3: 1}}, 'treasure_kind_weights': {'coin': 98, 'magnet': 0.2, 'clover': 0.5, 'golden': 0, 'star': 0, 'global': 0, 'scatter': 0}, 'coin_value_weights': {0.2: 40, 0.5: 30, 1.0: 25, 2.0: 8, 3.0: 4, 4.0: 2.5, 5.0: 1.5, 6.0: 1, 8.0: 0.6, 10.0: 0.4, 12.0: 0.25, 15.0: 0.15, 20.0: 0.1, 25.0: 0.009, 30.0: 0.0045, 40.0: 0.0021, 50.0: 0.0009, 100.0: 0.00024, 150.0: 8.999999999999999e-05, 200.0: 4.4999999999999996e-05, 250.0: 3e-05, 500.0: 9e-06, 1000.0: 3e-06, 25000.0: 2e-07}, 'wild_coin_value_weights': {20.0: 45, 25.0: 12, 30.0: 12, 40.0: 9, 50.0: 9, 75.0: 5, 100.0: 4, 150.0: 2, 200.0: 1.2, 250.0: 0.6, 500.0: 0.5, 1000.0: 0.15}, 'guarantee_symbol_weights': {'W': 1}, 'global_factor_weights': {2: 40, 3: 40, 5: 20}, 'hp_cut_weights': {0: 1}, 'wild_multi_weights': {2: 85, 3: 12, 4: 2, 5: 0.8, 10: 0.2}, 'wild_power_drop_chance': 0.0, 'chest_gift_multi_chance': {'dong': 0.05, 'bac': 0.05, 'vang': 0.05, 'do': 0.05}, 'wild_flash_chance': 0.1, 'chest_tier_bags': {'dong': {1: 40, 2: 30, 3: 18, 4: 12}, 'bac': {5: 35, 8: 25, 10: 18, 12: 12, 15: 10}, 'vang': {20: 35, 25: 25, 30: 18, 40: 12, 50: 10}, 'do': {100: 55, 150: 20, 200: 12, 250: 7, 500: 4.5, 1000: 1.5, 25000: 0.005}}, 'chain_block': {5: [2, 0.4]}}
+        self.tier_weights['treasure_hunt'] = {'treasure_kind_weights': {'coin': 82.50074599999999, 'magnet': 0.8711800000000001, 'clover': 3.48472, 'golden': 0.26135400000000003, 'star': 0, 'global': 0, 'scatter': 1.6}, 'coin_value_weights': {1.0: 92.59481067596933, 2.0: 81.02045934147317, 3.0: 69.446108006977, 4.0: 57.87175667248083, 5.0: 46.297405337984664, 6.0: 0.0, 8.0: 8.01176386823803, 10.0: 6.008822901178523, 12.0: 4.005881934119015, 15.0: 2.9376467516872777, 20.0: 2.5971412902439903, 25.0: 2.1469701332683653, 30.0: 1.8006846279024997, 40.0: 1.4543991225366346, 50.0: 1.2119992687805288, 100.0: 0.9811422652032855, 150.0: 0.8176185543360712, 200.0: 0.6540948434688569, 250.0: 0.49057113260164276, 500.0: 0.3847616726287394, 1000.0: 0.15390466905149572, 25000.0: 0.011108131492406907, 0.2: 0, 0.5: 0}, 'global_factor_weights': {2: 50, 3: 30, 5: 20}, 'golden_factor_weights': {2: 40, 3: 35, 4: 20, 5: 4, 10: 0.9, 20: 0.1}, 'star_value_weights': {5.0: 40, 10.0: 40, 20.0: 20}, 'treasure_round_kind_mult': {'clover': [1.0, 1.0], 'golden': [1.0, 1.0], 'scatter': [1, 0.4], 'global': [1, 0.15]}, 'clover_factor_weights': {2: 35, 3: 30, 4: 18, 5: 12, 10: 4, 20: 1}, 'treasure_clover_vanishes': True, 'treasure_hunt_scatter_count_weights': {0: 52.1538, 1: 29.2854, 2: 15.8661, 3: 1.542, 4: 0.9045, 5: 0.1601, 6: 0.0931}, 'treasure_big_coin_damp': {'min': 50, 'factor': 0.7, 'floor': 0.5}, 'treasure_hunt_scatter_refill_chance': 0.005, 'treasure_kind_max': {'golden': 2}, 'treasure_clover_cluster': 1.5}
+        self.feature_zero_share = {'heroic': 0.35, 'treasure_hunt': 0.0}
+        self.feature_heroic_chance = 0.608
+        self.feature_mean_targets = {'heroic': 426.6, 'treasure_hunt': 571.9}
+        self.feature_maxwin_rates = {'heroic': 0.00256, 'treasure_hunt': 0.0021}  # measured (20k / 10k), long run pending

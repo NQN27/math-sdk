@@ -37,7 +37,7 @@ ARROW_BOOST_COLS = {3: 1.4, 4: 1.4, 5: 1.4}
 REEL_SPECS = {  # accepted 2026-11-11: Normal LH8 (BON_S*), Super SP17 (SUPX_*), Epic EP34 (EPX_*); older f17 reels kept
     "BR0": dict(removed=0, wild=2.0, sc=0.9, weapon=0.6, shape={'L1': 50, 'L2': 48, 'L3': 46, 'L4': 44, 'H1': 22, 'H2': 17, 'H3': 12, 'H4': 8, 'H5': 5}),
     "ANTE": dict(removed=0, wild=2.0, sc=2.0, weapon=0.6, shape={'L1': 50, 'L2': 48, 'L3': 46, 'L4': 44, 'H1': 22, 'H2': 17, 'H3': 12, 'H4': 8, 'H5': 5}),
-    "HERO": dict(removed=4, wild=1.5, sc=0.0, weapon=0.0),
+    "HERO": dict(removed=4, wild=0.8, sc=0.0, weapon=0.0),  # Heroic HR30 (2026-11-19)
     "BON_S1": dict(removed=0, wild=1.7, sc=0.34, weapon=1.9, shape={'L1': 40, 'L2': 40, 'L3': 40, 'L4': 40, 'H1': 24, 'H2': 23, 'H3': 21, 'H4': 19, 'H5': 16}, arrow_boost={'3': 1.5, '4': 1.5, '5': 1.5}, weapon_adjust={'0': {'BM': -1, 'SW': -1}, '1': {'BM': -1, 'SW': -1}, '2': {'BM': -1, 'SW': -1}, '3': {'BM': -1}, '4': {'BM': -1}, '5': {'BM': -1}}),
     "BON_S2": dict(removed=1, wild=1.8, sc=0.34, weapon=3.3, arrow_boost={'3': 1.5, '4': 1.5, '5': 1.5}, weapon_adjust={'0': {'LT': -1}, '1': {'LT': -1}, '2': {'LT': -1}, '3': {'LT': -1}, '4': {'LT': -1}, '5': {'LT': -1}}),
     "BON_S3": dict(removed=2, wild=1.0, sc=0.34, weapon=4.0, arrow_boost={'3': 1.5, '4': 1.5, '5': 1.5}),

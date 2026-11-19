@@ -222,6 +222,10 @@ class GameState(GameStateOverride):
         self.win_manager.update_gametype_wins(self.gametype)
 
     def scatter_tier(self):
+        th = self.config.treasure_hunt_scatter_to_tier if getattr(self, "treasure_hunt", False) and not self.in_bonus else {}
+        if th:  # Treasure hunt (2026-11-18): Scatters come from Treasure, up to max(th) (6 = Legendary)
+            n = min(self.scatter_count(), max(th))
+            return th.get(n), n
         n = min(self.scatter_count(), self.config.max_scatters_on_board)
         return self.config.scatter_to_tier.get(n), n
 

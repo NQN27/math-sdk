@@ -17,6 +17,7 @@ step (9) chests -> Treasure if the stage was cleared.
       every boss of the stage is dead.
 """
 
+import collections
 import math
 import random
 
@@ -198,9 +199,15 @@ class GameExecutables(GameCalculations):
             key = "heroic" if getattr(self, "heroic", False) else stage
             chest_set = list(sets.get(key, sets.get(str(key), ["dong"] * 3)))
             random.shuffle(chest_set)
+        heroic = getattr(self, "heroic", False)
+        if heroic and self.config.heroic_chest_weights:  # designer 2026-11-15: each boss's chest drawn on its own
+            chest_set = [get_random_outcome(self.config.heroic_chest_weights) for _ in zones]
         for i, (bid, zone) in enumerate(zones.items()):
             if stage != ENDLESS:
-                hp = self._roll_hp(self.config.stage_hp_range[stage], stage)
+                if heroic and chest_set and self.config.heroic_chest_hp:  # higher chest = higher HP (2026-11-15)
+                    hp = self._roll_hp(self.config.heroic_chest_hp[chest_set[i % len(chest_set)]])
+                else:
+                    hp = self._roll_hp(self.config.stage_hp_range[stage], stage)
                 hp += self.config.boss_hp_offset.get(bid, {}).get(stage, 0)
                 if stage >= 1:
                     cut = self.weights("hp_cut_weights")
@@ -289,7 +296,7 @@ class GameExecutables(GameCalculations):
 
     def chain_block_roll(self) -> bool:
         """chain_block: should this refill be forced to connect nothing?"""
-        cb = self.weights("chain_block") if getattr(self, "in_bonus", False) else None
+        cb = self.weights("chain_block") if getattr(self, "in_bonus", False) or getattr(self, "heroic", False) else None
         spec = cb.get(self.stage, cb.get(str(self.stage))) if cb else None
         if not spec:
             return False
@@ -537,6 +544,8 @@ class GameExecutables(GameCalculations):
     def current_min_coin(self) -> float:
         if self.treasure_hunt and not self.in_bonus:  # a Bonus entered from Treasure hunt uses stage minimums
             return self.config.treasure_hunt_min_coin
+        if self.heroic and self.config.heroic_min_coin:
+            return self.config.heroic_min_coin
         tier = self.config.tier_stage_min_coin.get(self.bonus_tier, {}) if self.in_bonus else {}
         return tier.get(self.stage, self.config.stage_min_coin.get(self.stage, 0.2))
 
@@ -1051,6 +1060,22 @@ class GameExecutables(GameCalculations):
         first = True
         used_magnets, used_clovers = set(), set()
         rounds = 0
+        # Designer 2026-11-18 (Treasure hunt): the Scatter count is rolled first, the Scatters are placed (one per
+        # anywhere) before any other cell; in later rounds each refilled cell becomes a Scatter with the fixed chance
+        # treasure_hunt_scatter_refill_chance. Both are set so the END-of-spin count follows the designer's table.
+        pre_sc = []
+        sc_table = self.weights("treasure_hunt_scatter_count_weights") if self.treasure_hunt and not self.in_bonus else None
+        if sc_table:
+            n = get_random_outcome({int(k): w for k, w in sc_table.items()})
+            for c, r in random.sample(cells, min(n, len(cells))):  # any cell: no 1-per-column rule (2026-11-18)
+                self.board[c][r] = self._treasure_cell("scatter", min_coin)
+                kinds[(c, r)] = "scatter"
+                pre_sc.append((c, r))
+            emit(self, "treasureScatterRoll", count=len(pre_sc))
+        damp = self.weights("treasure_big_coin_damp") if self.treasure_hunt and not self.in_bonus else None
+        kind_max, kind_seen = self.weights("treasure_kind_max"), collections.Counter()
+        near = self.weights("treasure_clover_near_big")
+        cluster = self.weights("treasure_clover_cluster")
         while True:
             rounds += 1
             if rounds > cfg.treasure_max_rounds:
@@ -1064,11 +1089,36 @@ class GameExecutables(GameCalculations):
                 for k, ms in round_mult.items():  # e.g. Clover held back in the first round(s)
                     if k in weights:
                         weights[k] *= ms[min(rounds - 1, len(ms) - 1)]
-                if self.no_scatter_spin or (cfg.treasure_scatter_capped and not self.scatter_allowed(c, r)):
+                if self.no_scatter_spin or sc_table or (cfg.treasure_scatter_capped and not self.scatter_allowed(c, r)):
                     weights.pop("scatter", None)
+                if sc_table and not first and random.random() < self.weights("treasure_hunt_scatter_refill_chance"):
+                    self.board[c][r] = self._treasure_cell("scatter", min_coin)  # fixed chance per refilled cell
+                    kinds[(c, r)] = "scatter"
+                    new.append((c, r))
+                    continue
+                if damp:  # big coins on the board quietly hold back Clover / Golden / Magnet (designer 2026-11-18)
+                    big = sum(1 for x in cells if kinds.get(x) == "coin" and self.board[x[0]][x[1]] is not None
+                              and self.board[x[0]][x[1]].prize >= damp["min"])
+                    f = max(damp.get("floor", 0.5), damp["factor"] ** big)
+                    for k in damp.get("kinds", ("clover", "golden", "magnet")):
+                        if k in weights:
+                            weights[k] *= f
                 if sum(1 for x in cells if kinds.get(x) == "coin") < cfg.magnet_min_coins:
                     weights.pop("magnet", None)
+                if near and "clover" in weights:  # a high coin next to this cell: Clover a little likelier (2026-11-19)
+                    if any(kinds.get((cc, rr)) == "coin" and self.board[cc][rr] is not None
+                           and self.board[cc][rr].prize >= near["min"]
+                           for cc in range(c - 1, c + 2) for rr in range(r - 1, r + 2) if (cc, rr) != (c, r)):
+                        weights["clover"] *= near["factor"]
+                if cluster and "clover" in weights and any(  # Clovers cluster: next to an unused Clover (2026-11-19)
+                        kinds.get((cc, rr)) == "clover" and (cc, rr) not in used_clovers
+                        for cc in range(c - 1, c + 2) for rr in range(r - 1, r + 2) if (cc, rr) != (c, r)):
+                    weights["clover"] *= cluster
+                for k, cap in kind_max.items():  # at most `cap` of this kind per Treasure (designer 2026-11-18)
+                    if kind_seen[k] >= cap:
+                        weights.pop(k, None)
                 kind = self.roll_treasure_kind(weights)
+                kind_seen[kind] += 1
                 self.board[c][r] = self._treasure_cell(kind, min_coin)
                 kinds[(c, r)] = kind
                 new.append((c, r))
@@ -1076,6 +1126,8 @@ class GameExecutables(GameCalculations):
                 c, r = random.choice(new)
                 self.board[c][r] = self._treasure_cell("coin", min_coin)
                 kinds[(c, r)] = "coin"
+            if first:
+                new = pre_sc + new
             first = False
             n_sc = 0
             for c, r in new:

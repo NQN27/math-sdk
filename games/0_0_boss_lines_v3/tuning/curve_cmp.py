@@ -4,17 +4,21 @@ percentiles outside +-15% (p5..p99.5) and the Max Win count."""
 import glob, json, sys
 
 args = sys.argv[1:]
-tier, rdir = "bonus", "tuning/results"
+tier, rdir, zero_override = "bonus", "tuning/results", None
 while args and args[0].startswith("--"):
     if args[0] == "--tier":
         tier = args[1]
     elif args[0] == "--dir":
         rdir = args[1]
+    elif args[0] == "--zero":  # override the 0x share (e.g. Heroic 0.35, designer 2026-11-15)
+        zero_override = float(args[1])
     args = args[2:]
 MEAN = {"bonus": 91.0, "super": 245.0, "epic": 2045.0, "feature_treasure": 564.0, "feature_heroic": 403.0,
         "base": 0.967 - 91 / 350 - 245 / 2815 - 2045 / 14990}[tier]  # base: the spin without its Bonus
 ZERO = {"feature_heroic": 0.30,  # game_config.feature_zero_share
         "base": 0.75}  # designer base curve: 0x up to p75 (the optimizer's "0" fence)
+if zero_override is not None:
+    ZERO[tier] = zero_override
 CURVE_DATE = {"heroic": "2026-10-22"}  # Heroic re-targeted for the line-only design (designer 2026-10-22)
 CURVE = {"feature_treasure": "treasure_hunt", "feature_heroic": "heroic"}.get(tier, tier)
 curve = {float(a): float(b) for a, b in (l.strip().split(",") for l in open(f"tuning/targets/{CURVE}_curve_{CURVE_DATE.get(CURVE, '2026-10-14')}.csv") if l[0].isdigit())}
